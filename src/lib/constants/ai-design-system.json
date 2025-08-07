@@ -1,0 +1,331 @@
+{
+  "designSystem": {
+    "name": "AI Assistant Voice Interface Design System",
+    "version": "2.0",
+    "philosophy": "Conversational AI interfaces with emphasis on voice interaction, ambient backgrounds, and personalized assistance experiences"
+  },
+  "colorPalette": {
+    "primary": {
+      "darkNavy": "#0F1419",
+      "deepBlue": "#1A202C",
+      "accent": "#4FD1C7",
+      "teal": "#38B2AC"
+    },
+    "backgrounds": {
+      "darkGradient": "radial-gradient(ellipse at center, #2D3748 0%, #1A202C 100%)",
+      "lightMinimal": "#FFFFFF",
+      "ambientGradient": "linear-gradient(135deg, #E6FFFA 0%, #B2F5EA 100%)",
+      "voiceActive": "radial-gradient(circle, #4FD1C7 0%, #38B2AC 100%)",
+      "glassEffect": "rgba(255, 255, 255, 0.1)",
+      "overlayDark": "rgba(0, 0, 0, 0.4)"
+    },
+    "text": {
+      "primary": "#FFFFFF",
+      "secondary": "#A0AEC0",
+      "onLight": "#2D3748",
+      "muted": "#718096",
+      "accent": "#4FD1C7",
+      "success": "#48BB78"
+    },
+    "interactive": {
+      "voiceButton": "#4FD1C7",
+      "actionButton": "#2D3748",
+      "hoverState": "#4A5568",
+      "activeState": "#38B2AC"
+    }
+  },
+  "typography": {
+    "fontFamilies": {
+      "primary": "-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif",
+      "body": "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif"
+    },
+    "hierarchy": {
+      "greeting": {
+        "fontSize": "28px",
+        "fontWeight": "600",
+        "lineHeight": "1.2",
+        "usage": "Main greeting messages, primary user interactions"
+      },
+      "assistantName": {
+        "fontSize": "24px",
+        "fontWeight": "700",
+        "lineHeight": "1.3",
+        "usage": "AI assistant identity, brand names"
+      },
+      "conversation": {
+        "fontSize": "18px",
+        "fontWeight": "400",
+        "lineHeight": "1.4",
+        "usage": "Main conversation text, user queries"
+      },
+      "body": {
+        "fontSize": "16px",
+        "fontWeight": "400",
+        "lineHeight": "1.5",
+        "usage": "Standard content, descriptions"
+      },
+      "metadata": {
+        "fontSize": "14px",
+        "fontWeight": "400",
+        "lineHeight": "1.4",
+        "usage": "Status messages, secondary information"
+      },
+      "label": {
+        "fontSize": "13px",
+        "fontWeight": "500",
+        "lineHeight": "1.3",
+        "usage": "Button labels, system messages"
+      }
+    }
+  },
+  "spacing": {
+    "scale": "8px base unit with emphasis on generous white space",
+    "values": {
+      "xs": "4px",
+      "sm": "8px",
+      "md": "16px",
+      "lg": "24px",
+      "xl": "32px",
+      "2xl": "48px",
+      "3xl": "64px",
+      "4xl": "96px"
+    },
+    "usage": {
+      "screenPadding": "20px - 32px",
+      "conversationBubbles": "16px - 20px",
+      "voiceButtonArea": "48px - 64px margin",
+      "cardSpacing": "24px - 32px"
+    }
+  },
+  "components": {
+    "voiceInterface": {
+      "centralOrb": {
+        "size": "120px - 200px diameter",
+        "gradient": "Radial teal to blue with glass effect",
+        "animation": "Subtle breathing or pulse animation",
+        "activeState": "Expanded with audio visualization"
+      },
+      "voiceButton": {
+        "size": "64px - 80px diameter",
+        "backgroundColor": "#4FD1C7",
+        "icon": "Microphone with 24px size",
+        "activeState": "Pulsing animation with color shift",
+        "borderRadius": "50% (perfect circle)"
+      },
+      "audioVisualizer": {
+        "bars": "4-8 vertical bars",
+        "height": "Variable 8px - 32px",
+        "color": "#4FD1C7",
+        "animation": "Real-time audio response"
+      }
+    },
+    "conversationBubbles": {
+      "userMessage": {
+        "backgroundColor": "#4FD1C7",
+        "color": "#FFFFFF",
+        "borderRadius": "20px 20px 4px 20px",
+        "padding": "12px 16px",
+        "alignment": "right",
+        "maxWidth": "80%"
+      },
+      "assistantMessage": {
+        "backgroundColor": "rgba(255, 255, 255, 0.1)",
+        "color": "#FFFFFF",
+        "borderRadius": "20px 20px 20px 4px",
+        "padding": "12px 16px",
+        "alignment": "left",
+        "maxWidth": "85%"
+      },
+      "systemMessage": {
+        "backgroundColor": "transparent",
+        "color": "#A0AEC0",
+        "textAlign": "center",
+        "fontSize": "14px",
+        "padding": "8px 16px"
+      }
+    },
+    "actionChips": {
+      "structure": {
+        "backgroundColor": "rgba(255, 255, 255, 0.1)",
+        "borderRadius": "24px",
+        "padding": "8px 16px",
+        "border": "1px solid rgba(255, 255, 255, 0.2)"
+      },
+      "variants": {
+        "suggestion": {
+          "icon": "16px leading icon",
+          "text": "Short action phrase",
+          "hoverState": "Background lightens"
+        },
+        "quickAction": {
+          "backgroundColor": "#2D3748",
+          "color": "#FFFFFF",
+          "fontWeight": "500"
+        }
+      }
+    },
+    "topicCards": {
+      "structure": {
+        "backgroundColor": "rgba(255, 255, 255, 0.08)",
+        "borderRadius": "16px",
+        "padding": "20px",
+        "backdropFilter": "blur(10px)",
+        "border": "1px solid rgba(255, 255, 255, 0.1)"
+      },
+      "content": {
+        "icon": "32px - 40px size with subtle color",
+        "title": "Bold 16px text",
+        "description": "14px secondary text",
+        "spacing": "12px between elements"
+      }
+    },
+    "navigationHeader": {
+      "structure": {
+        "height": "56px",
+        "backgroundColor": "transparent or dark overlay",
+        "backdropFilter": "blur(20px) when over content"
+      },
+      "elements": {
+        "backButton": "24px chevron or arrow",
+        "title": "18px font-weight 600",
+        "actions": "24px icons with proper spacing"
+      }
+    },
+    "inputArea": {
+      "textInput": {
+        "backgroundColor": "rgba(255, 255, 255, 0.1)",
+        "borderRadius": "24px",
+        "padding": "12px 20px",
+        "placeholder": "Subtle placeholder text",
+        "focusState": "Border highlight in teal"
+      },
+      "voiceInput": {
+        "mainButton": "Large circular teal button",
+        "secondaryActions": "Smaller circular buttons flanking",
+        "layout": "Horizontal row with proper spacing"
+      }
+    }
+  },
+  "layouts": {
+    "conversational": {
+      "structure": "Full-screen with conversation area and fixed input",
+      "scrollBehavior": "Smooth scrolling with momentum",
+      "keyboardHandling": "Input area pushes up with keyboard"
+    },
+    "onboarding": {
+      "structure": "Centered content with minimal chrome",
+      "progression": "Simple back/forward navigation",
+      "visualization": "Large central visual element"
+    },
+    "voiceActive": {
+      "structure": "Minimal UI with central voice visualization",
+      "overlay": "Semi-transparent dark overlay",
+      "controls": "Floating action buttons"
+    }
+  },
+  "animations": {
+    "voiceVisualizations": {
+      "duration": "Real-time (continuous)",
+      "easing": "Linear for audio, ease-out for interactions",
+      "patterns": "Breathing, pulsing, audio wave visualization"
+    },
+    "transitions": {
+      "duration": "200ms - 300ms",
+      "easing": "ease-in-out",
+      "types": "Fade, slide, scale for state changes"
+    },
+    "microInteractions": {
+      "buttonPress": "Scale down (0.95) with haptic feedback",
+      "messageAppear": "Slide up with fade in",
+      "typing": "Dot animation for AI thinking"
+    }
+  },
+  "states": {
+    "listening": {
+      "visualCue": "Pulsing voice button",
+      "backgroundDim": "Slight overlay to focus attention",
+      "feedback": "Real-time audio visualization"
+    },
+    "processing": {
+      "visualCue": "Animated dots or spinner",
+      "message": "Subtle 'thinking' indication",
+      "duration": "Brief with clear completion"
+    },
+    "speaking": {
+      "visualCue": "Audio wave visualization",
+      "controls": "Pause/stop options available",
+      "feedback": "Clear indication of AI speaking"
+    },
+    "idle": {
+      "visualCue": "Subtle breathing animation",
+      "suggestions": "Contextual quick actions visible",
+      "accessibility": "Clear call-to-action present"
+    }
+  },
+  "personalityElements": {
+    "aiPersona": {
+      "visualIdentity": "Consistent orb/avatar representation",
+      "colorAssociation": "Teal/blue gradient for AI responses",
+      "tonality": "Friendly, professional, approachable"
+    },
+    "contextualAdaptation": {
+      "timeOfDay": "Appropriate greetings and suggestions",
+      "userHistory": "Personalized quick actions",
+      "environment": "Contextual awareness in responses"
+    }
+  },
+  "accessibility": {
+    "voiceFirst": {
+      "principle": "Voice interaction as primary method",
+      "fallbacks": "Text alternatives always available",
+      "feedback": "Audio and visual confirmation"
+    },
+    "visualSupport": {
+      "contrast": "High contrast for text on dark backgrounds",
+      "sizing": "Large touch targets (44px minimum)",
+      "indicators": "Clear visual state indicators"
+    }
+  },
+  "responsiveStrategy": {
+    "mobileFirst": {
+      "approach": "Optimized for mobile voice interaction",
+      "landscape": "Adapted layouts for horizontal use",
+      "oneHanded": "Reachable controls for single-hand use"
+    },
+    "crossDevice": {
+      "continuity": "Conversation sync across devices",
+      "adaptation": "Interface scales to device capabilities",
+      "contextual": "Device-appropriate feature sets"
+    }
+  },
+  "technicalRequirements": {
+    "performance": {
+      "voiceLatency": "Sub-200ms response time",
+      "animations": "60fps smooth interactions",
+      "audioQuality": "Clear voice synthesis and recognition"
+    },
+    "permissions": {
+      "microphone": "Clear permission requests",
+      "privacy": "Transparent data handling",
+      "offline": "Graceful degradation without connectivity"
+    }
+  },
+  "designPrinciples": {
+    "conversationalFirst": {
+      "importance": "Voice and natural language as primary interface",
+      "implementation": "Large voice controls, clear audio feedback"
+    },
+    "contextualIntelligence": {
+      "importance": "AI understanding and adapting to user context",
+      "implementation": "Personalized suggestions, environment awareness"
+    },
+    "trustBuilding": {
+      "importance": "Clear AI capabilities and limitations",
+      "implementation": "Transparent responses, clear data usage"
+    },
+    "seamlessInteraction": {
+      "importance": "Smooth transitions between voice and touch",
+      "implementation": "Consistent interaction patterns across modalities"
+    }
+  }
+}

@@ -1,0 +1,206 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// User model - represents a rancher/user
+model User {
+  id                String            @id @default(cuid())
+  clerkId           String            @unique
+  email             String            @unique
+  name              String?
+  ranchName         String?
+  location          String?
+  timezone          String            @default("America/Denver")
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  
+  animals           Animal[]
+  healthRecords     HealthRecord[]
+  breedingRecords   BreedingRecord[]
+  modules           UserModule[]
+  syncQueue         SyncQueue[]
+  conversations     AIConversation[]
+  
+  @@index([clerkId])
+  @@index([email])
+}
+
+// Animal model - represents cattle/livestock
+model Animal {
+  id                String            @id @default(cuid())
+  userId            String
+  name              String
+  tagNumber         String            @unique
+  species           String            @default("cattle")
+  breed             String?
+  sex               String
+  birthDate         DateTime?
+  weight            Float?
+  color             String?
+  status            String            @default("active") // active, sold, deceased
+  motherId          String?
+  fatherId          String?
+  imageUrl          String?
+  metadata          String?           // JSON string for additional data
+  qrCode            String?
+  nfcId             String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mother            Animal?           @relation("MotherChildren", fields: [motherId], references: [id])
+  father            Animal?           @relation("FatherChildren", fields: [fatherId], references: [id])
+  motherChildren    Animal[]          @relation("MotherChildren")
+  fatherChildren    Animal[]          @relation("FatherChildren")
+  healthRecords     HealthRecord[]
+  breedingRecords   BreedingRecord[]  @relation("AnimalBreedingRecords")
+  sireRecords       BreedingRecord[]  @relation("SireBreedingRecords")
+  
+  @@index([userId])
+  @@index([tagNumber])
+  @@index([status])
+}
+
+// Health Record model - tracks medical history
+model HealthRecord {
+  id                String            @id @default(cuid())
+  userId            String
+  animalId          String
+  type              String            // vaccination, treatment, deworming, checkup
+  description       String
+  medication        String?
+  dosage            String?
+  veterinarian      String?
+  cost              Float?
+  notes             String?
+  performedAt       DateTime
+  nextDueDate       DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  animal            Animal            @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([animalId])
+  @@index([type])
+  @@index([performedAt])
+}
+
+// Breeding Record model - tracks breeding history
+model BreedingRecord {
+  id                String            @id @default(cuid())
+  userId            String
+  animalId          String
+  eventType         String            // heat, insemination, pregnancy_check, birth
+  eventDate         DateTime
+  sireId            String?
+  inseminationType  String?           // natural, artificial
+  pregnancyStatus   String?           // confirmed, not_confirmed, unknown
+  expectedDueDate   DateTime?
+  actualBirthDate   DateTime?
+  offspringCount    Int?
+  notes             String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  animal            Animal            @relation("AnimalBreedingRecords", fields: [animalId], references: [id], onDelete: Cascade)
+  sire              Animal?           @relation("SireBreedingRecords", fields: [sireId], references: [id])
+  
+  @@index([userId])
+  @@index([animalId])
+  @@index([eventType])
+  @@index([eventDate])
+}
+
+// Module Registry - tracks available modules
+model ModuleRegistry {
+  id                String            @id @default(cuid())
+  name              String            @unique
+  displayName       String
+  description       String
+  category          String            // management, health, breeding, financial, etc.
+  icon              String
+  version           String
+  isCore            Boolean           @default(false)
+  isEnabled         Boolean           @default(true)
+  config            String?           // JSON configuration
+  aiPrompts         String?           // JSON array of AI prompts
+  permissions       String?           // JSON array of required permissions
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  
+  userModules       UserModule[]
+  
+  @@index([category])
+  @@index([isEnabled])
+}
+
+// User Module - links users to their enabled modules
+model UserModule {
+  id                String            @id @default(cuid())
+  userId            String
+  moduleId          String
+  isEnabled         Boolean           @default(true)
+  customConfig      String?           // JSON for user-specific config
+  lastUsed          DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  module            ModuleRegistry    @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, moduleId])
+  @@index([userId])
+  @@index([moduleId])
+}
+
+// Sync Queue - tracks pending sync operations
+model SyncQueue {
+  id                String            @id @default(cuid())
+  userId            String
+  operation         String            // create, update, delete
+  entityType        String            // animal, health_record, breeding_record
+  entityId          String
+  data              String            // JSON payload
+  status            String            @default("pending") // pending, syncing, synced, failed, conflict
+  retryCount        Int               @default(0)
+  errorMessage      String?
+  syncedAt          DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([status])
+  @@index([entityType])
+  @@index([createdAt])
+}
+
+// AI Conversation - tracks chat history
+model AIConversation {
+  id                String            @id @default(cuid())
+  userId            String
+  sessionId         String
+  role              String            // user, assistant, system
+  content           String
+  moduleContext     String?           // Which module was active
+  metadata          String?           // JSON for additional data
+  createdAt         DateTime          @default(now())
+  
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([sessionId])
+  @@index([createdAt])
+}
