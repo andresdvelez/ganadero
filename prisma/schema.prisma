@@ -36,6 +36,7 @@ model User {
 // Animal model - represents cattle/livestock
 model Animal {
   id                String            @id @default(cuid())
+  externalId        String?           @unique
   userId            String
   name              String
   tagNumber         String            @unique
@@ -72,6 +73,7 @@ model Animal {
 // Health Record model - tracks medical history
 model HealthRecord {
   id                String            @id @default(cuid())
+  externalId        String?           @unique
   userId            String
   animalId          String
   type              String            // vaccination, treatment, deworming, checkup
@@ -98,6 +100,7 @@ model HealthRecord {
 // Breeding Record model - tracks breeding history
 model BreedingRecord {
   id                String            @id @default(cuid())
+  externalId        String?           @unique
   userId            String
   animalId          String
   eventType         String            // heat, insemination, pregnancy_check, birth
