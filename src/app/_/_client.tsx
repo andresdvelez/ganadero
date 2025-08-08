@@ -43,7 +43,7 @@ export default function AnimalsClient() {
   }, [params]);
 
   const allAnimals = isOnline && serverAnimals ? serverAnimals : localAnimals;
-  const filteredAnimals = allAnimals.filter((animal) => {
+  const filteredAnimals = allAnimals.filter((animal: any) => {
     const matchesSearch =
       animal.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       animal.tagNumber?.toLowerCase().includes(searchTerm.toLowerCase());

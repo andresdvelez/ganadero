@@ -56,6 +56,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [showConflicts, setShowConflicts] = useState(false);
   const [conflicts, setConflicts] = useState<any[]>([]);
 
+  const hasClerk = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
   useEffect(() => {
     const sm = getSyncManager();
     let mounted = true;
@@ -221,10 +223,12 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               )}
             </div>
 
-            <UserButton
-              afterSignOutUrl="/sign-in"
-              appearance={{ elements: { avatarBox: "h-8 w-8" } }}
-            />
+            {hasClerk && (
+              <UserButton
+                afterSignOutUrl="/sign-in"
+                appearance={{ elements: { avatarBox: "h-8 w-8" } }}
+              />
+            )}
           </div>
         </header>
 

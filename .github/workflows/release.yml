@@ -48,6 +48,8 @@ jobs:
       - name: Build app (standalone + tauri)
         run: npx @tauri-apps/cli build
         working-directory: ${{ env.PROJECT_DIR }}
+        env:
+          TAURI: "1"
       - name: Upload DMG
         uses: actions/upload-artifact@v4
         with:
@@ -125,6 +127,8 @@ jobs:
       - name: Build app (standalone + tauri, signed)
         run: npx @tauri-apps/cli build
         working-directory: ${{ env.PROJECT_DIR }}
+        env:
+          TAURI: "1"
       - name: Upload MSI
         uses: actions/upload-artifact@v4
         with:
