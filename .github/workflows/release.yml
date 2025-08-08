@@ -33,6 +33,9 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            ${{ env.PROJECT_DIR }}/src-tauri -> ${{ env.PROJECT_DIR }}/src-tauri/target
       - name: Install deps
         run: |
           if [ -f package-lock.json ]; then
@@ -43,7 +46,7 @@ jobs:
           fi
         working-directory: ${{ env.PROJECT_DIR }}
       - name: Build app (standalone + tauri)
-        run: npm run tauri:build
+        run: npx @tauri-apps/cli build
         working-directory: ${{ env.PROJECT_DIR }}
       - name: Upload DMG
         uses: actions/upload-artifact@v4
@@ -83,6 +86,9 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            ${{ env.PROJECT_DIR }}\src-tauri -> ${{ env.PROJECT_DIR }}\src-tauri\target
       - name: Install deps
         shell: pwsh
         run: |
@@ -117,7 +123,7 @@ jobs:
           (Get-Content src-tauri/tauri.conf.json) -replace '\$\{WINDOWS_CERTIFICATE_THUMBPRINT\}', "$env:WINDOWS_CERTIFICATE_THUMBPRINT" | Set-Content src-tauri/tauri.conf.json
           Write-Host "Injected thumbprint: $env:WINDOWS_CERTIFICATE_THUMBPRINT"
       - name: Build app (standalone + tauri, signed)
-        run: npm run tauri:build
+        run: npx @tauri-apps/cli build
         working-directory: ${{ env.PROJECT_DIR }}
       - name: Upload MSI
         uses: actions/upload-artifact@v4
