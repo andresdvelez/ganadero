@@ -166,23 +166,53 @@ fn main() {
           .resolve_resource("sidecar/node")
           .or_else(|| app.path_resolver().resolve_resource("sidecar/node.exe"));
 
-        let mut cmd = if let Some(node_bin) = node_path { Command::new(node_bin) } else { Command::new("node") };
-        match cmd
-          .arg(srv)
-          .env("PORT", port.to_string())
-          .stdout(Stdio::null())
-          .stderr(Stdio::null())
-          .spawn() {
-          Ok(child) => {
+        // Primer intento: sidecar/node si está presente
+        if let Some(node_bin) = node_path {
+          let mut cmd = Command::new(node_bin);
+          let sidecar_attempt = cmd
+            .arg(&srv)
+            .env("PORT", port.to_string())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn();
+
+          match sidecar_attempt {
+            Ok(child) => {
+              tauri::async_runtime::block_on(async {
+                let mut guard = SERVER_CHILD.lock().await;
+                *guard = Some(child);
+              });
+              started = true;
+            }
+            Err(_e) => {
+              // Segundo intento: usar 'node' del sistema
+              if let Ok(child) = Command::new("node")
+                .arg(&srv)
+                .env("PORT", port.to_string())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn() {
+                tauri::async_runtime::block_on(async {
+                  let mut guard = SERVER_CHILD.lock().await;
+                  *guard = Some(child);
+                });
+                started = true;
+              }
+            }
+          }
+        } else {
+          // No hay sidecar: intentar directamente con 'node' del sistema
+          if let Ok(child) = Command::new("node")
+            .arg(&srv)
+            .env("PORT", port.to_string())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn() {
             tauri::async_runtime::block_on(async {
               let mut guard = SERVER_CHILD.lock().await;
               *guard = Some(child);
             });
             started = true;
-          }
-          Err(e) => {
-            #[cfg(debug_assertions)]
-            println!("No se pudo iniciar Next standalone: {}", e);
           }
         }
       }

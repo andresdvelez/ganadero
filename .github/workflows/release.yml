@@ -31,6 +31,8 @@ jobs:
           node-version: "20"
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+      - name: Add macOS Rust targets (universal)
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
@@ -58,8 +60,8 @@ jobs:
             npx @tauri-apps/cli icon
           fi
         working-directory: ${{ env.PROJECT_DIR }}
-      - name: Build app (standalone + tauri)
-        run: npx @tauri-apps/cli build
+      - name: Build app (standalone + tauri, Universal 2)
+        run: npx @tauri-apps/cli build --target universal-apple-darwin
         working-directory: ${{ env.PROJECT_DIR }}
         env:
           TAURI: "1"

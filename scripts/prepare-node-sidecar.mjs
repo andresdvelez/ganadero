@@ -41,13 +41,18 @@ function copyFile(src, dst) {
   const nodeSrc = process.execPath; // ejecutable de Node actual
   const nodeBase = `node-${triple}${ext}`;
   const nodeDst = path.join(sidecarDir, nodeBase);
+  const nodePlain = path.join(sidecarDir, `node${ext}`);
 
+  // Copia con sufijo por triple
   if (fs.existsSync(nodeDst)) {
     console.log(`[prepare-node-sidecar] Ya existe ${nodeBase}, omitiendo.`);
-    return;
+  } else {
+    console.log(`[prepare-node-sidecar] Copiando ${nodeSrc} -> ${nodeDst}`);
+    copyFile(nodeSrc, nodeDst);
+    console.log(`[prepare-node-sidecar] Listo: ${nodeBase}`);
   }
 
-  console.log(`[prepare-node-sidecar] Copiando ${nodeSrc} -> ${nodeDst}`);
-  copyFile(nodeSrc, nodeDst);
-  console.log(`[prepare-node-sidecar] Listo: ${nodeBase}`);
+  // Copia también como nombre genérico esperado por Tauri (externalBin) y runtime
+  console.log(`[prepare-node-sidecar] Asegurando sidecar/node${ext}`);
+  copyFile(nodeSrc, nodePlain);
 })();
