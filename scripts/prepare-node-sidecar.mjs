@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import fs from "fs";
 import path from "path";
+import os from "os";
+import { execSync } from "child_process";
 
 function getTargetTriple() {
   const platform = process.platform;
@@ -32,6 +34,29 @@ function copyFile(src, dst) {
   }
 }
 
+function downloadNodeDarwin(archLabel /* 'arm64' | 'x64' */) {
+  const version = process.version.replace(/^v/, "");
+  const url = `https://nodejs.org/dist/v${version}/node-v${version}-darwin-${archLabel}.tar.gz`;
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), `node-${archLabel}-`));
+  const tgz = path.join(tmp, `node-${archLabel}.tar.gz`);
+  console.log(
+    `[prepare-node-sidecar] Descargando Node ${version} ${archLabel} desde ${url}`
+  );
+  execSync(`curl -fsSL ${url} -o ${tgz}`, { stdio: "inherit" });
+  execSync(`tar -xzf ${tgz} -C ${tmp}`, { stdio: "inherit" });
+  const extractedDir = fs
+    .readdirSync(tmp)
+    .map((f) => path.join(tmp, f))
+    .find(
+      (p) => fs.statSync(p).isDirectory() && /node-v/.test(path.basename(p))
+    );
+  if (!extractedDir) throw new Error("No se pudo extraer Node descargado");
+  const nodeBin = path.join(extractedDir, "bin", "node");
+  if (!fs.existsSync(nodeBin))
+    throw new Error("Binario node no encontrado tras extracción");
+  return nodeBin;
+}
+
 (function main() {
   const { triple, ext } = getTargetTriple();
   const projectRoot = process.cwd();
@@ -43,13 +68,42 @@ function copyFile(src, dst) {
   const nodeDst = path.join(sidecarDir, nodeBase);
   const nodePlain = path.join(sidecarDir, `node${ext}`);
 
-  // Copia con sufijo por triple
+  // Copia con sufijo por triple (host)
   if (fs.existsSync(nodeDst)) {
     console.log(`[prepare-node-sidecar] Ya existe ${nodeBase}, omitiendo.`);
   } else {
     console.log(`[prepare-node-sidecar] Copiando ${nodeSrc} -> ${nodeDst}`);
     copyFile(nodeSrc, nodeDst);
     console.log(`[prepare-node-sidecar] Listo: ${nodeBase}`);
+  }
+
+  // Si estamos en macOS, también preparar el binario de la otra arquitectura para Universal 2
+  if (process.platform === "darwin") {
+    const otherArch = process.arch === "arm64" ? "x64" : "arm64";
+    const otherTriple =
+      otherArch === "arm64" ? "aarch64-apple-darwin" : "x86_64-apple-darwin";
+    const otherDst = path.join(sidecarDir, `node-${otherTriple}`);
+    if (!fs.existsSync(otherDst)) {
+      try {
+        const downloadedNode = downloadNodeDarwin(otherArch);
+        console.log(
+          `[prepare-node-sidecar] Copiando ${downloadedNode} -> ${otherDst}`
+        );
+        copyFile(downloadedNode, otherDst);
+      } catch (e) {
+        console.error(
+          `[prepare-node-sidecar] Error preparando Node ${otherArch} para Universal:`,
+          e
+        );
+        process.exit(1);
+      }
+    } else {
+      console.log(
+        `[prepare-node-sidecar] Ya existe ${path.basename(
+          otherDst
+        )}, omitiendo.`
+      );
+    }
   }
 
   // Copia también como nombre genérico esperado por Tauri (externalBin) y runtime
