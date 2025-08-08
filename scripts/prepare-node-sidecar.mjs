@@ -78,11 +78,18 @@ function downloadNodeDarwin(archLabel /* 'arm64' | 'x64' */) {
   }
 
   // Si estamos en macOS, también preparar el binario de la otra arquitectura para Universal 2
+  let armNodePath = null;
+  let x64NodePath = null;
   if (process.platform === "darwin") {
     const otherArch = process.arch === "arm64" ? "x64" : "arm64";
     const otherTriple =
       otherArch === "arm64" ? "aarch64-apple-darwin" : "x86_64-apple-darwin";
     const otherDst = path.join(sidecarDir, `node-${otherTriple}`);
+
+    // Rutas de ambos
+    armNodePath = path.join(sidecarDir, "node-aarch64-apple-darwin");
+    x64NodePath = path.join(sidecarDir, "node-x86_64-apple-darwin");
+
     if (!fs.existsSync(otherDst)) {
       try {
         const downloadedNode = downloadNodeDarwin(otherArch);
@@ -103,6 +110,30 @@ function downloadNodeDarwin(archLabel /* 'arm64' | 'x64' */) {
           otherDst
         )}, omitiendo.`
       );
+    }
+
+    // Crear binario universal combinando ambos
+    const universalOut = path.join(sidecarDir, "node-universal-apple-darwin");
+    try {
+      if (!fs.existsSync(armNodePath) || !fs.existsSync(x64NodePath)) {
+        throw new Error(
+          "Faltan uno o ambos binarios arm64/x86_64 para crear universal"
+        );
+      }
+      console.log(
+        `[prepare-node-sidecar] Creando binario universal con lipo -> ${universalOut}`
+      );
+      execSync(
+        `lipo -create -output "${universalOut}" "${armNodePath}" "${x64NodePath}"`,
+        { stdio: "inherit" }
+      );
+      fs.chmodSync(universalOut, 0o755);
+    } catch (e) {
+      console.error(
+        `[prepare-node-sidecar] No se pudo crear node-universal-apple-darwin:`,
+        e
+      );
+      process.exit(1);
     }
   }
 
