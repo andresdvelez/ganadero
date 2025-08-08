@@ -1,0 +1,79 @@
+name: release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: ganado-ai-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+      - name: Install deps
+        run: npm ci
+      - name: Build app (standalone + tauri)
+        run: npm run tauri:build
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: src-tauri/target/release/bundle/dmg/*.dmg
+      # Firma y notarización macOS: pendiente de secretos y pasos de notarytool/codesign
+
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: ganado-ai-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+      - name: Install deps
+        run: npm ci
+      - name: Import Windows code signing certificate
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if (-not $env:WINDOWS_CERTIFICATE_BASE64) { throw "Missing WINDOWS_CERTIFICATE_BASE64 secret" }
+          if (-not $env:WINDOWS_CERTIFICATE_PASSWORD) { throw "Missing WINDOWS_CERTIFICATE_PASSWORD secret" }
+          New-Item -ItemType Directory -Path certificate | Out-Null
+          Set-Content -Path certificate\cert_base64.txt -Value $env:WINDOWS_CERTIFICATE_BASE64
+          certutil -decode certificate\cert_base64.txt certificate\codesign.pfx
+          Remove-Item certificate\cert_base64.txt
+          $securePwd = ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -Force -AsPlainText
+          Import-PfxCertificate -FilePath certificate\codesign.pfx -CertStoreLocation Cert:\LocalMachine\My -Password $securePwd | Out-Null
+          $thumb = (Get-ChildItem Cert:\LocalMachine\My | Where-Object { $_.HasPrivateKey } | Select-Object -First 1).Thumbprint
+          if (-not $thumb) { throw "No certificate thumbprint found in LocalMachine\My" }
+          echo "WINDOWS_CERTIFICATE_THUMBPRINT=$thumb" | Out-File -FilePath $env:GITHUB_ENV -Append
+      - name: Inject thumbprint into tauri.conf.json
+        shell: pwsh
+        run: |
+          (Get-Content src-tauri/tauri.conf.json) -replace '\$\{WINDOWS_CERTIFICATE_THUMBPRINT\}', "$env:WINDOWS_CERTIFICATE_THUMBPRINT" | Set-Content src-tauri/tauri.conf.json
+          Write-Host "Injected thumbprint: $env:WINDOWS_CERTIFICATE_THUMBPRINT"
+      - name: Build app (standalone + tauri, signed)
+        run: npm run tauri:build
+      - name: Upload MSI
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-msi
+          path: src-tauri/target/release/bundle/msi/*.msi

@@ -28,6 +28,11 @@ model User {
   modules           UserModule[]
   syncQueue         SyncQueue[]
   conversations     AIConversation[]
+  products          Product[]
+  stockMovements    StockMovement[]
+  milkRecords       MilkRecord[]
+  pastures          Pasture[]
+  labExams          LabExam[]
   
   @@index([clerkId])
   @@index([email])
@@ -64,6 +69,8 @@ model Animal {
   healthRecords     HealthRecord[]
   breedingRecords   BreedingRecord[]  @relation("AnimalBreedingRecords")
   sireRecords       BreedingRecord[]  @relation("SireBreedingRecords")
+  milkRecords       MilkRecord[]
+  labExams          LabExam[]
   
   @@index([userId])
   @@index([tagNumber])
@@ -165,6 +172,119 @@ model UserModule {
   @@unique([userId, moduleId])
   @@index([userId])
   @@index([moduleId])
+}
+
+// Inventory (Products)
+model Product {
+  id           String   @id @default(cuid())
+  externalId   String?  @unique
+  userId       String
+  code         String
+  name         String
+  category     String?
+  unit         String
+  minStock     Float?
+  currentStock Float    @default(0)
+  cost         Float?
+  supplier     String?
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movements    StockMovement[]
+
+  @@index([userId])
+  @@index([code])
+}
+
+model StockMovement {
+  id          String   @id @default(cuid())
+  externalId  String?  @unique
+  userId      String
+  productId   String
+  type        String   // in | out | adjust
+  quantity    Float
+  unitCost    Float?
+  reason      String?
+  relatedEntity String?
+  occurredAt  DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([productId])
+  @@index([occurredAt])
+}
+
+// Milk production records
+model MilkRecord {
+  id          String   @id @default(cuid())
+  externalId  String?  @unique
+  userId      String
+  animalId    String?
+  session     String   // AM | PM | TOTAL
+  liters      Float
+  fatPct      Float?
+  proteinPct  Float?
+  ccs         Float?
+  notes       String?
+  recordedAt  DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  animal      Animal?  @relation(fields: [animalId], references: [id])
+
+  @@index([userId])
+  @@index([animalId])
+  @@index([recordedAt])
+}
+
+// Pastures
+model Pasture {
+  id             String   @id @default(cuid())
+  externalId     String?  @unique
+  userId         String
+  name           String
+  areaHa         Float?
+  currentGroup   String?
+  occupancySince DateTime?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Laboratory exams
+model LabExam {
+  id           String   @id @default(cuid())
+  externalId   String?  @unique
+  userId       String
+  animalId     String?
+  examType     String
+  sampleType   String?
+  labName      String?
+  requestedAt  DateTime
+  resultAt     DateTime?
+  result       String?
+  antibiogram  String?
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  animal       Animal?  @relation(fields: [animalId], references: [id])
+
+  @@index([userId])
+  @@index([animalId])
+  @@index([examType])
 }
 
 // Sync Queue - tracks pending sync operations

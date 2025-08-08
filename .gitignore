@@ -1,5 +1,17 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+/src-tauri/sidecar/
+/src-tauri/target/
+# por si existen rutas anidadas por error
+/ganado-ai-app/src-tauri/sidecar/
+**/*.dmg
+**/*.msi
+.next/
+node_modules/
+*.p12
+*.pfx
+certificate.pfx.b64
+
 # dependencies
 /node_modules
 /.pnp
@@ -41,6 +53,11 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+/src/generated/prisma/dev.db
+
+# local prisma db files
+/prisma/dev.db
+/prisma/*.db
 
 # clerk configuration (can include secrets)
 /.clerk/

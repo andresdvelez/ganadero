@@ -1,5 +1,5 @@
 import { db, SyncQueueItem } from "@/lib/dexie";
-import { trpc } from "@/lib/trpc/client";
+import { trpcClient } from "@/lib/trpc/standalone";
 
 export class SyncManager {
   private isSyncing = false;
@@ -95,19 +95,49 @@ export class SyncManager {
 
     switch (item.entityType) {
       case "animal":
-        await trpc.sync.upsertAnimal.mutate({
+        await trpcClient.sync.upsertAnimal.mutate({
           externalId: item.entityId,
           data,
         });
         break;
       case "health_record":
-        await trpc.sync.upsertHealth.mutate({
+        await trpcClient.sync.upsertHealth.mutate({
           externalId: item.entityId,
           data,
         });
         break;
       case "breeding_record":
-        await trpc.sync.upsertBreeding.mutate({
+        await trpcClient.sync.upsertBreeding.mutate({
+          externalId: item.entityId,
+          data,
+        });
+        break;
+      case "product":
+        await trpcClient.sync.upsertProduct.mutate({
+          externalId: item.entityId,
+          data,
+        });
+        break;
+      case "stock_movement":
+        await trpcClient.sync.upsertStockMovement.mutate({
+          externalId: item.entityId,
+          data,
+        });
+        break;
+      case "milk_record":
+        await trpcClient.sync.upsertMilk.mutate({
+          externalId: item.entityId,
+          data,
+        });
+        break;
+      case "pasture":
+        await trpcClient.sync.upsertPasture.mutate({
+          externalId: item.entityId,
+          data,
+        });
+        break;
+      case "lab_exam":
+        await trpcClient.sync.upsertLabExam.mutate({
           externalId: item.entityId,
           data,
         });

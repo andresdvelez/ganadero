@@ -16,23 +16,33 @@ interface AIClientConfig {
 
 export class AIClient {
   private model: string;
-  private ollamaHost: string;
+  private _ollamaHost: string;
   private useCloud: boolean = false;
 
   constructor(config: AIClientConfig = {}) {
-    this.ollamaHost =
-      config.ollamaHost ||
-      process.env.NEXT_PUBLIC_OLLAMA_HOST ||
-      "http://localhost:11434";
-    this.model = config.model || "deepseek-r1:latest";
+    this._ollamaHost =
+      config.ollamaHost || process.env.NEXT_PUBLIC_OLLAMA_HOST || "/api/ollama"; // proxy a servidor gestionado
+    this.model =
+      config.model ||
+      process.env.NEXT_PUBLIC_OLLAMA_MODEL ||
+      "deepseek-r1:latest";
+  }
+
+  get ollamaHost() {
+    return this._ollamaHost;
+  }
+  setHost(newHost: string) {
+    this._ollamaHost = newHost.replace(/\/$/, "");
   }
 
   async checkLocalAvailability(): Promise<boolean> {
     try {
-      const response = await fetch(`${this.ollamaHost}/api/tags`);
+      const response = await fetch(`${this._ollamaHost}/api/tags`);
       if (response.ok) {
         const data = await response.json();
-        return data.models?.some((m: any) => m.name?.includes("deepseek")) || false;
+        return (
+          data.models?.some((m: any) => m.name?.includes("deepseek")) || false
+        );
       }
     } catch (error) {
       // Silenciar en cliente web cuando Ollama no está disponible
@@ -56,12 +66,15 @@ export class AIClient {
     }
   }
 
-  private async processLocalQuery(query: string, context?: any): Promise<AIResponse> {
+  private async processLocalQuery(
+    query: string,
+    context?: any
+  ): Promise<AIResponse> {
     const systemPrompt = this.buildSystemPrompt();
     const userPrompt = this.buildUserPrompt(query, context);
 
     try {
-      const response = await fetch(`${this.ollamaHost}/api/chat`, {
+      const response = await fetch(`${this._ollamaHost}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -85,7 +98,10 @@ export class AIClient {
     }
   }
 
-  private async processCloudQuery(query: string, context?: any): Promise<AIResponse> {
+  private async processCloudQuery(
+    query: string,
+    context?: any
+  ): Promise<AIResponse> {
     const systemPrompt = this.buildSystemPrompt();
     const userPrompt = this.buildUserPrompt(query, context);
 
@@ -142,10 +158,14 @@ Reglas:
         prompt += `Módulo actual: ${context.currentModule}\n`;
       }
       if (context.recentAnimals) {
-        prompt += `Animales recientes: ${JSON.stringify(context.recentAnimals)}\n`;
+        prompt += `Animales recientes: ${JSON.stringify(
+          context.recentAnimals
+        )}\n`;
       }
       if (context.pendingTasks) {
-        prompt += `Tareas pendientes: ${JSON.stringify(context.pendingTasks)}\n`;
+        prompt += `Tareas pendientes: ${JSON.stringify(
+          context.pendingTasks
+        )}\n`;
       }
     }
 
@@ -188,12 +208,16 @@ Reglas:
       data.fields.forEach((field: any) => {
         switch (field.type) {
           case "string":
-            schema[field.name] = z.string().min(1, field.required ? "Requerido" : undefined);
+            schema[field.name] = z
+              .string()
+              .min(1, field.required ? "Requerido" : undefined);
             break;
           case "number":
             schema[field.name] = z
               .number()
-              .positive(field.validation?.positive ? "Debe ser positivo" : undefined);
+              .positive(
+                field.validation?.positive ? "Debe ser positivo" : undefined
+              );
             break;
           case "date":
             schema[field.name] = z.date();
@@ -211,8 +235,12 @@ Reglas:
   }
 
   // Método para routing de módulos basado en intención
-  async routeToModule(query: string): Promise<{ module: string; action?: string; params?: any }> {
-    const response = await this.processQuery(query, { requestModuleRouting: true });
+  async routeToModule(
+    query: string
+  ): Promise<{ module: string; action?: string; params?: any }> {
+    const response = await this.processQuery(query, {
+      requestModuleRouting: true,
+    });
 
     return {
       module: response.module || "dashboard",
@@ -230,4 +258,12 @@ export function getAIClient(): AIClient {
     aiClientInstance = new AIClient();
   }
   return aiClientInstance;
+}
+
+export function setAIClientHost(host: string) {
+  if (!aiClientInstance) {
+    aiClientInstance = new AIClient({ ollamaHost: host });
+  } else {
+    aiClientInstance.setHost(host);
+  }
 }

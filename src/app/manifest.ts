@@ -1,29 +1,23 @@
-import type { MetadataRoute } from "next";
+import { MetadataRoute } from "next";
+
+export const dynamic = "force-static";
+export const revalidate = 3600;
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Ganado AI - Gestión Ganadera",
-    short_name: "Ganado AI",
-    description: "Plataforma de gestión ganadera offline con asistente de IA",
-    icons: [
-      {
-        src: "/icon-192.png",
-        sizes: "192x192",
-        type: "image/png",
-        purpose: "maskable",
-      },
-      { src: "/icon-384.png", sizes: "384x384", type: "image/png" },
-      { src: "/icon-512.png", sizes: "512x512", type: "image/png" },
-    ],
-    theme_color: "#d4844a",
-    background_color: "#fdf8f3",
+    name: "Ganado AI",
+    short_name: "GanadoAI",
+    description: "Asistente ganadero offline con IA",
     start_url: "/",
     display: "standalone",
-    orientation: "portrait",
-    scope: "/",
-    lang: "es-CO",
-    categories: ["business", "productivity", "utilities"],
-    prefer_related_applications: false,
-    related_applications: [],
+    background_color: "#ffffff",
+    theme_color: "#16a34a",
+    icons: [
+      {
+        src: "/favicon.ico",
+        sizes: "any",
+        type: "image/x-icon",
+      },
+    ],
   };
 }

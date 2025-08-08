@@ -6,11 +6,23 @@ import { TRPCProvider } from "@/lib/trpc/provider";
 import { translations } from "@/lib/constants/translations";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { getAIClient } from "@/services/ai/ollama-client";
-import { Send, Mic, MicOff, Loader2, Bot, User, Sparkles } from "lucide-react";
+import { getAIClient, setAIClientHost } from "@/services/ai/ollama-client";
+import {
+  Send,
+  Mic,
+  MicOff,
+  Loader2,
+  Bot,
+  User,
+  Sparkles,
+  Download,
+  Server,
+  Play,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { moduleRegistry } from "@/modules";
+import { trpc } from "@/lib/trpc/client";
 
 interface Message {
   id: string;
@@ -19,6 +31,7 @@ interface Message {
   timestamp: Date;
   module?: string;
   action?: string;
+  data?: any;
 }
 
 export default function AIAssistantPage() {
@@ -30,6 +43,24 @@ export default function AIAssistantPage() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const aiClient = getAIClient();
   const router = useRouter();
+  const routeIntent = trpc.ai.routeIntent.useMutation();
+  const checkLocal = trpc.ai.checkLocalModel.useMutation();
+  const ensureLocal = trpc.ai.ensureLocalModel.useMutation();
+  const [localModelAvailable, setLocalModelAvailable] = useState<
+    boolean | null
+  >(null);
+  const [isTauri, setIsTauri] = useState(false);
+
+  const [dlProgress, setDlProgress] = useState<{
+    downloaded: number;
+    total: number;
+  } | null>(null);
+  const [llamaRunning, setLlamaRunning] = useState(false);
+
+  const MODEL_URL = process.env.NEXT_PUBLIC_MODEL_DOWNLOAD_URL || "";
+  const MODEL_SHA = process.env.NEXT_PUBLIC_MODEL_SHA256 || undefined;
+  const LLAMA_BIN_URL = process.env.NEXT_PUBLIC_LLAMA_BINARY_URL || "";
+  const LLAMA_PORT = Number(process.env.NEXT_PUBLIC_LLAMA_PORT || 11434);
 
   // Sample commands for quick actions
   const sampleCommands = [
@@ -40,8 +71,46 @@ export default function AIAssistantPage() {
   ];
 
   useEffect(() => {
+    setIsTauri(typeof window !== "undefined" && !!(window as any).__TAURI__);
+  }, []);
+
+  useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await checkLocal.mutateAsync();
+        setLocalModelAvailable(res.available);
+      } catch {
+        setLocalModelAvailable(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!isTauri) return;
+    const unsubs: Array<() => void> = [];
+    const t = (window as any).__TAURI__;
+    if (t?.event) {
+      t.event
+        .listen("model-download-progress", (e: any) => {
+          const payload = e?.payload as any;
+          if (payload && typeof payload.downloaded === "number") {
+            setDlProgress({
+              downloaded: payload.downloaded,
+              total: payload.total || 0,
+            });
+          }
+        })
+        .then((un: any) => unsubs.push(un));
+    }
+    return () => {
+      unsubs.forEach((u) => u());
+    };
+  }, [isTauri]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -62,6 +131,37 @@ export default function AIAssistantPage() {
     setIsLoading(true);
 
     try {
+      // Primero: intentar enrutar intención para acciones CRUD/navegación
+      const intent = await routeIntent.mutateAsync({
+        query: userMessage.content,
+      });
+      if (intent?.action === "list_modules" && intent?.data?.modules) {
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: "Estos son los módulos disponibles:",
+          timestamp: new Date(),
+          module: "assistant",
+          action: "list_modules",
+          data: intent.data,
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+        return;
+      }
+      if (intent?.navigateTo) {
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: "Abriendo la pantalla solicitada...",
+          timestamp: new Date(),
+          module: intent.module ?? undefined,
+          action: intent.action ?? undefined,
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+        router.push(intent.navigateTo);
+        return;
+      }
+
       const response = await aiClient.processQuery(input, {
         currentModule: "chat",
         recentMessages: messages.slice(-5),
@@ -104,8 +204,8 @@ export default function AIAssistantPage() {
 
   const handleVoiceInput = () => {
     if (
-      !("webkitSpeechRecognition" in window) &&
-      !("SpeechRecognition" in window)
+      !(typeof window !== "undefined" && "webkitSpeechRecognition" in window) &&
+      !(typeof window !== "undefined" && "SpeechRecognition" in window)
     ) {
       alert("Tu navegador no soporta reconocimiento de voz");
       return;
@@ -160,6 +260,27 @@ export default function AIAssistantPage() {
     inputRef.current?.focus();
   };
 
+  const startLocalAI = async () => {
+    if (!isTauri) return;
+    const { tauri } = (window as any).__TAURI__;
+    try {
+      const binPath = await tauri.invoke("download_llama_binary");
+      const modelPath = await tauri.invoke("download_model", {
+        url: MODEL_URL,
+        sha256Hex: MODEL_SHA || null,
+      });
+      await tauri.invoke("start_llama_server", {
+        modelPath,
+        port: LLAMA_PORT,
+      });
+      setAIClientHost(`http://127.0.0.1:${LLAMA_PORT}`);
+      setLocalModelAvailable(true);
+      setLlamaRunning(true);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   return (
     <TRPCProvider>
       <DashboardLayout>
@@ -183,6 +304,79 @@ export default function AIAssistantPage() {
 
           {/* Messages Area */}
           <div className="flex-1 overflow-y-auto bg-ranch-50 p-4 space-y-4">
+            {localModelAvailable === false && (
+              <div className="max-w-2xl mx-auto bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm">
+                    Modelo local no disponible. Puedes descargar{" "}
+                    <strong>deepseek-r1</strong> para usar la IA sin conexión.
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="solid"
+                    color="primary"
+                    isLoading={ensureLocal.isPending}
+                    onPress={async () => {
+                      if (isTauri) {
+                        await startLocalAI();
+                      } else {
+                        const res = await ensureLocal.mutateAsync({
+                          model:
+                            process.env.NEXT_PUBLIC_OLLAMA_MODEL ||
+                            "deepseek-r1:latest",
+                        });
+                        if (res.ok) {
+                          const chk = await checkLocal.mutateAsync();
+                          setLocalModelAvailable(chk.available);
+                        }
+                      }
+                    }}
+                    className="bg-violet-600 hover:bg-violet-700 text-white shadow-md"
+                  >
+                    <Download className="h-4 w-4 mr-1" /> Descargar modelo
+                  </Button>
+                </div>
+                {dlProgress && (
+                  <div className="mt-2 text-xs">
+                    <div className="h-2 bg-amber-200 rounded">
+                      <div
+                        className="h-2 bg-violet-600 rounded"
+                        style={{
+                          width:
+                            dlProgress.total > 0
+                              ? `${Math.min(
+                                  100,
+                                  Math.round(
+                                    (dlProgress.downloaded / dlProgress.total) *
+                                      100
+                                  )
+                                )}%`
+                              : "10%",
+                        }}
+                      />
+                    </div>
+                    <p className="mt-1">
+                      {dlProgress.total > 0
+                        ? `${(dlProgress.downloaded / (1024 * 1024)).toFixed(
+                            1
+                          )} MB / ${(dlProgress.total / (1024 * 1024)).toFixed(
+                            1
+                          )} MB`
+                        : `Descargando... ${(
+                            dlProgress.downloaded /
+                            (1024 * 1024)
+                          ).toFixed(1)} MB`}
+                    </p>
+                  </div>
+                )}
+                {llamaRunning && (
+                  <div className="flex items-center gap-2 text-green-700 text-sm mt-2">
+                    <Server className="h-4 w-4" /> IA local en ejecución en{" "}
+                    {`127.0.0.1:${LLAMA_PORT}`}
+                  </div>
+                )}
+              </div>
+            )}
             {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full space-y-6">
                 <div className="text-center">
@@ -256,6 +450,57 @@ export default function AIAssistantPage() {
                         )}
                       >
                         <p className="whitespace-pre-wrap">{message.content}</p>
+                        {message.module === "assistant" &&
+                          message.action === "list_modules" && (
+                            <div className="mt-3 border-t pt-3">
+                              <p className="text-sm font-medium mb-2">
+                                Módulos disponibles
+                              </p>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {(message as any).data?.modules?.map(
+                                  (m: any) => (
+                                    <div
+                                      key={m.id}
+                                      className="border rounded-lg p-2 flex items-center justify-between"
+                                    >
+                                      <div>
+                                        <p className="text-sm font-medium">
+                                          {m.name}
+                                        </p>
+                                        <p className="text-xs text-ranch-600">
+                                          /{m.id}
+                                        </p>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        {m.hasList && (
+                                          <Button
+                                            size="sm"
+                                            variant="bordered"
+                                            onPress={() =>
+                                              router.push(`/${m.id}`)
+                                            }
+                                          >
+                                            Ver
+                                          </Button>
+                                        )}
+                                        {m.hasCreate && (
+                                          <Button
+                                            size="sm"
+                                            color="primary"
+                                            onPress={() =>
+                                              router.push(`/${m.id}/new`)
+                                            }
+                                          >
+                                            Nuevo
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )
+                                )}
+                              </div>
+                            </div>
+                          )}
                         {message.module && (
                           <p className="text-xs mt-2 opacity-70">
                             Módulo: {message.module}
@@ -291,10 +536,7 @@ export default function AIAssistantPage() {
                     placeholder={translations.ai.placeholder}
                     className="w-full px-4 py-2 border border-ranch-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-ranch-500 resize-none"
                     rows={1}
-                    style={{
-                      minHeight: "40px",
-                      maxHeight: "120px",
-                    }}
+                    style={{ minHeight: "40px", maxHeight: "120px" }}
                   />
                 </div>
                 <Button

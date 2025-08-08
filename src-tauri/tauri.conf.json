@@ -1,0 +1,51 @@
+{
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/v1/tools/cli/schema.json",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devPath": "http://localhost:3001",
+    "distDir": "dist"
+  },
+  "package": {
+    "productName": "Ganado AI",
+    "version": "0.1.0"
+  },
+  "tauri": {
+    "bundle": {
+      "active": true,
+      "targets": "all",
+      "identifier": "ai.ganado.app",
+      "resources": ["../.next/standalone/**", "../.next/static/**"],
+      "externalBin": ["sidecar/node"],
+      "windows": {
+        "certificateThumbprint": "${WINDOWS_CERTIFICATE_THUMBPRINT}",
+        "digestAlgorithm": "sha256",
+        "timestampUrl": "http://timestamp.comodoca.com",
+        "tsp": false
+      }
+    },
+    "updater": {
+      "active": false,
+      "endpoints": [
+        "https://ganadero-nine.vercel.app/api/updates/{target}/{current_version}"
+      ],
+      "pubkey": ""
+    },
+    "windows": [
+      {
+        "title": "Ganado AI",
+        "width": 1280,
+        "height": 800,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": null
+    },
+    "allowlist": {
+      "shell": {
+        "all": false
+      }
+    }
+  }
+}

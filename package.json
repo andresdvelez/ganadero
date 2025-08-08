@@ -3,10 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build",
+    "dev": "next dev -p 3001 --turbopack",
+    "prebuild": "node ./scripts/prepare-node-sidecar.mjs",
+    "build": "next build && node ./scripts/standalone-postbuild.mjs",
+    "build:tauri": "next build && node ./scripts/standalone-postbuild.mjs",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "tauri:dev": "PATH=$HOME/.cargo/bin:$PATH tauri dev",
+    "tauri:build": "PATH=$HOME/.cargo/bin:$PATH tauri build"
   },
   "dependencies": {
     "@capacitor/camera": "^7.0.2",
@@ -73,6 +77,7 @@
     "jest": "^30.0.5",
     "jest-environment-jsdom": "^30.0.5",
     "tailwindcss": "4.1.11",
-    "typescript": "^5"
+    "typescript": "^5",
+    "@tauri-apps/cli": "^1.6.2"
   }
 }

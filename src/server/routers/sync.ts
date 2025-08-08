@@ -128,4 +128,191 @@ export const syncRouter = createTRPCRouter({
         : await ctx.prisma.breedingRecord.create({ data: payload });
       return saved;
     }),
+
+  // Inventory: Product
+  upsertProduct: protectedProcedure
+    .input(z.object({ externalId: z.string(), data: z.any() }))
+    .mutation(async ({ ctx, input }) => {
+      const user = await ctx.prisma.user.findUnique({
+        where: { clerkId: ctx.userId },
+      });
+      if (!user) throw new Error("User not found");
+      const { externalId, data } = input;
+      const existing = await ctx.prisma.product.findFirst({
+        where: { externalId },
+      });
+      const payload = {
+        externalId,
+        userId: user.id,
+        code: data.code,
+        name: data.name,
+        category: data.category ?? null,
+        unit: data.unit ?? "unidad",
+        minStock: data.minStock ?? null,
+        currentStock: data.currentStock ?? 0,
+        cost: data.cost ?? null,
+        supplier: data.supplier ?? null,
+        notes: data.notes ?? null,
+      } as any;
+      const saved = existing
+        ? await ctx.prisma.product.update({
+            where: { id: existing.id },
+            data: payload,
+          })
+        : await ctx.prisma.product.create({ data: payload });
+      return saved;
+    }),
+
+  // Inventory: Stock Movement
+  upsertStockMovement: protectedProcedure
+    .input(z.object({ externalId: z.string(), data: z.any() }))
+    .mutation(async ({ ctx, input }) => {
+      const user = await ctx.prisma.user.findUnique({
+        where: { clerkId: ctx.userId },
+      });
+      if (!user) throw new Error("User not found");
+      const { externalId, data } = input;
+      const product = data.productExternalId
+        ? await ctx.prisma.product.findFirst({
+            where: { externalId: data.productExternalId },
+          })
+        : data.productId
+        ? await ctx.prisma.product.findUnique({ where: { id: data.productId } })
+        : null;
+      if (!product) throw new Error("Product not found for stock movement");
+      const existing = await ctx.prisma.stockMovement.findFirst({
+        where: { externalId },
+      });
+      const payload = {
+        externalId,
+        userId: user.id,
+        productId: product.id,
+        type: data.type,
+        quantity: data.quantity,
+        unitCost: data.unitCost ?? null,
+        reason: data.reason ?? null,
+        relatedEntity: data.relatedEntity ?? null,
+        occurredAt: new Date(data.occurredAt),
+      } as any;
+      const saved = existing
+        ? await ctx.prisma.stockMovement.update({
+            where: { id: existing.id },
+            data: payload,
+          })
+        : await ctx.prisma.stockMovement.create({ data: payload });
+      return saved;
+    }),
+
+  // Milk
+  upsertMilk: protectedProcedure
+    .input(z.object({ externalId: z.string(), data: z.any() }))
+    .mutation(async ({ ctx, input }) => {
+      const user = await ctx.prisma.user.findUnique({
+        where: { clerkId: ctx.userId },
+      });
+      if (!user) throw new Error("User not found");
+      const { externalId, data } = input;
+      const animal = data.animalExternalId
+        ? await ctx.prisma.animal.findFirst({
+            where: { externalId: data.animalExternalId },
+          })
+        : data.animalId
+        ? await ctx.prisma.animal.findUnique({ where: { id: data.animalId } })
+        : null;
+      const existing = await ctx.prisma.milkRecord.findFirst({
+        where: { externalId },
+      });
+      const payload = {
+        externalId,
+        userId: user.id,
+        animalId: animal?.id ?? null,
+        session: data.session,
+        liters: data.liters,
+        fatPct: data.fatPct ?? null,
+        proteinPct: data.proteinPct ?? null,
+        ccs: data.ccs ?? null,
+        notes: data.notes ?? null,
+        recordedAt: new Date(data.recordedAt),
+      } as any;
+      const saved = existing
+        ? await ctx.prisma.milkRecord.update({
+            where: { id: existing.id },
+            data: payload,
+          })
+        : await ctx.prisma.milkRecord.create({ data: payload });
+      return saved;
+    }),
+
+  // Pastures
+  upsertPasture: protectedProcedure
+    .input(z.object({ externalId: z.string(), data: z.any() }))
+    .mutation(async ({ ctx, input }) => {
+      const user = await ctx.prisma.user.findUnique({
+        where: { clerkId: ctx.userId },
+      });
+      if (!user) throw new Error("User not found");
+      const { externalId, data } = input;
+      const existing = await ctx.prisma.pasture.findFirst({
+        where: { externalId },
+      });
+      const payload = {
+        externalId,
+        userId: user.id,
+        name: data.name,
+        areaHa: data.areaHa ?? null,
+        currentGroup: data.currentGroup ?? null,
+        occupancySince: data.occupancySince
+          ? new Date(data.occupancySince)
+          : null,
+        notes: data.notes ?? null,
+      } as any;
+      const saved = existing
+        ? await ctx.prisma.pasture.update({
+            where: { id: existing.id },
+            data: payload,
+          })
+        : await ctx.prisma.pasture.create({ data: payload });
+      return saved;
+    }),
+
+  // Lab exams
+  upsertLabExam: protectedProcedure
+    .input(z.object({ externalId: z.string(), data: z.any() }))
+    .mutation(async ({ ctx, input }) => {
+      const user = await ctx.prisma.user.findUnique({
+        where: { clerkId: ctx.userId },
+      });
+      if (!user) throw new Error("User not found");
+      const { externalId, data } = input;
+      const animal = data.animalExternalId
+        ? await ctx.prisma.animal.findFirst({
+            where: { externalId: data.animalExternalId },
+          })
+        : data.animalId
+        ? await ctx.prisma.animal.findUnique({ where: { id: data.animalId } })
+        : null;
+      const existing = await ctx.prisma.labExam.findFirst({
+        where: { externalId },
+      });
+      const payload = {
+        externalId,
+        userId: user.id,
+        animalId: animal?.id ?? null,
+        examType: data.examType,
+        sampleType: data.sampleType ?? null,
+        labName: data.labName ?? null,
+        requestedAt: new Date(data.requestedAt),
+        resultAt: data.resultAt ? new Date(data.resultAt) : null,
+        result: data.result ?? null,
+        antibiogram: data.antibiogram ?? null,
+        notes: data.notes ?? null,
+      } as any;
+      const saved = existing
+        ? await ctx.prisma.labExam.update({
+            where: { id: existing.id },
+            data: payload,
+          })
+        : await ctx.prisma.labExam.create({ data: payload });
+      return saved;
+    }),
 });

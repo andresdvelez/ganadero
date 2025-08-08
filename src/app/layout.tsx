@@ -1,19 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Providers } from "@/providers/heroui-provider";
 import "./globals.css";
 
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-});
-
 export const metadata: Metadata = {
   title: "Ganado AI - Plataforma de Gestión Ganadera",
   description: "Gestión ganadera inteligente con asistente de IA",
-  manifest: "/manifest.webmanifest",
+  manifest: "/manifest.json",
   icons: {
     icon: "/favicon.ico",
     apple: "/icon-192.png",
@@ -36,7 +29,7 @@ export default function RootLayout({
   const hasClerk = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
   const appBody = (
-    <html lang="es" className={inter.variable}>
+    <html lang="es">
       <body className="font-sans antialiased bg-neutral-50 text-neutral-900">
         <Providers>{children}</Providers>
       </body>

@@ -1,10 +1,14 @@
 import withPWA from "next-pwa";
 
+const isDev = process.env.NODE_ENV === "development";
+const isTauri = process.env.TAURI === "1" || process.env.TAURI === "true";
+
 const pwaConfig = withPWA({
   dest: "public",
   register: true,
   skipWaiting: true,
-  disable: process.env.NODE_ENV === "development",
+  // Desactivar PWA en Tauri para evitar problemas con service workers en esquemas no-HTTP
+  disable: isDev || isTauri,
   runtimeCaching: [
     {
       urlPattern: /^https?.*/,
@@ -13,7 +17,7 @@ const pwaConfig = withPWA({
         cacheName: "offlineCache",
         expiration: {
           maxEntries: 200,
-          maxAgeSeconds: 30 * 24 * 60 * 60, // 30 days
+          maxAgeSeconds: 30 * 24 * 60 * 60, // 30 días
         },
       },
     },
@@ -23,7 +27,10 @@ const pwaConfig = withPWA({
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Ejecutaremos con `node .next/standalone/server.js` dentro de Tauri
+  output: "standalone",
   images: {
+    unoptimized: true,
     domains: ["localhost"],
     remotePatterns: [
       {
@@ -31,11 +38,6 @@ const nextConfig = {
         hostname: "**",
       },
     ],
-  },
-  experimental: {
-    serverActions: {
-      bodySizeLimit: "10mb",
-    },
   },
 };
 

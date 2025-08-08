@@ -14,12 +14,16 @@ import {
   MessageCircle,
   Menu,
   X,
+  AlertTriangle,
+  RefreshCcw,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { translations } from "@/lib/constants/translations";
+import { useEffect } from "react";
+import { getSyncManager } from "@/services/sync/sync-manager";
 
 const navigation = [
   { name: translations.navigation.dashboard, href: "/", icon: Home },
@@ -43,6 +47,43 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [syncInfo, setSyncInfo] = useState<{
+    online: boolean;
+    syncing: boolean;
+    pending: number;
+    conflicts: number;
+  }>({ online: true, syncing: false, pending: 0, conflicts: 0 });
+  const [showConflicts, setShowConflicts] = useState(false);
+  const [conflicts, setConflicts] = useState<any[]>([]);
+
+  useEffect(() => {
+    const sm = getSyncManager();
+    let mounted = true;
+    const load = async () => {
+      const [pending, conflictItems] = await Promise.all([
+        sm.getPendingCount(),
+        sm.getConflicts(),
+      ]);
+      if (!mounted) return;
+      setConflicts(conflictItems);
+      setSyncInfo({
+        online: navigator.onLine,
+        syncing: false,
+        pending,
+        conflicts: conflictItems.length,
+      });
+    };
+    load();
+    const onOnline = () => setSyncInfo((s) => ({ ...s, online: true }));
+    const onOffline = () => setSyncInfo((s) => ({ ...s, online: false }));
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      mounted = false;
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-mesh">
@@ -126,9 +167,58 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               <Menu className="h-5 w-5 text-slate-700" />
             </button>
 
-            <div className="flex items-center gap-2 text-sm">
-              <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse" />
-              <span className="text-slate-600">En Línea</span>
+            <div className="flex items-center gap-3 text-sm">
+              <div className="flex items-center gap-2">
+                <div
+                  className={`h-2 w-2 rounded-full ${
+                    syncInfo.online ? "bg-green-500" : "bg-red-500"
+                  } ${syncInfo.syncing ? "animate-pulse" : ""}`}
+                />
+                <span className="text-slate-600">
+                  {syncInfo.online ? "En línea" : "Sin conexión"}
+                </span>
+              </div>
+              <button
+                className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white/70 hover:bg-white shadow-sm"
+                onClick={async () => {
+                  const sm = getSyncManager();
+                  setSyncInfo((s) => ({ ...s, syncing: true }));
+                  const res = await sm.sync();
+                  const [pending, conflictItems] = await Promise.all([
+                    sm.getPendingCount(),
+                    sm.getConflicts(),
+                  ]);
+                  setConflicts(conflictItems);
+                  setSyncInfo({
+                    online: navigator.onLine,
+                    syncing: false,
+                    pending,
+                    conflicts: conflictItems.length,
+                  });
+                }}
+                aria-label="Sincronizar"
+              >
+                <RefreshCcw
+                  className={`h-4 w-4 ${
+                    syncInfo.syncing ? "animate-spin" : ""
+                  }`}
+                />
+                <span>
+                  {syncInfo.syncing
+                    ? "Sincronizando..."
+                    : `Pendientes: ${syncInfo.pending}`}
+                </span>
+              </button>
+              {syncInfo.conflicts > 0 && (
+                <button
+                  onClick={() => setShowConflicts(true)}
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-100 text-amber-700 hover:bg-amber-200"
+                  aria-label="Conflictos de sincronización"
+                >
+                  <AlertTriangle className="h-4 w-4" />
+                  <span>{syncInfo.conflicts} conflictos</span>
+                </button>
+              )}
             </div>
 
             <UserButton
@@ -143,6 +233,89 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           <div className="mx-auto max-w-7xl">{children}</div>
         </main>
       </div>
+
+      {/* Conflicts modal */}
+      {showConflicts && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold">
+                Conflictos de sincronización
+              </h3>
+              <button
+                className="p-1 rounded hover:bg-slate-100"
+                onClick={() => setShowConflicts(false)}
+                aria-label="Cerrar"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-3 max-h-96 overflow-auto">
+              {conflicts.length === 0 ? (
+                <p className="text-sm text-slate-600">No hay conflictos.</p>
+              ) : (
+                conflicts.map((c) => (
+                  <div
+                    key={c.id}
+                    className="border rounded-xl p-3 flex items-start justify-between gap-3"
+                  >
+                    <div>
+                      <p className="text-sm font-medium">{c.entityType}</p>
+                      {c.errorMessage && (
+                        <p className="text-xs text-slate-600 mt-1">
+                          {c.errorMessage}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="px-3 py-1 rounded-lg bg-violet-600 text-white hover:bg-violet-700 text-sm"
+                        onClick={async () => {
+                          const sm = getSyncManager();
+                          await sm.resolveConflict(c.id, "local");
+                          const [pending, conflictItems] = await Promise.all([
+                            sm.getPendingCount(),
+                            sm.getConflicts(),
+                          ]);
+                          setConflicts(conflictItems);
+                          setSyncInfo({
+                            online: navigator.onLine,
+                            syncing: false,
+                            pending,
+                            conflicts: conflictItems.length,
+                          });
+                        }}
+                      >
+                        Mantener local
+                      </button>
+                      <button
+                        className="px-3 py-1 rounded-lg bg-slate-200 text-slate-800 hover:bg-slate-300 text-sm"
+                        onClick={async () => {
+                          const sm = getSyncManager();
+                          await sm.resolveConflict(c.id, "remote");
+                          const [pending, conflictItems] = await Promise.all([
+                            sm.getPendingCount(),
+                            sm.getConflicts(),
+                          ]);
+                          setConflicts(conflictItems);
+                          setSyncInfo({
+                            online: navigator.onLine,
+                            syncing: false,
+                            pending,
+                            conflicts: conflictItems.length,
+                          });
+                        }}
+                      >
+                        Mantener remoto
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
