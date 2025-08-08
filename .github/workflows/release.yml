@@ -126,9 +126,11 @@ jobs:
           certutil -decode certificate\cert_base64.txt certificate\codesign.pfx
           Remove-Item certificate\cert_base64.txt
           $securePwd = ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -Force -AsPlainText
-          Import-PfxCertificate -FilePath certificate\codesign.pfx -CertStoreLocation Cert:\LocalMachine\My -Password $securePwd | Out-Null
-          $thumb = (Get-ChildItem Cert:\LocalMachine\My | Where-Object { $_.HasPrivateKey } | Select-Object -First 1).Thumbprint
-          if (-not $thumb) { throw "No certificate thumbprint found in LocalMachine\My" }
+          # Importar en CurrentUser y LocalMachine
+          $certCU = Import-PfxCertificate -FilePath certificate\codesign.pfx -CertStoreLocation Cert:\CurrentUser\My -Password $securePwd
+          $certLM = Import-PfxCertificate -FilePath certificate\codesign.pfx -CertStoreLocation Cert:\LocalMachine\My -Password $securePwd
+          $thumb = $certCU.Thumbprint
+          if (-not $thumb) { throw "No thumbprint from imported certificate" }
           echo "WINDOWS_CERTIFICATE_THUMBPRINT=$thumb" | Out-File -FilePath $env:GITHUB_ENV -Append
       - name: Inject thumbprint into tauri.conf.json
         shell: pwsh
