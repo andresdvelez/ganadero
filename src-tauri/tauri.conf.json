@@ -25,8 +25,7 @@
         "icons/icon.ico"
       ],
       "windows": {
-        "certificatePath": "certificate/codesign.pfx",
-        "certificatePassword": "${WINDOWS_CERTIFICATE_PASSWORD}",
+        "certificateThumbprint": "${WINDOWS_CERTIFICATE_THUMBPRINT}",
         "digestAlgorithm": "sha256",
         "timestampUrl": "http://timestamp.digicert.com",
         "tsp": true
