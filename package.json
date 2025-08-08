@@ -10,7 +10,8 @@
     "start": "next start",
     "lint": "next lint",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "icons:gen": "node ./scripts/generate-placeholder-icon.mjs"
   },
   "dependencies": {
     "@capacitor/camera": "^7.0.2",

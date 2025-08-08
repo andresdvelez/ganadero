@@ -45,6 +45,19 @@ jobs:
             npm install --no-audit --no-fund --legacy-peer-deps
           fi
         working-directory: ${{ env.PROJECT_DIR }}
+      - name: Generar placeholder icon (si falta)
+        run: npm run icons:gen
+        working-directory: ${{ env.PROJECT_DIR }}
+      - name: Generar íconos de Tauri
+        run: |
+          if [ -f src-tauri/icons/icon.png ]; then
+            echo "Usando src-tauri/icons/icon.png como fuente"
+            npx @tauri-apps/cli icon src-tauri/icons/icon.png
+          else
+            echo "src-tauri/icons/icon.png no existe; usando entrada por defecto"
+            npx @tauri-apps/cli icon
+          fi
+        working-directory: ${{ env.PROJECT_DIR }}
       - name: Build app (standalone + tauri)
         run: npx @tauri-apps/cli build
         working-directory: ${{ env.PROJECT_DIR }}
@@ -124,6 +137,21 @@ jobs:
         run: |
           (Get-Content src-tauri/tauri.conf.json) -replace '\$\{WINDOWS_CERTIFICATE_THUMBPRINT\}', "$env:WINDOWS_CERTIFICATE_THUMBPRINT" | Set-Content src-tauri/tauri.conf.json
           Write-Host "Injected thumbprint: $env:WINDOWS_CERTIFICATE_THUMBPRINT"
+      - name: Generar placeholder icon (si falta)
+        shell: pwsh
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: npm run icons:gen
+      - name: Generar íconos de Tauri
+        shell: pwsh
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          if (Test-Path src-tauri/icons/icon.png) {
+            Write-Host "Usando src-tauri/icons/icon.png como fuente"
+            npx @tauri-apps/cli icon src-tauri/icons/icon.png
+          } else {
+            Write-Host "src-tauri/icons/icon.png no existe; usando entrada por defecto"
+            npx @tauri-apps/cli icon
+          }
       - name: Build app (standalone + tauri, signed)
         run: npx @tauri-apps/cli build
         working-directory: ${{ env.PROJECT_DIR }}
