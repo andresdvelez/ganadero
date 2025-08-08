@@ -25,10 +25,11 @@
         "icons/icon.ico"
       ],
       "windows": {
-        "certificateThumbprint": "${WINDOWS_CERTIFICATE_THUMBPRINT}",
+        "certificatePath": "certificate/codesign.pfx",
+        "certificatePassword": "${WINDOWS_CERTIFICATE_PASSWORD}",
         "digestAlgorithm": "sha256",
-        "timestampUrl": "http://timestamp.comodoca.com",
-        "tsp": false
+        "timestampUrl": "http://timestamp.digicert.com",
+        "tsp": true
       }
     },
     "updater": {
