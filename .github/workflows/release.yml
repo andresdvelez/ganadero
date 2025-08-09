@@ -1,167 +1,52 @@
-name: release
+name: Release
 
 on:
-  workflow_dispatch:
   push:
     tags:
-      - "v*.*.*"
+      - "v*"
+  workflow_dispatch:
 
 jobs:
-  build-macos:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Detectar carpeta del proyecto
-        id: detect-macos
-        run: |
-          if [ -d "${GITHUB_WORKSPACE}/ganado-ai-app" ]; then
-            echo "PROJECT_DIR=${GITHUB_WORKSPACE}/ganado-ai-app" >> $GITHUB_ENV
-            echo "ARTIFACT_PREFIX=ganado-ai-app/" >> $GITHUB_ENV
-          else
-            echo "PROJECT_DIR=${GITHUB_WORKSPACE}" >> $GITHUB_ENV
-            echo "ARTIFACT_PREFIX=" >> $GITHUB_ENV
-          fi
-      - name: Mostrar rutas
-        run: |
-          echo "workspace: $GITHUB_WORKSPACE"
-          echo "project: $PROJECT_DIR"
-          ls -la "$PROJECT_DIR" || true
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-      - name: Add macOS Rust targets (universal)
-        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            ${{ env.PROJECT_DIR }}/src-tauri -> ${{ env.PROJECT_DIR }}/src-tauri/target
-      - name: Install deps
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            echo "package-lock.json no existe; usando npm install con --legacy-peer-deps"
-            npm install --no-audit --no-fund --legacy-peer-deps
-          fi
-        working-directory: ${{ env.PROJECT_DIR }}
-      - name: Generar placeholder icon (si falta)
-        run: npm run icons:gen
-        working-directory: ${{ env.PROJECT_DIR }}
-      - name: Generar íconos de Tauri
-        run: |
-          if [ -f src-tauri/icons/icon.png ]; then
-            echo "Usando src-tauri/icons/icon.png como fuente"
-            npx @tauri-apps/cli icon src-tauri/icons/icon.png
-          else
-            echo "src-tauri/icons/icon.png no existe; usando entrada por defecto"
-            npx @tauri-apps/cli icon
-          fi
-        working-directory: ${{ env.PROJECT_DIR }}
-      - name: Build app (standalone + tauri, Universal 2)
-        run: npx @tauri-apps/cli build --target universal-apple-darwin
-        working-directory: ${{ env.PROJECT_DIR }}
-        env:
-          TAURI: "1"
-      - name: Upload DMG
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-dmg
-          path: ${{ env.ARTIFACT_PREFIX }}src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+  build:
+    strategy:
+      matrix:
+        platform: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.platform }}
 
-  build-windows:
-    runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Detectar carpeta del proyecto
-        id: detect-windows
-        shell: pwsh
-        run: |
-          if (Test-Path "$env:GITHUB_WORKSPACE/ganado-ai-app") {
-            echo "PROJECT_DIR=$env:GITHUB_WORKSPACE/ganado-ai-app" >> $env:GITHUB_ENV
-            echo "ARTIFACT_PREFIX=ganado-ai-app/" >> $env:GITHUB_ENV
-          } else {
-            echo "PROJECT_DIR=$env:GITHUB_WORKSPACE" >> $env:GITHUB_ENV
-            echo "ARTIFACT_PREFIX=" >> $env:GITHUB_ENV
-          }
-      - name: Mostrar rutas
-        shell: pwsh
-        run: |
-          Write-Host "workspace: $env:GITHUB_WORKSPACE"
-          Write-Host "project: $env:PROJECT_DIR"
-          if (Test-Path $env:PROJECT_DIR) { Get-ChildItem -Force $env:PROJECT_DIR | Select-Object -First 10 | Format-List } else { Write-Host "project dir not found" }
-      - name: Marcar workspace como seguro (opcional)
-        shell: pwsh
-        run: git config --global --add safe.directory $env:GITHUB_WORKSPACE
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: "npm"
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            ${{ env.PROJECT_DIR }}\src-tauri -> ${{ env.PROJECT_DIR }}\src-tauri\target
+
+      - name: Install system deps (Ubuntu only)
+        if: matrix.platform == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
+
       - name: Install deps
-        shell: pwsh
-        run: |
-          if (Test-Path package-lock.json) {
-            npm ci
-          } else {
-            Write-Host "package-lock.json no existe; usando npm install con --legacy-peer-deps"
-            npm install --no-audit --no-fund --legacy-peer-deps
-          }
-        working-directory: ${{ env.PROJECT_DIR }}
-      - name: Import Windows code signing certificate
-        shell: pwsh
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Build Next.js standalone
         env:
-          WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
-          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
-        run: |
-          if (-not $env:WINDOWS_CERTIFICATE_BASE64) { throw "Missing WINDOWS_CERTIFICATE_BASE64 secret" }
-          if (-not $env:WINDOWS_CERTIFICATE_PASSWORD) { throw "Missing WINDOWS_CERTIFICATE_PASSWORD secret" }
-          New-Item -ItemType Directory -Path certificate | Out-Null
-          Set-Content -Path certificate\cert_base64.txt -Value $env:WINDOWS_CERTIFICATE_BASE64
-          certutil -decode certificate\cert_base64.txt certificate\codesign.pfx
-          Remove-Item certificate\cert_base64.txt
-          $securePwd = ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -Force -AsPlainText
-          # Importar en CurrentUser y LocalMachine
-          $certCU = Import-PfxCertificate -FilePath certificate\codesign.pfx -CertStoreLocation Cert:\CurrentUser\My -Password $securePwd
-          $certLM = Import-PfxCertificate -FilePath certificate\codesign.pfx -CertStoreLocation Cert:\LocalMachine\My -Password $securePwd
-          $thumb = $certCU.Thumbprint
-          if (-not $thumb) { throw "No thumbprint from imported certificate" }
-          echo "WINDOWS_CERTIFICATE_THUMBPRINT=$thumb" | Out-File -FilePath $env:GITHUB_ENV -Append
-      - name: Inject thumbprint into tauri.conf.json
-        shell: pwsh
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: |
-          (Get-Content src-tauri/tauri.conf.json) -replace '\$\{WINDOWS_CERTIFICATE_THUMBPRINT\}', "$env:WINDOWS_CERTIFICATE_THUMBPRINT" | Set-Content src-tauri/tauri.conf.json
-          Write-Host "Injected thumbprint: $env:WINDOWS_CERTIFICATE_THUMBPRINT"
-      - name: Generar placeholder icon (si falta)
-        shell: pwsh
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: npm run icons:gen
-      - name: Generar íconos de Tauri
-        shell: pwsh
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: |
-          if (Test-Path src-tauri/icons/icon.png) {
-            Write-Host "Usando src-tauri/icons/icon.png como fuente"
-            npx @tauri-apps/cli icon src-tauri/icons/icon.png
-          } else {
-            Write-Host "src-tauri/icons/icon.png no existe; usando entrada por defecto"
-            npx @tauri-apps/cli icon
-          }
-      - name: Build app (standalone + tauri, signed)
-        run: npx @tauri-apps/cli build
-        working-directory: ${{ env.PROJECT_DIR }}
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: npm run build:tauri
+
+      - name: Tauri build and publish
+        uses: tauri-apps/tauri-action@v0
         env:
-          TAURI: "1"
-      - name: Upload MSI
-        uses: actions/upload-artifact@v4
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: windows-msi
-          path: ${{ env.ARTIFACT_PREFIX }}src-tauri/target/release/bundle/msi/*.msi
+          tagName: ${{ github.ref_name }}
+          releaseName: Ganado AI ${{ github.ref_name }}
+          releaseDraft: false
+          prerelease: false
