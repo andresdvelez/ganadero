@@ -9,6 +9,7 @@ on:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         platform: [macos-latest, windows-latest]
     runs-on: ${{ matrix.platform }}
@@ -21,6 +22,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+
+      - name: Setup Bun (for tauri-action which detects bun.lock)
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.1.29"
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
