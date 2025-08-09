@@ -29,8 +29,8 @@ jobs:
         if: matrix.platform == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
 
-      - name: Install deps
-        run: npm install --no-audit --no-fund
+      - name: Install deps (allow legacy peer deps)
+        run: npm install --no-audit --no-fund --legacy-peer-deps
 
       - name: Generate Prisma client
         run: npx prisma generate
