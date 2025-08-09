@@ -6,6 +6,9 @@ on:
       - "v*"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
@@ -50,12 +53,33 @@ jobs:
       - name: Prepare Node sidecar binaries
         run: node ./scripts/prepare-node-sidecar.mjs
 
+      - name: Determine Windows certificate presence
+        if: matrix.platform == 'windows-latest'
+        id: win_cert
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrEmpty("${{ secrets.WINDOWS_CERTIFICATE_THUMBPRINT }}")) { echo "present=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append } else { echo "present=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append }
+
+      - name: Disable Windows signing if certificate not provided
+        if: matrix.platform == 'windows-latest' && steps.win_cert.outputs.present == 'false'
+        shell: pwsh
+        run: |
+          $p = 'src-tauri/tauri.conf.json'
+          $c = Get-Content $p -Raw
+          $c = $c -replace '"certificateThumbprint":\s*"\$\{WINDOWS_CERTIFICATE_THUMBPRINT\}",\s*',''
+          Set-Content $p -Value $c
+
       - name: Build Next.js standalone
         env:
           NEXT_TELEMETRY_DISABLED: "1"
         run: npm run build:tauri
 
-      - name: Tauri build and publish
+      - name: Tauri build (no publish on non-tag)
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        run: bun tauri build
+
+      - name: Tauri build and publish (only on tag)
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
