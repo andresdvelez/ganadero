@@ -41,6 +41,15 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
+      - name: Ensure base icon exists (optional)
+        run: npm run icons:gen
+
+      - name: Generate Tauri icons (.icns/.ico)
+        run: npx @tauri-apps/cli icon src-tauri/icons/icon.png
+
+      - name: Prepare Node sidecar binaries
+        run: node ./scripts/prepare-node-sidecar.mjs
+
       - name: Build Next.js standalone
         env:
           NEXT_TELEMETRY_DISABLED: "1"
