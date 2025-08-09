@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export function AIDock({
   onMic,
@@ -31,27 +33,19 @@ export function AIDock({
   return (
     <div className="fixed bottom-4 left-0 right-0 px-4">
       <div className="mx-auto max-w-2xl ios-surface rounded-full p-2 flex items-center gap-2 shadow-lg">
-        <button
-          aria-label="Hablar"
-          onClick={onMic}
-          className="px-3 py-2 rounded-full bg-neutral-100"
-        >
+        <Button aria-label="Hablar" onPress={onMic} isIconOnly variant="flat">
           🎤
-        </button>
-        <input
+        </Button>
+        <Input
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSend()}
           placeholder="Pregunta o indica una acción..."
-          className="flex-1 px-4 py-2 bg-transparent outline-none"
+          className="flex-1"
         />
-        <button
-          aria-label="Enviar"
-          onClick={handleSend}
-          className="px-3 py-2 rounded-full bg-primary-purple text-white"
-        >
+        <Button aria-label="Enviar" onPress={handleSend} isIconOnly color="primary">
           →
-        </button>
+        </Button>
       </div>
     </div>
   );

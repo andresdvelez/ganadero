@@ -4,6 +4,8 @@ import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, X, Mic, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface AIBubbleProps {
   onClose?: () => void;
@@ -44,14 +46,14 @@ export function AIBubble({ onClose }: AIBubbleProps) {
     <div className="relative">
       {/* Trigger */}
       {!isExpanded && (
-        <button
-          onClick={() => setIsExpanded(true)}
+        <Button
+          onPress={() => setIsExpanded(true)}
           className="island px-3 py-2 flex items-center gap-2"
           aria-label="Abrir asistente"
         >
           <Sparkles className="w-5 h-5 text-primary-purple" />
           <span>Asistente</span>
-        </button>
+        </Button>
       )}
 
       {/* Expanded Chat */}
@@ -70,12 +72,13 @@ export function AIBubble({ onClose }: AIBubbleProps) {
                 </div>
                 <div className="font-medium">Asistente IA</div>
               </div>
-              <button
-                onClick={() => setIsExpanded(false)}
+              <Button
+                onPress={() => setIsExpanded(false)}
+                isIconOnly
                 aria-label="Cerrar asistente"
               >
                 <X className="w-5 h-5 text-neutral-500" />
-              </button>
+              </Button>
             </div>
 
             <div className="p-4 space-y-3 max-h-80 overflow-y-auto">
@@ -111,8 +114,8 @@ export function AIBubble({ onClose }: AIBubbleProps) {
             </div>
 
             <div className="p-3 border-t border-neutral-200/50 flex gap-2">
-              <button
-                onClick={handleVoiceInput}
+              <Button
+                onPress={handleVoiceInput}
                 className={cn(
                   "p-2 rounded-lg",
                   isListening
@@ -124,27 +127,18 @@ export function AIBubble({ onClose }: AIBubbleProps) {
                 }
               >
                 <Mic className="w-5 h-5" />
-              </button>
-              <input
-                ref={inputRef}
+              </Button>
+              <Input
+                ref={inputRef as any}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSend()}
                 placeholder="Escribe tu mensaje..."
-                className="flex-1 px-3 py-2 border border-neutral-200 rounded-lg"
+                className="flex-1"
               />
-              <button
-                onClick={handleSend}
-                className={cn(
-                  "p-2 rounded-lg",
-                  message.trim()
-                    ? "bg-gradient-primary text-white"
-                    : "bg-neutral-100 text-neutral-400"
-                )}
-                aria-label="Enviar mensaje"
-              >
+              <Button onPress={handleSend} className={cn("p-2 rounded-lg", message.trim() ? "bg-gradient-primary text-white" : "bg-neutral-100 text-neutral-400")} aria-label="Enviar mensaje">
                 <Send className="w-5 h-5" />
-              </button>
+              </Button>
             </div>
           </motion.div>
         )}

@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { db, addToSyncQueue, generateUUID } from "@/lib/dexie";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 
 export default function LabNewClient() {
   const [form, setForm] = useState({
@@ -43,18 +46,17 @@ export default function LabNewClient() {
           <label className="block text-sm text-neutral-600" htmlFor="animalId">
             ID del animal (opcional)
           </label>
-          <input
+          <Input
             id="animalId"
-            className="w-full border rounded-lg px-3 py-2"
+            className="w-full"
             value={form.animalId}
             onChange={(e) => setForm({ ...form, animalId: e.target.value })}
           />
           <label className="block text-sm text-neutral-600" htmlFor="examType">
             Tipo de examen
           </label>
-          <select
+          <Select
             id="examType"
-            className="w-full border rounded-lg px-3 py-2"
             value={form.examType}
             onChange={(e) => setForm({ ...form, examType: e.target.value })}
           >
@@ -62,16 +64,16 @@ export default function LabNewClient() {
             <option value="bromatologico">Bromatológico</option>
             <option value="suelo">Suelo</option>
             <option value="sangre">Sangre</option>
-          </select>
+          </Select>
           <label
             className="block text-sm text-neutral-600"
             htmlFor="sampleType"
           >
             Tipo de muestra
           </label>
-          <input
+          <Input
             id="sampleType"
-            className="w-full border rounded-lg px-3 py-2"
+            className="w-full"
             value={form.sampleType}
             onChange={(e) => setForm({ ...form, sampleType: e.target.value })}
           />
@@ -81,36 +83,29 @@ export default function LabNewClient() {
           >
             Fecha de solicitud
           </label>
-          <input
+          <Input
             id="requestedAt"
             type="date"
-            className="w-full border rounded-lg px-3 py-2"
+            className="w-full"
             value={form.requestedAt}
             onChange={(e) => setForm({ ...form, requestedAt: e.target.value })}
           />
           <label className="block text-sm text-neutral-600" htmlFor="notes">
             Notas
           </label>
-          <input
+          <Input
             id="notes"
-            className="w-full border rounded-lg px-3 py-2"
+            className="w-full"
             value={form.notes}
             onChange={(e) => setForm({ ...form, notes: e.target.value })}
           />
           <div className="flex gap-2 justify-end">
-            <button
-              className="px-4 py-2 rounded-lg bg-neutral-100"
-              onClick={() => history.back()}
-            >
+            <Button variant="flat" onPress={() => history.back()}>
               Cancelar
-            </button>
-            <button
-              className="px-4 py-2 rounded-lg bg-primary-purple text-white"
-              onClick={onSave}
-              disabled={saving}
-            >
+            </Button>
+            <Button color="primary" onPress={onSave} isDisabled={saving}>
               Guardar
-            </button>
+            </Button>
           </div>
         </div>
       </div>

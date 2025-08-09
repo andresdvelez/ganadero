@@ -25,6 +25,16 @@ import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { moduleRegistry } from "@/modules";
 import { trpc } from "@/lib/trpc/client";
+import { AnimalNewEmbedded } from "@/components/embedded/animal-new-embedded";
+import { AIAssistantDashboard } from "@/components/ai/ai-dashboard";
+import {
+  db,
+  generateUUID,
+  OfflineChat,
+  OfflineChatMessage,
+  addToSyncQueue,
+} from "@/lib/dexie";
+// Sidebar is now handled globally in the layout
 
 interface Message {
   id: string;
@@ -41,6 +51,8 @@ export default function AIAssistantPage() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [chatUuid, setChatUuid] = useState<string | null>(null);
+  const [chatList, setChatList] = useState<OfflineChat[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const aiClient = getAIClient();
@@ -59,6 +71,11 @@ export default function AIAssistantPage() {
   } | null>(null);
   const [llamaRunning, setLlamaRunning] = useState(false);
 
+  const [inlineTool, setInlineTool] = useState<{
+    type: "animals.create";
+    props?: any;
+  } | null>(null);
+
   const MODEL_URL = process.env.NEXT_PUBLIC_MODEL_DOWNLOAD_URL || "";
   const MODEL_SHA = process.env.NEXT_PUBLIC_MODEL_SHA256 || undefined;
   const LLAMA_BIN_URL = process.env.NEXT_PUBLIC_LLAMA_BINARY_URL || "";
@@ -74,11 +91,56 @@ export default function AIAssistantPage() {
 
   useEffect(() => {
     setIsTauri(typeof window !== "undefined" && !!(window as any).__TAURI__);
+    // Load recent chats
+    (async () => {
+      try {
+        const items = await db.chats
+          .orderBy("updatedAt")
+          .reverse()
+          .limit(20)
+          .toArray();
+        setChatList(items);
+      } catch {}
+    })();
+    // Hook up module launcher opener
+    const openListener = () => {
+      const ev = new CustomEvent("open-modules");
+      window.dispatchEvent(ev);
+    };
+    // No-op here; DashboardLayout listens to open-modules already
+    // Listen for layout chat events
+    const onNewChat = () => {
+      setChatUuid(null);
+      setMessages([]);
+      setInput("");
+    };
+    const onOpenChat = async (e: any) => {
+      const uuid = e?.detail?.uuid as string;
+      if (!uuid) return;
+      setChatUuid(uuid);
+      const msgs = await db.chatMessages
+        .where({ chatUuid: uuid })
+        .sortBy("createdAt");
+      setMessages(
+        msgs.map((m) => ({
+          id: String(m.id),
+          role: m.role,
+          content: m.content,
+          timestamp: new Date(m.createdAt),
+        })) as Message[]
+      );
+    };
+    window.addEventListener("ai-new-chat", onNewChat as any);
+    window.addEventListener("ai-open-chat", onOpenChat as any);
+    return () => {
+      window.removeEventListener("ai-new-chat", onNewChat as any);
+      window.removeEventListener("ai-open-chat", onOpenChat as any);
+    };
   }, []);
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, inlineTool]);
 
   useEffect(() => {
     (async () => {
@@ -118,25 +180,81 @@ export default function AIAssistantPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+  const handleSend = async (overrideText?: string) => {
+    const textToSend = (overrideText ?? input).trim();
+    if (!textToSend || isLoading) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: input,
+      content: textToSend,
       timestamp: new Date(),
     };
 
     setMessages((prev) => [...prev, userMessage]);
-    setInput("");
+    setInput(overrideText ? "" : "");
     setIsLoading(true);
 
     try {
+      // Ensure chat exists
+      let currentChatUuid = chatUuid;
+      if (!currentChatUuid) {
+        currentChatUuid = generateUUID();
+        const title = textToSend.slice(0, 60);
+        await db.chats.add({
+          uuid: currentChatUuid,
+          userId: "dev-user",
+          title,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        } as OfflineChat);
+        setChatUuid(currentChatUuid);
+        setChatList(
+          await db.chats.orderBy("updatedAt").reverse().limit(20).toArray()
+        );
+        window.dispatchEvent(new Event("ai-chat-updated"));
+      }
+      // Persist user message
+      await db.chatMessages.add({
+        chatUuid: currentChatUuid!,
+        role: "user",
+        content: textToSend,
+        createdAt: new Date(),
+      } as OfflineChatMessage);
+      // Queue sync for user message
+      await addToSyncQueue(
+        "create",
+        "ai_conversation",
+        `${currentChatUuid}-user-${Date.now()}`,
+        {
+          sessionId: currentChatUuid,
+          role: "user",
+          content: textToSend,
+          createdAt: new Date().toISOString(),
+        },
+        "dev-user"
+      );
+
       // Primero: intentar enrutar intención para acciones CRUD/navegación
       const intent = await routeIntent.mutateAsync({
         query: userMessage.content,
       });
+
+      // Mostrar herramientas inline en lugar de navegar
+      if (intent?.module === "animals" && intent?.action === "create") {
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: "Abrí el formulario para registrar un nuevo animal.",
+          timestamp: new Date(),
+          module: intent.module,
+          action: intent.action,
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+        setInlineTool({ type: "animals.create" });
+        return;
+      }
+
       if (intent?.action === "list_modules" && intent?.data?.modules) {
         const assistantMessage: Message = {
           id: (Date.now() + 1).toString(),
@@ -150,6 +268,7 @@ export default function AIAssistantPage() {
         setMessages((prev) => [...prev, assistantMessage]);
         return;
       }
+
       if (intent?.navigateTo) {
         const assistantMessage: Message = {
           id: (Date.now() + 1).toString(),
@@ -160,11 +279,11 @@ export default function AIAssistantPage() {
           action: intent.action ?? undefined,
         };
         setMessages((prev) => [...prev, assistantMessage]);
-        router.push(intent.navigateTo);
+        // router.push(intent.navigateTo) => ahora evitamos navegación
         return;
       }
 
-      const response = await aiClient.processQuery(input, {
+      const response = await aiClient.processQuery(textToSend, {
         currentModule: "chat",
         recentMessages: messages.slice(-5),
       });
@@ -172,13 +291,44 @@ export default function AIAssistantPage() {
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: response.content,
+        content: String(response.content ?? ""),
         timestamp: new Date(),
         module: response.module,
         action: response.action,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
+      // Persist assistant message and update chat timestamp/title if needed
+      if (currentChatUuid) {
+        await db.chatMessages.add({
+          chatUuid: currentChatUuid,
+          role: "assistant",
+          content: assistantMessage.content,
+          createdAt: new Date(),
+        } as OfflineChatMessage);
+        await db.chats
+          .where({ uuid: currentChatUuid })
+          .modify({ updatedAt: new Date() });
+        window.dispatchEvent(new Event("ai-chat-updated"));
+        // Queue sync for assistant message
+        await addToSyncQueue(
+          "create",
+          "ai_conversation",
+          `${currentChatUuid}-assistant-${Date.now()}`,
+          {
+            sessionId: currentChatUuid,
+            role: "assistant",
+            content: assistantMessage.content,
+            createdAt: new Date().toISOString(),
+          },
+          "dev-user"
+        );
+      }
+
+      if (response.module === "animals" && response.action === "create") {
+        setInlineTool({ type: "animals.create" });
+        return;
+      }
 
       if (response.module && response.action) {
         const mod =
@@ -186,7 +336,18 @@ export default function AIAssistantPage() {
         const act = mod?.actions?.[response.action];
         if (act) {
           const result = await act.run(response.data);
-          if (result?.navigateTo) router.push(result.navigateTo);
+          // evitamos navegar, sólo informamos
+          if (result?.message) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: String(result.message ?? ""),
+                timestamp: new Date(),
+              },
+            ]);
+          }
         }
       }
     } catch (error) {
@@ -234,8 +395,9 @@ export default function AIAssistantPage() {
 
     recognition.onresult = (event: any) => {
       const transcript = event.results[0][0].transcript;
-      setInput(transcript);
       setIsListening(false);
+      // Auto-send immediately after transcription ends
+      handleSend(transcript);
     };
 
     recognition.onerror = (event: any) => {
@@ -287,287 +449,162 @@ export default function AIAssistantPage() {
     <TRPCProvider>
       <DashboardLayout>
         <div className="flex flex-col h-[calc(100vh-4rem)]">
-          {/* Header */}
-          <div className="bg-white border-b border-ranch-200 px-6 py-4">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-pasture-100 rounded-lg">
-                <Bot className="h-6 w-6 text-pasture-600" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-ranch-900">
-                  {translations.ai.title}
-                </h1>
-                <p className="text-sm text-ranch-600">
-                  Tu asistente inteligente para gestión ganadera
-                </p>
-              </div>
-            </div>
-          </div>
+          {/* Header removed per new design */}
 
-          {/* Messages Area */}
-          <div className="flex-1 overflow-y-auto bg-ranch-50 p-4 space-y-4">
-            {localModelAvailable === false && (
-              <div className="max-w-2xl mx-auto bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm">
-                    Modelo local no disponible. Puedes descargar{" "}
-                    <strong>deepseek-r1</strong> para usar la IA sin conexión.
-                  </p>
-                  <Button
-                    size="sm"
-                    variant="solid"
-                    color="primary"
-                    isLoading={ensureLocal.isPending}
-                    onPress={async () => {
-                      if (isTauri) {
-                        await startLocalAI();
-                      } else {
-                        const res = await ensureLocal.mutateAsync({
-                          model:
-                            process.env.NEXT_PUBLIC_OLLAMA_MODEL ||
-                            "deepseek-r1:latest",
-                        });
-                        if (res.ok) {
-                          const chk = await checkLocal.mutateAsync();
-                          setLocalModelAvailable(chk.available);
-                        }
-                      }
-                    }}
-                    className="bg-violet-600 hover:bg-violet-700 text-white shadow-md"
-                  >
-                    <Download className="h-4 w-4 mr-1" /> Descargar modelo
-                  </Button>
-                </div>
-                {dlProgress && (
-                  <div className="mt-2 text-xs">
-                    <div className="h-2 bg-amber-200 rounded">
-                      <div
-                        className="h-2 bg-violet-600 rounded"
-                        style={{
-                          width:
-                            dlProgress.total > 0
-                              ? `${Math.min(
-                                  100,
-                                  Math.round(
-                                    (dlProgress.downloaded / dlProgress.total) *
-                                      100
-                                  )
-                                )}%`
-                              : "10%",
+          {/* Messages + Inline Tools */}
+          <div className="flex-1 overflow-y-auto p-0">
+            {/* Conversation content only; sidebar handled in layout */}
+            {messages.length > 0 ? (
+              <div className="flex h-full">
+                <div className="flex-1 overflow-y-auto p-6">
+                  {/* Inline tool remains */}
+                  {inlineTool?.type === "animals.create" && (
+                    <div className="max-w-3xl mx-auto mb-4">
+                      <AnimalNewEmbedded
+                        onCompleted={() => {
+                          setInlineTool(null);
+                          setMessages((prev) => [
+                            ...prev,
+                            {
+                              id: (Date.now() + 3).toString(),
+                              role: "assistant",
+                              content: "Animal registrado correctamente.",
+                              timestamp: new Date(),
+                            },
+                          ]);
                         }}
+                        onClose={() => setInlineTool(null)}
                       />
                     </div>
-                    <p className="mt-1">
-                      {dlProgress.total > 0
-                        ? `${(dlProgress.downloaded / (1024 * 1024)).toFixed(
-                            1
-                          )} MB / ${(dlProgress.total / (1024 * 1024)).toFixed(
-                            1
-                          )} MB`
-                        : `Descargando... ${(
-                            dlProgress.downloaded /
-                            (1024 * 1024)
-                          ).toFixed(1)} MB`}
-                    </p>
-                  </div>
-                )}
-                {llamaRunning && (
-                  <div className="flex items-center gap-2 text-green-700 text-sm mt-2">
-                    <Server className="h-4 w-4" /> IA local en ejecución en{" "}
-                    {`127.0.0.1:${LLAMA_PORT}`}
-                  </div>
-                )}
-              </div>
-            )}
-            {messages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full space-y-6">
-                <div className="text-center">
-                  <Sparkles className="h-12 w-12 text-pasture-500 mx-auto mb-4" />
-                  <h2 className="text-xl font-semibold text-ranch-900 mb-2">
-                    ¡Hola! Soy tu asistente Ganado AI
-                  </h2>
-                  <p className="text-ranch-600 max-w-md">
-                    Puedo ayudarte a gestionar tu finca, registrar animales,
-                    programar vacunaciones y mucho más. ¿En qué puedo ayudarte
-                    hoy?
-                  </p>
-                </div>
+                  )}
 
-                {/* Sample Commands */}
-                <div className="w-full max-w-2xl">
-                  <p className="text-sm text-ranch-600 mb-3">
-                    Comandos de ejemplo:
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {sampleCommands.map((command) => (
-                      <button
-                        key={command}
-                        onClick={() => handleSampleCommand(command)}
-                        className="text-left px-4 py-2 bg-white rounded-lg border border-ranch-200 hover:bg-ranch-50 transition-colors text-sm text-ranch-700"
+                  <div
+                    className={cn(
+                      "mx-auto max-w-3xl space-y-4",
+                      inlineTool ? "mt-4" : ""
+                    )}
+                  >
+                    {messages.map((message) => (
+                      <div
+                        key={message.id}
+                        className={cn(
+                          "animate-message",
+                          message.role === "user"
+                            ? "flex justify-end"
+                            : "flex justify-start"
+                        )}
                       >
-                        {command}
-                      </button>
+                        <div
+                          className={cn(
+                            "flex items-start gap-3 w-full",
+                            message.role === "user" ? "flex-row-reverse" : ""
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "h-8 w-8 rounded-full grid place-items-center",
+                              message.role === "user"
+                                ? "bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white"
+                                : "bg-neutral-100 text-neutral-700"
+                            )}
+                          >
+                            {message.role === "user" ? (
+                              <User className="h-4 w-4" />
+                            ) : (
+                              <Bot className="h-4 w-4" />
+                            )}
+                          </div>
+                          <div
+                            className={cn(
+                              "rounded-2xl px-4 py-3 max-w-[80%] transition-all",
+                              message.role === "user"
+                                ? "bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white shadow-md"
+                                : "bg-white border border-neutral-200 shadow-sm text-neutral-800"
+                            )}
+                          >
+                            <p className="whitespace-pre-wrap leading-relaxed">
+                              {message.content}
+                            </p>
+                            {message.module && (
+                              <p className="text-[11px] mt-2 opacity-70">
+                                Módulo sugerido: {message.module}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     ))}
+                    {isLoading && (
+                      <div className="mx-auto max-w-3xl">
+                        <div className="inline-flex items-center gap-2 rounded-2xl bg-white border border-neutral-200 px-4 py-2 shadow-sm">
+                          <span className="typing-dots" />
+                          <span className="text-neutral-600">Pensando…</span>
+                        </div>
+                      </div>
+                    )}
+                    <div ref={messagesEndRef} />
                   </div>
                 </div>
               </div>
             ) : (
-              <>
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={cn(
-                      "flex",
-                      message.role === "user" ? "justify-end" : "justify-start"
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        "flex items-start space-x-2 max-w-[70%]",
-                        message.role === "user"
-                          ? "flex-row-reverse space-x-reverse"
-                          : ""
-                      )}
-                    >
-                      <div
-                        className={cn(
-                          "p-2 rounded-lg",
-                          message.role === "user"
-                            ? "bg-ranch-100"
-                            : "bg-pasture-100"
-                        )}
-                      >
-                        {message.role === "user" ? (
-                          <User className="h-5 w-5 text-ranch-600" />
-                        ) : (
-                          <Bot className="h-5 w-5 text-pasture-600" />
-                        )}
-                      </div>
-                      <div
-                        className={cn(
-                          "px-4 py-2 rounded-lg",
-                          message.role === "user"
-                            ? "bg-ranch-500 text-white"
-                            : "bg-white border border-ranch-200"
-                        )}
-                      >
-                        <p className="whitespace-pre-wrap">{message.content}</p>
-                        {message.module === "assistant" &&
-                          message.action === "list_modules" && (
-                            <div className="mt-3 border-t pt-3">
-                              <p className="text-sm font-medium mb-2">
-                                Módulos disponibles
-                              </p>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                {(message as any).data?.modules?.map(
-                                  (m: any) => (
-                                    <div
-                                      key={m.id}
-                                      className="border rounded-lg p-2 flex items-center justify-between"
-                                    >
-                                      <div>
-                                        <p className="text-sm font-medium">
-                                          {m.name}
-                                        </p>
-                                        <p className="text-xs text-ranch-600">
-                                          /{m.id}
-                                        </p>
-                                      </div>
-                                      <div className="flex items-center gap-2">
-                                        {m.hasList && (
-                                          <Button
-                                            size="sm"
-                                            variant="bordered"
-                                            onPress={() =>
-                                              router.push(`/${m.id}`)
-                                            }
-                                          >
-                                            Ver
-                                          </Button>
-                                        )}
-                                        {m.hasCreate && (
-                                          <Button
-                                            size="sm"
-                                            color="primary"
-                                            onPress={() =>
-                                              router.push(`/${m.id}/new`)
-                                            }
-                                          >
-                                            Nuevo
-                                          </Button>
-                                        )}
-                                      </div>
-                                    </div>
-                                  )
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        {message.module && (
-                          <p className="text-xs mt-2 opacity-70">
-                            Módulo: {message.module}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                {isLoading && (
-                  <div className="flex justify-start">
-                    <div className="flex items-center space-x-2 bg-white border border-ranch-200 rounded-lg px-4 py-2">
-                      <Loader2 className="h-4 w-4 animate-spin text-pasture-600" />
-                      <span className="text-ranch-600">Pensando...</span>
-                    </div>
-                  </div>
-                )}
-                <div ref={messagesEndRef} />
-              </>
+              <div className="p-6">
+                <AIAssistantDashboard
+                  value={input}
+                  onChange={(v) => setInput(v)}
+                  onSend={() => handleSend()}
+                  onMic={handleVoiceInput}
+                  onSample={(cmd) => handleSampleCommand(cmd)}
+                  userName={undefined}
+                />
+              </div>
             )}
           </div>
 
-          {/* Input Area */}
-          <div className="bg-white border-t border-ranch-200 p-4">
-            <div className="max-w-4xl mx-auto">
-              <div className="flex items-end space-x-2">
-                <div className="flex-1">
-                  <textarea
-                    ref={inputRef}
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    placeholder={translations.ai.placeholder}
-                    className="w-full px-4 py-2 border border-ranch-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-ranch-500 resize-none"
-                    rows={1}
-                    style={{ minHeight: "40px", maxHeight: "120px" }}
-                  />
+          {/* Input Area (hidden on empty-state dashboard) */}
+          {messages.length > 0 && (
+            <div className="bg-white border-t border-ranch-200 p-4">
+              <div className="max-w-4xl mx-auto">
+                <div className="flex items-end space-x-2">
+                  <div className="flex-1">
+                    <textarea
+                      ref={inputRef}
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyPress={handleKeyPress}
+                      placeholder={translations.ai.placeholder}
+                      className="w-full px-4 py-2 border border-ranch-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-ranch-500 resize-none"
+                      rows={1}
+                      style={{ minHeight: "40px", maxHeight: "120px" }}
+                    />
+                  </div>
+                  <Button
+                    onPress={handleVoiceInput}
+                    variant="bordered"
+                    isIconOnly
+                    className={cn(isListening && "bg-red-100 border-red-300")}
+                  >
+                    {isListening ? (
+                      <MicOff className="h-5 w-5 text-red-600" />
+                    ) : (
+                      <Mic className="h-5 w-5" />
+                    )}
+                  </Button>
+                  <Button
+                    onPress={handleSend}
+                    isDisabled={!input.trim() || isLoading}
+                    color="primary"
+                    className="bg-pasture-500 hover:bg-pasture-600 text-white"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <Send className="h-5 w-5" />
+                    )}
+                  </Button>
                 </div>
-                <Button
-                  onPress={handleVoiceInput}
-                  variant="bordered"
-                  isIconOnly
-                  className={cn(isListening && "bg-red-100 border-red-300")}
-                >
-                  {isListening ? (
-                    <MicOff className="h-5 w-5 text-red-600" />
-                  ) : (
-                    <Mic className="h-5 w-5" />
-                  )}
-                </Button>
-                <Button
-                  onPress={handleSend}
-                  isDisabled={!input.trim() || isLoading}
-                  color="primary"
-                  className="bg-pasture-500 hover:bg-pasture-600 text-white"
-                >
-                  {isLoading ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    <Send className="h-5 w-5" />
-                  )}
-                </Button>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </DashboardLayout>
     </TRPCProvider>

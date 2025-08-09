@@ -6,41 +6,78 @@ import { translations } from "@/lib/constants/translations";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc/client";
-import { db } from "@/lib/dexie";
+import { db, addToSyncQueue } from "@/lib/dexie";
 import Link from "next/link";
-import { Plus, Search, Filter, Home as Cow } from "lucide-react";
+import {
+  Plus,
+  Search,
+  Filter,
+  Home as Cow,
+  Trash2,
+  Edit3,
+  Save,
+  X,
+} from "lucide-react";
 import { useSearchParams } from "next/navigation";
+import { AnimalNewEmbedded } from "@/components/embedded/animal-new-embedded";
 
 export default function AnimalsClient() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [localAnimals, setLocalAnimals] = useState<any[]>([]);
   const [isOnline, setIsOnline] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState<{
+    name?: string;
+    status?: string;
+  }>({});
+  const [showInlineCreate, setShowInlineCreate] = useState(false);
   const params = useSearchParams();
 
-  const { data: serverAnimals, isLoading } = trpc.animal.getAll.useQuery(
-    undefined,
-    {
+  const updateMutation = trpc.animal.update.useMutation();
+  const deleteMutation = trpc.animal.delete.useMutation();
+
+  const {
+    data: serverAnimals,
+    isLoading,
+    refetch,
+    } = trpc.animal.getAll.useQuery(undefined, {
       enabled: isOnline,
       retry: false,
+    });
+
+  async function loadLocal() {
+    try {
+      const animals = await db.animals.toArray();
+      setLocalAnimals(animals);
+    } catch (e) {
+      console.error(e);
     }
-  );
+  }
 
   useEffect(() => {
-    (async () => {
-      try {
-        const animals = await db.animals.toArray();
-        setLocalAnimals(animals);
-      } catch (e) {
-        console.error(e);
-      }
-    })();
+    loadLocal();
   }, []);
 
   useEffect(() => {
     const qp = params.get("q");
     if (qp != null) setSearchTerm(qp);
   }, [params]);
+
+  useEffect(() => {
+    const onChanged = () => {
+      loadLocal();
+      refetch();
+    };
+    if (typeof window !== "undefined") {
+      window.addEventListener("animals-changed", onChanged);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("animals-changed", onChanged);
+      }
+    };
+  }, [refetch]);
 
   const allAnimals = isOnline && serverAnimals ? serverAnimals : localAnimals;
   const filteredAnimals = allAnimals.filter((animal: any) => {
@@ -51,6 +88,57 @@ export default function AnimalsClient() {
       filterStatus === "all" || animal.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
+
+  async function handleDelete(animal: any) {
+    const ok = window.confirm(`Eliminar ${animal.name}?`);
+    if (!ok) return;
+    try {
+      await db.animals.where({ uuid: animal.uuid }).delete();
+      await addToSyncQueue(
+        "delete",
+        "animal",
+        animal.uuid || animal.id,
+        { id: animal.uuid || animal.id },
+        "dev-user"
+      );
+      if (isOnline && animal.id) {
+        await deleteMutation.mutateAsync({ id: animal.id });
+      }
+    } finally {
+      if (typeof window !== "undefined")
+        window.dispatchEvent(new Event("animals-changed"));
+    }
+  }
+
+  function startEdit(animal: any) {
+    setEditingId(animal.uuid || animal.id);
+    setEditDraft({ name: animal.name, status: animal.status });
+  }
+
+  async function saveEdit(animal: any) {
+    try {
+      const patch = { ...editDraft } as any;
+      await db.animals.where({ uuid: animal.uuid }).modify(patch);
+      await addToSyncQueue(
+        "update",
+        "animal",
+        animal.uuid || animal.id,
+        { id: animal.uuid || animal.id, ...patch },
+        "dev-user"
+      );
+      if (isOnline && animal.id) {
+        await updateMutation.mutateAsync({
+          id: animal.id,
+          name: patch.name,
+          status: patch.status,
+        });
+      }
+    } finally {
+      setEditingId(null);
+      if (typeof window !== "undefined")
+        window.dispatchEvent(new Event("animals-changed"));
+    }
+  }
 
   return (
     <DashboardLayout>
@@ -64,13 +152,29 @@ export default function AnimalsClient() {
               {translations.animals.totalAnimals}: {filteredAnimals.length}
             </p>
           </div>
-          <Link href="/animals/new">
-            <Button className="bg-ranch-500 hover:bg-ranch-600 text-white">
+          <div className="flex items-center gap-2">
+            <Button
+              className="bg-ranch-500 hover:bg-ranch-600 text-white"
+              onPress={() => setShowInlineCreate(true)}
+            >
               <Plus className="h-5 w-5 mr-2" />
               {translations.animals.addAnimal}
             </Button>
-          </Link>
+          </div>
         </div>
+
+        {showInlineCreate && (
+          <div className="max-w-3xl">
+            <AnimalNewEmbedded
+              onCompleted={() => {
+                setShowInlineCreate(false);
+                if (typeof window !== "undefined")
+                  window.dispatchEvent(new Event("animals-changed"));
+              }}
+              onClose={() => setShowInlineCreate(false)}
+            />
+          </div>
+        )}
 
         <Card>
           <CardContent className="p-4">
@@ -110,35 +214,112 @@ export default function AnimalsClient() {
           </CardContent>
         </Card>
 
-        {isLoading ? (
+        {isLoading && isOnline ? (
           <div className="text-center py-12">
             <p className="text-ranch-600">{translations.common.loading}</p>
           </div>
         ) : filteredAnimals.length === 0 ? (
           <Card>
-            <CardContent className="text-center py-12">
-              <Cow className="h-12 w-12 text-ranch-400 mx-auto mb-4" />
+            <CardContent className="text-center py-12 space-y-4">
+              <Cow className="h-12 w-12 text-ranch-400 mx-auto mb-2" />
               <p className="text-ranch-600">{translations.common.noData}</p>
-              <Link href="/animals/new">
-                <Button className="mt-4 bg-ranch-500 hover:bg-ranch-600 text-white">
-                  <Plus className="h-5 w-5 mr-2" />
-                  {translations.animals.addAnimal}
-                </Button>
-              </Link>
+              <Button
+                className="bg-ranch-500 hover:bg-ranch-600 text-white"
+                onPress={() => setShowInlineCreate(true)}
+              >
+                <Plus className="h-5 w-5 mr-2" />{" "}
+                {translations.animals.addAnimal}
+              </Button>
             </CardContent>
           </Card>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredAnimals.map((animal: any) => (
-              <Card key={animal.uuid}>
-                <CardHeader>
-                  <CardTitle>{animal.name}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-ranch-600">{animal.tagNumber}</p>
-                </CardContent>
-              </Card>
-            ))}
+            {filteredAnimals.map((animal: any) => {
+              const isEditing = editingId === (animal.uuid || animal.id);
+              return (
+                <Card key={animal.uuid || animal.id}>
+                  <CardHeader className="flex-row items-center justify-between gap-3">
+                    {isEditing ? (
+                      <input
+                        aria-label="Editar nombre"
+                        title="Editar nombre"
+                        placeholder="Nombre"
+                        className="flex-1 px-3 py-2 border border-ranch-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-ranch-500"
+                        defaultValue={animal.name}
+                        onChange={(e) =>
+                          setEditDraft((d) => ({ ...d, name: e.target.value }))
+                        }
+                      />
+                    ) : (
+                      <CardTitle className="flex-1">{animal.name}</CardTitle>
+                    )}
+                    <div className="flex items-center gap-2">
+                      {isEditing ? (
+                        <>
+                          <Button size="sm" onPress={() => saveEdit(animal)}>
+                            <Save className="h-4 w-4 mr-1" /> Guardar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="bordered"
+                            onPress={() => setEditingId(null)}
+                          >
+                            <X className="h-4 w-4 mr-1" /> Cancelar
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="bordered"
+                            onPress={() => startEdit(animal)}
+                          >
+                            <Edit3 className="h-4 w-4 mr-1" /> Editar
+                          </Button>
+                          <Button
+                            size="sm"
+                            color="danger"
+                            className="bg-red-500 text-white"
+                            onPress={() => handleDelete(animal)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" /> Eliminar
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <p className="text-sm text-ranch-600">{animal.tagNumber}</p>
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm">Estado:</label>
+                      {isEditing ? (
+                        <select
+                          aria-label="Cambiar estado"
+                          title="Cambiar estado"
+                          defaultValue={animal.status}
+                          onChange={(e) =>
+                            setEditDraft((d) => ({
+                              ...d,
+                              status: e.target.value,
+                            }))
+                          }
+                          className="px-2 py-1 border rounded"
+                        >
+                          <option value="active">Activo</option>
+                          <option value="sold">Vendido</option>
+                          <option value="deceased">Muerto</option>
+                          <option value="pregnant">Preñado</option>
+                        </select>
+                      ) : (
+                        <span className="text-sm text-ranch-700">
+                          {animal.status}
+                        </span>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>

@@ -18,6 +18,7 @@ import {
   MapPin,
   Users,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export interface ModuleItem {
   id: string;
@@ -81,9 +82,14 @@ export function ModuleGrid({
             {content}
           </Link>
         ) : (
-          <button key={m.id} onClick={() => onSelect?.(m.id)} className="block">
+          <Button
+            key={m.id}
+            onPress={() => onSelect?.(m.id)}
+            className="block"
+            variant="light"
+          >
             {content}
-          </button>
+          </Button>
         );
       })}
     </div>

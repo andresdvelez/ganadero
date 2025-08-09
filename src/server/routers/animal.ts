@@ -5,19 +5,16 @@ import { generateTagNumber } from "@/lib/utils";
 
 export const animalRouter = createTRPCRouter({
   getAll: protectedProcedure.query(async ({ ctx }) => {
-    const user = await ctx.prisma.user.findUnique({
+    // Garantiza que exista el usuario (útil en dev con ALLOW_DEV_UNAUTH)
+    const user = await ctx.prisma.user.upsert({
       where: { clerkId: ctx.userId },
-      include: {
-        animals: {
-          orderBy: { createdAt: "desc" },
-        },
+      update: {},
+      create: {
+        clerkId: ctx.userId,
+        email: `user_${ctx.userId}@ganado.ai`,
       },
+      include: { animals: { orderBy: { createdAt: "desc" } } },
     });
-
-    if (!user) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
-    }
-
     return user.animals;
   }),
 
@@ -65,27 +62,14 @@ export const animalRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const user = await ctx.prisma.user.findUnique({
+      const user = await ctx.prisma.user.upsert({
         where: { clerkId: ctx.userId },
+        update: {},
+        create: {
+          clerkId: ctx.userId,
+          email: `user_${ctx.userId}@ganado.ai`,
+        },
       });
-
-      if (!user) {
-        // Create user if doesn't exist
-        const newUser = await ctx.prisma.user.create({
-          data: {
-            clerkId: ctx.userId,
-            email: `user_${ctx.userId}@ganado.ai`, // Placeholder email
-          },
-        });
-
-        return await ctx.prisma.animal.create({
-          data: {
-            ...input,
-            tagNumber: generateTagNumber(),
-            userId: newUser.id,
-          },
-        });
-      }
 
       return await ctx.prisma.animal.create({
         data: {

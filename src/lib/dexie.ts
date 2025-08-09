@@ -164,6 +164,24 @@ export interface SyncQueueItem {
   syncedAt?: Date;
 }
 
+// Chat history
+export interface OfflineChat {
+  id?: number;
+  uuid: string;
+  userId: string;
+  title: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface OfflineChatMessage {
+  id?: number;
+  chatUuid: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: Date;
+}
+
 export class GanadoDB extends Dexie {
   animals!: Table<OfflineAnimal>;
   healthRecords!: Table<OfflineHealthRecord>;
@@ -174,6 +192,8 @@ export class GanadoDB extends Dexie {
   pastures!: Table<OfflinePasture>;
   labExams!: Table<OfflineLabExam>;
   syncQueue!: Table<SyncQueueItem>;
+  chats!: Table<OfflineChat>;
+  chatMessages!: Table<OfflineChatMessage>;
 
   constructor() {
     super("GanadoDB");
@@ -200,6 +220,16 @@ export class GanadoDB extends Dexie {
       })
       .upgrade(() => {
         // no data migration required for new tables
+      });
+
+    // Version 3: chat history
+    this.version(3)
+      .stores({
+        chats: "++id, uuid, userId, updatedAt, title",
+        chatMessages: "++id, chatUuid, createdAt, role",
+      })
+      .upgrade(() => {
+        // nothing to migrate
       });
   }
 }

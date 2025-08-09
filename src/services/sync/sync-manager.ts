@@ -142,6 +142,11 @@ export class SyncManager {
           data,
         });
         break;
+      case "ai_conversation":
+        await trpcClient.sync.upsertAIConversation.mutate({
+          data,
+        });
+        break;
       default:
         throw new Error(`Tipo de entidad no soportado: ${item.entityType}`);
     }

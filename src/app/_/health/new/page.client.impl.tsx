@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { db, addToSyncQueue, generateUUID } from "@/lib/dexie";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 
 export default function HealthNewClient() {
   const [form, setForm] = useState({
@@ -41,9 +44,9 @@ export default function HealthNewClient() {
           <label className="block text-sm text-neutral-600" htmlFor="animalId">
             ID del animal (opcional)
           </label>
-          <input
+          <Input
             id="animalId"
-            className="w-full border rounded-lg px-3 py-2"
+            className="w-full"
             placeholder="Ej: a1b2c3..."
             value={form.animalId}
             onChange={(e) => setForm({ ...form, animalId: e.target.value })}
@@ -51,9 +54,8 @@ export default function HealthNewClient() {
           <label className="block text-sm text-neutral-600" htmlFor="type">
             Tipo de evento
           </label>
-          <select
+          <Select
             id="type"
-            className="w-full border rounded-lg px-3 py-2"
             value={form.type}
             onChange={(e) => setForm({ ...form, type: e.target.value })}
           >
@@ -61,38 +63,40 @@ export default function HealthNewClient() {
             <option value="desparasitación">Desparasitación</option>
             <option value="tratamiento">Tratamiento</option>
             <option value="chequeo">Chequeo</option>
-          </select>
-          <label className="block text-sm text-neutral-600" htmlFor="description">
+          </Select>
+          <label
+            className="block text-sm text-neutral-600"
+            htmlFor="description"
+          >
             Descripción
           </label>
-          <input
+          <Input
             id="description"
-            className="w-full border rounded-lg px-3 py-2"
+            className="w-full"
             placeholder="Detalle del evento"
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
           />
-          <label className="block text-sm text-neutral-600" htmlFor="performedAt">
+          <label
+            className="block text-sm text-neutral-600"
+            htmlFor="performedAt"
+          >
             Fecha de realización
           </label>
-          <input
+          <Input
             id="performedAt"
             type="date"
-            className="w-full border rounded-lg px-3 py-2"
+            className="w-full"
             value={form.performedAt}
             onChange={(e) => setForm({ ...form, performedAt: e.target.value })}
           />
           <div className="flex gap-2 justify-end">
-            <button className="px-4 py-2 rounded-lg bg-neutral-100" onClick={() => history.back()}>
+            <Button variant="flat" onPress={() => history.back()}>
               Cancelar
-            </button>
-            <button
-              className="px-4 py-2 rounded-lg bg-primary-purple text-white"
-              onClick={onSave}
-              disabled={saving}
-            >
+            </Button>
+            <Button color="primary" onPress={onSave} isDisabled={saving}>
               Guardar
-            </button>
+            </Button>
           </div>
         </div>
       </div>

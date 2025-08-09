@@ -315,4 +315,43 @@ export const syncRouter = createTRPCRouter({
         : await ctx.prisma.labExam.create({ data: payload });
       return saved;
     }),
+
+  // AI Conversation entries (chat messages and metadata)
+  upsertAIConversation: protectedProcedure
+    .input(z.object({ data: z.any() }))
+    .mutation(async ({ ctx, input }) => {
+      const user = await ctx.prisma.user.findUnique({
+        where: { clerkId: ctx.userId },
+      });
+      if (!user) throw new Error("User not found");
+      const d = input.data || {};
+      const sessionId = String(d.sessionId);
+      const role = String(d.role || "user");
+      const content = String(d.content || "");
+      const createdAt = d.createdAt ? new Date(d.createdAt) : new Date();
+
+      // Avoid duplicates: check if a record with matching fields exists
+      const existing = await ctx.prisma.aIConversation.findFirst({
+        where: {
+          userId: user.id,
+          sessionId,
+          role,
+          content,
+          createdAt,
+        },
+      });
+      if (existing) return existing;
+      const saved = await ctx.prisma.aIConversation.create({
+        data: {
+          userId: user.id,
+          sessionId,
+          role,
+          content,
+          moduleContext: d.moduleContext ?? null,
+          metadata: d.metadata ? JSON.stringify(d.metadata) : null,
+          createdAt,
+        } as any,
+      });
+      return saved;
+    }),
 });

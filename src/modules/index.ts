@@ -1,6 +1,8 @@
 export interface RanchModule {
   id: string;
   name: string;
+  category?: string; // e.g., "Productividad", "Salud", "Administración", "Integración"
+  tags?: string[]; // keywords to enhance search in launcher
   actions: Record<
     string,
     {
@@ -14,17 +16,19 @@ export const moduleRegistry: Record<string, RanchModule> = {
   animals: {
     id: "animals",
     name: "Animales",
+    category: "Productividad",
+    tags: ["inventario vivo", "ganado", "registro"],
     actions: {
       list: {
         label: "Ver animales",
         async run() {
-          return { navigateTo: "/animals" };
+          return { navigateTo: "/_" };
         },
       },
       create: {
         label: "Agregar animal",
         async run() {
-          return { navigateTo: "/animals/new" };
+          return { navigateTo: "/_/new" };
         },
       },
     },
@@ -32,17 +36,19 @@ export const moduleRegistry: Record<string, RanchModule> = {
   health: {
     id: "health",
     name: "Salud",
+    category: "Salud y Reproducción",
+    tags: ["vacunación", "tratamientos", "desparasitación"],
     actions: {
       list: {
         label: "Ver salud",
         async run() {
-          return { navigateTo: "/health" };
+          return { navigateTo: "/_/health" };
         },
       },
       create: {
         label: "Agregar registro de salud",
         async run() {
-          return { navigateTo: "/health/new" };
+          return { navigateTo: "/_/health/new" };
         },
       },
     },
@@ -50,17 +56,19 @@ export const moduleRegistry: Record<string, RanchModule> = {
   breeding: {
     id: "breeding",
     name: "Reproducción",
+    category: "Salud y Reproducción",
+    tags: ["partos", "montas", "inseminación"],
     actions: {
       list: {
         label: "Ver reproducción",
         async run() {
-          return { navigateTo: "/breeding" };
+          return { navigateTo: "/_/breeding" };
         },
       },
       create: {
         label: "Nuevo evento",
         async run() {
-          return { navigateTo: "/breeding/new" };
+          return { navigateTo: "/_/breeding/new" };
         },
       },
     },
@@ -68,57 +76,87 @@ export const moduleRegistry: Record<string, RanchModule> = {
   inventory: {
     id: "inventory",
     name: "Inventario",
+    category: "Administración",
+    tags: ["productos", "bodega", "stock"],
     actions: {
       list: {
         label: "Ver inventario",
         async run() {
-          return { navigateTo: "/inventory" };
+          return { navigateTo: "/_/inventory" };
         },
       },
       create: {
         label: "Nuevo producto",
         async run() {
-          return { navigateTo: "/inventory/new" };
+          return { navigateTo: "/_/inventory/new" };
         },
       },
     },
   },
-  finance: { id: "finance", name: "Finanzas", actions: {} },
-  reports: { id: "reports", name: "Reportes", actions: {} },
+  finance: {
+    id: "finance",
+    name: "Finanzas",
+    category: "Administración",
+    tags: ["costos", "ingresos", "egresos"],
+    actions: {},
+  },
+  reports: {
+    id: "reports",
+    name: "Reportes",
+    category: "Administración",
+    tags: ["informes", "exportar"],
+    actions: {},
+  },
   pastures: {
     id: "pastures",
     name: "Potreros",
+    category: "Productividad",
+    tags: ["rotación", "forraje", "mapa"],
     actions: {
       list: {
         label: "Ver potreros",
         async run() {
-          return { navigateTo: "/pastures" };
+          return { navigateTo: "/_/pastures" };
         },
       },
       create: {
         label: "Nuevo potrero",
         async run() {
-          return { navigateTo: "/pastures/new" };
+          return { navigateTo: "/_/pastures/new" };
         },
       },
     },
   },
-  weather: { id: "weather", name: "Clima", actions: {} },
-  tasks: { id: "tasks", name: "Tareas", actions: {} },
+  weather: {
+    id: "weather",
+    name: "Clima",
+    category: "Integración",
+    tags: ["pronóstico", "estación"],
+    actions: {},
+  },
+  tasks: {
+    id: "tasks",
+    name: "Tareas",
+    category: "Productividad",
+    tags: ["pendientes", "gestión"],
+    actions: {},
+  },
   milk: {
     id: "milk",
     name: "Lechería",
+    category: "Productividad",
+    tags: ["producción", "control lechero"],
     actions: {
       list: {
         label: "Control lechero",
         async run() {
-          return { navigateTo: "/milk" };
+          return { navigateTo: "/_/milk" };
         },
       },
       create: {
         label: "Nuevo registro",
         async run() {
-          return { navigateTo: "/milk/new" };
+          return { navigateTo: "/_/milk/new" };
         },
       },
     },
@@ -126,21 +164,35 @@ export const moduleRegistry: Record<string, RanchModule> = {
   lab: {
     id: "lab",
     name: "Laboratorio",
+    category: "Integración",
+    tags: ["exámenes", "muestreo"],
     actions: {
       list: {
         label: "Ver exámenes",
         async run() {
-          return { navigateTo: "/lab" };
+          return { navigateTo: "/_/lab" };
         },
       },
       create: {
         label: "Nuevo examen",
         async run() {
-          return { navigateTo: "/lab/new" };
+          return { navigateTo: "/_/lab/new" };
         },
       },
     },
   },
-  sensors: { id: "sensors", name: "Sensores", actions: {} },
-  locations: { id: "locations", name: "Ubicaciones", actions: {} },
+  sensors: {
+    id: "sensors",
+    name: "Sensores",
+    category: "Integración",
+    tags: ["iot", "telemetría"],
+    actions: {},
+  },
+  locations: {
+    id: "locations",
+    name: "Ubicaciones",
+    category: "Administración",
+    tags: ["georreferenciación", "mapas"],
+    actions: {},
+  },
 };

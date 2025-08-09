@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { db, addToSyncQueue, generateUUID } from "@/lib/dexie";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 
 export default function MilkNewClient() {
   const [form, setForm] = useState({
@@ -41,32 +44,31 @@ export default function MilkNewClient() {
           <label className="block text-sm text-neutral-600" htmlFor="animalId">
             ID del animal (opcional)
           </label>
-          <input
+          <Input
             id="animalId"
-            className="w-full border rounded-lg px-3 py-2"
+            className="w-full"
             value={form.animalId}
             onChange={(e) => setForm({ ...form, animalId: e.target.value })}
           />
           <label className="block text-sm text-neutral-600" htmlFor="session">
             Jornada
           </label>
-          <select
+          <Select
             id="session"
-            className="w-full border rounded-lg px-3 py-2"
             value={form.session}
             onChange={(e) => setForm({ ...form, session: e.target.value })}
           >
             <option value="AM">AM</option>
             <option value="PM">PM</option>
             <option value="TOTAL">Total</option>
-          </select>
+          </Select>
           <label className="block text-sm text-neutral-600" htmlFor="liters">
             Litros
           </label>
-          <input
+          <Input
             id="liters"
             type="number"
-            className="w-full border rounded-lg px-3 py-2"
+            className="w-full"
             value={form.liters}
             onChange={(e) => setForm({ ...form, liters: e.target.value })}
           />
@@ -76,27 +78,20 @@ export default function MilkNewClient() {
           >
             Fecha y hora
           </label>
-          <input
+          <Input
             id="recordedAt"
             type="datetime-local"
-            className="w-full border rounded-lg px-3 py-2"
+            className="w-full"
             value={form.recordedAt}
             onChange={(e) => setForm({ ...form, recordedAt: e.target.value })}
           />
           <div className="flex gap-2 justify-end">
-            <button
-              className="px-4 py-2 rounded-lg bg-neutral-100"
-              onClick={() => history.back()}
-            >
+            <Button variant="flat" onPress={() => history.back()}>
               Cancelar
-            </button>
-            <button
-              className="px-4 py-2 rounded-lg bg-primary-purple text-white"
-              onClick={onSave}
-              disabled={saving}
-            >
+            </Button>
+            <Button color="primary" onPress={onSave} isDisabled={saving}>
               Guardar
-            </button>
+            </Button>
           </div>
         </div>
       </div>

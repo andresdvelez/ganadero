@@ -57,8 +57,36 @@ export const aiRouter = createTRPCRouter({
   routeIntent: protectedProcedure
     .input(z.object({ query: z.string() }))
     .mutation(async ({ input }) => {
-      // Preguntas sobre módulos disponibles
       const ql = input.query.toLowerCase();
+
+      // Heurística: crear/registrar nuevo animal (vaca, toro, novillo, etc.)
+      const wantsCreate =
+        ql.includes("agregar") ||
+        ql.includes("añadir") ||
+        ql.includes("anadir") ||
+        ql.includes("crear") ||
+        ql.includes("registrar") ||
+        ql.includes("nuevo") ||
+        ql.includes("nueva");
+      const mentionsAnimal = [
+        "animal",
+        "vaca",
+        "toro",
+        "novillo",
+        "novilla",
+        "ternero",
+        "ternera",
+        "res",
+        "ganado",
+      ].some((w) => ql.includes(w));
+      if (wantsCreate && mentionsAnimal) {
+        return {
+          module: "animals",
+          action: "create",
+          navigateTo: "/_/new",
+        } as any;
+      }
+
       // Búsqueda simple de productos por nombre/código
       if (
         ql.includes("buscar") &&
@@ -72,7 +100,7 @@ export const aiRouter = createTRPCRouter({
         return {
           module: "inventory",
           action: "list",
-          navigateTo: `/inventory?q=${token}`,
+          navigateTo: `/_/inventory?q=${token}`,
         } as any;
       }
       // Búsqueda/edición/eliminación por nombre/tag para animales
@@ -87,7 +115,7 @@ export const aiRouter = createTRPCRouter({
         return {
           module: "animals",
           action: "list",
-          navigateTo: `/animals?q=${token}`,
+          navigateTo: `/_?q=${token}`,
         } as any;
       }
       // Leche
@@ -103,7 +131,7 @@ export const aiRouter = createTRPCRouter({
         return {
           module: "milk",
           action: "list",
-          navigateTo: `/milk?q=${token}`,
+          navigateTo: `/_/milk?q=${token}`,
         } as any;
       }
       // Potreros
@@ -118,7 +146,7 @@ export const aiRouter = createTRPCRouter({
         return {
           module: "pastures",
           action: "list",
-          navigateTo: `/pastures?q=${token}`,
+          navigateTo: `/_/pastures?q=${token}`,
         } as any;
       }
       // Laboratorio
@@ -134,7 +162,7 @@ export const aiRouter = createTRPCRouter({
         return {
           module: "lab",
           action: "list",
-          navigateTo: `/lab?q=${token}`,
+          navigateTo: `/_/lab?q=${token}`,
         } as any;
       }
       if (
@@ -163,10 +191,15 @@ export const aiRouter = createTRPCRouter({
         const routed = await client.routeToModule(input.query);
         const module = routed.module;
         let navigateTo: string | undefined;
-        const base = module ? `/${module}` : undefined;
+        const base = module
+          ? module === "animals"
+            ? "/_"
+            : `/_/${module}`
+          : undefined;
         if (base) {
           if (routed.action === "list") navigateTo = base;
-          else if (routed.action === "create") navigateTo = `${base}/new`;
+          else if (routed.action === "create")
+            navigateTo = `${base}${module === "animals" ? "/new" : "/new"}`;
         }
         return {
           module,
@@ -180,35 +213,39 @@ export const aiRouter = createTRPCRouter({
           return {
             module: "health",
             action: "create",
-            navigateTo: "/health/new",
+            navigateTo: "/_/health/new",
           };
         if (q.includes("repro") || q.includes("insemin"))
           return {
             module: "breeding",
             action: "create",
-            navigateTo: "/breeding/new",
+            navigateTo: "/_/breeding/new",
           };
         if (q.includes("leche") || q.includes("control"))
-          return { module: "milk", action: "create", navigateTo: "/milk/new" };
+          return {
+            module: "milk",
+            action: "create",
+            navigateTo: "/_/milk/new",
+          };
         if (q.includes("invent") || q.includes("producto"))
           return {
             module: "inventory",
             action: "create",
-            navigateTo: "/inventory/new",
+            navigateTo: "/_/inventory/new",
           };
         if (q.includes("potrero"))
           return {
             module: "pastures",
             action: "create",
-            navigateTo: "/pastures/new",
+            navigateTo: "/_/pastures/new",
           };
         if (q.includes("lab") || q.includes("examen"))
-          return { module: "lab", action: "create", navigateTo: "/lab/new" };
-        if (q.includes("animal"))
+          return { module: "lab", action: "create", navigateTo: "/_/lab/new" };
+        if (q.includes("animal") || q.includes("vaca"))
           return {
             module: "animals",
             action: "create",
-            navigateTo: "/animals/new",
+            navigateTo: "/_/new",
           };
         return { module: null, action: null };
       }

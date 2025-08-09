@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { db, addToSyncQueue, generateUUID } from "@/lib/dexie";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export default function InventoryNewClient() {
   const [form, setForm] = useState({
@@ -44,63 +46,56 @@ export default function InventoryNewClient() {
           <label className="block text-sm text-neutral-600" htmlFor="code">
             Código
           </label>
-          <input
+          <Input
             id="code"
-            className="w-full border rounded-lg px-3 py-2"
+            className="w-full"
             value={form.code}
             onChange={(e) => setForm({ ...form, code: e.target.value })}
           />
           <label className="block text-sm text-neutral-600" htmlFor="name">
             Nombre
           </label>
-          <input
+          <Input
             id="name"
-            className="w-full border rounded-lg px-3 py-2"
+            className="w-full"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
           />
           <label className="block text-sm text-neutral-600" htmlFor="unit">
             Unidad
           </label>
-          <input
+          <Input
             id="unit"
-            className="w-full border rounded-lg px-3 py-2"
+            className="w-full"
             value={form.unit}
             onChange={(e) => setForm({ ...form, unit: e.target.value })}
           />
           <label className="block text-sm text-neutral-600" htmlFor="category">
             Categoría
           </label>
-          <input
+          <Input
             id="category"
-            className="w-full border rounded-lg px-3 py-2"
+            className="w-full"
             value={form.category}
             onChange={(e) => setForm({ ...form, category: e.target.value })}
           />
           <label className="block text-sm text-neutral-600" htmlFor="minStock">
             Stock mínimo
           </label>
-          <input
+          <Input
             id="minStock"
-            className="w-full border rounded-lg px-3 py-2"
+            className="w-full"
             type="number"
             value={form.minStock}
             onChange={(e) => setForm({ ...form, minStock: e.target.value })}
           />
           <div className="flex gap-2 justify-end">
-            <button
-              className="px-4 py-2 rounded-lg bg-neutral-100"
-              onClick={() => history.back()}
-            >
+            <Button variant="flat" onPress={() => history.back()}>
               Cancelar
-            </button>
-            <button
-              className="px-4 py-2 rounded-lg bg-primary-purple text-white"
-              onClick={onSave}
-              disabled={saving}
-            >
+            </Button>
+            <Button color="primary" onPress={onSave} isDisabled={saving}>
               Guardar
-            </button>
+            </Button>
           </div>
         </div>
       </div>

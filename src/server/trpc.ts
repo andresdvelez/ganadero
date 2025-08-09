@@ -4,6 +4,14 @@ import { prisma } from "@/lib/prisma";
 import superjson from "superjson";
 
 export const createTRPCContext = async (opts: { headers: Headers }) => {
+  if (process.env.ALLOW_DEV_UNAUTH === "1") {
+    return {
+      prisma,
+      userId: "dev-user",
+      headers: opts.headers,
+    } as const;
+  }
+
   const { userId } = await auth();
 
   return {
@@ -29,6 +37,15 @@ export const createTRPCRouter = t.router;
 
 const enforceUserIsAuthed = t.middleware(async ({ ctx, next }) => {
   if (!ctx.userId) {
+    // Permitir bypass en desarrollo si ALLOW_DEV_UNAUTH=1
+    if (process.env.ALLOW_DEV_UNAUTH === "1") {
+      return next({
+        ctx: {
+          ...ctx,
+          userId: "dev-user",
+        },
+      });
+    }
     throw new TRPCError({ code: "UNAUTHORIZED" });
   }
 
