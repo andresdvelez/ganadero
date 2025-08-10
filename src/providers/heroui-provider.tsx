@@ -4,6 +4,7 @@ import { HeroUIProvider } from "@heroui/system";
 import { useRouter } from "next/navigation";
 import { ReactNode, useEffect } from "react";
 import { TRPCProvider } from "@/lib/trpc/provider";
+import { AuthGate } from "./auth-gate";
 
 export function Providers({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -18,7 +19,10 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <HeroUIProvider navigate={router.push} locale="es-CO">
-      <TRPCProvider>{children}</TRPCProvider>
+      <TRPCProvider>
+        <AuthGate />
+        {children}
+      </TRPCProvider>
     </HeroUIProvider>
   );
 }

@@ -68,3 +68,46 @@ export function debounce<T extends (...args: any[]) => any>(
     timeout = setTimeout(later, wait);
   };
 }
+
+export function robustDeviceId(): string {
+  try {
+    const nav = typeof navigator !== "undefined" ? navigator : ({} as any);
+    const scr = typeof screen !== "undefined" ? screen : ({} as any);
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+    const data = [
+      nav.userAgent,
+      nav.platform,
+      (nav as any).hardwareConcurrency || "",
+      scr.width,
+      scr.height,
+      scr.colorDepth,
+      tz,
+      (window as any).devicePixelRatio || "",
+    ].join("::");
+    const enc = new TextEncoder().encode(data);
+    const hashBuffer = (window.crypto as any).subtle.digest("SHA-256", enc);
+    // Note: subtle.digest returns a Promise
+    // We cannot await in this sync util; return a cached value if present
+    // Fallback to localStorage cache
+    const cached = localStorage.getItem("_device_id");
+    if (cached) return cached;
+    // create a quick pseudo id while async hash resolves in background
+    const temp = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    localStorage.setItem("_device_id", temp);
+    Promise.resolve(hashBuffer)
+      .then((buf: ArrayBuffer) => {
+        const arr = Array.from(new Uint8Array(buf));
+        const hex = arr.map((b) => b.toString(16).padStart(2, "0")).join("");
+        localStorage.setItem("_device_id", hex);
+      })
+      .catch(() => {});
+    return temp;
+  } catch {
+    let id = localStorage.getItem("_device_id");
+    if (!id) {
+      id = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      localStorage.setItem("_device_id", id);
+    }
+    return id;
+  }
+}

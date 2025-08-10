@@ -1,5 +1,30 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { TRPCError } from "@trpc/server";
+
+function assertNoConflict<T extends { updatedAt: Date }>(opts: {
+  existing: T | null;
+  expectedUpdatedAt?: string | null;
+  incoming: any;
+}) {
+  if (!opts.existing || !opts.expectedUpdatedAt) return;
+  const expected = new Date(opts.expectedUpdatedAt);
+  const actual = new Date(opts.existing.updatedAt);
+  if (Number.isNaN(expected.getTime())) return;
+  if (actual.getTime() !== expected.getTime()) {
+    // Include current and incoming for client-side merge/UX
+    throw new TRPCError({
+      code: "CONFLICT",
+      message: JSON.stringify({
+        reason: "VERSION_MISMATCH",
+        currentUpdatedAt: opts.existing.updatedAt,
+        expectedUpdatedAt: opts.expectedUpdatedAt,
+        current: opts.existing,
+        incoming: opts.incoming,
+      }),
+    });
+  }
+}
 
 export const syncRouter = createTRPCRouter({
   upsertAnimal: protectedProcedure
@@ -19,6 +44,7 @@ export const syncRouter = createTRPCRouter({
       const existing = await ctx.prisma.animal.findFirst({
         where: { externalId },
       });
+
       const payload = {
         externalId,
         userId: user.id,
@@ -36,6 +62,12 @@ export const syncRouter = createTRPCRouter({
         qrCode: data.qrCode ?? null,
         nfcId: data.nfcId ?? null,
       } as any;
+
+      assertNoConflict({
+        existing: existing as any,
+        expectedUpdatedAt: data?.expectedUpdatedAt,
+        incoming: payload,
+      });
 
       const saved = existing
         ? await ctx.prisma.animal.update({
@@ -60,6 +92,9 @@ export const syncRouter = createTRPCRouter({
             where: { externalId: data.animalExternalId },
           })
         : null;
+      const existing = await ctx.prisma.healthRecord.findFirst({
+        where: { externalId },
+      });
       const payload = {
         externalId,
         userId: user.id,
@@ -74,9 +109,13 @@ export const syncRouter = createTRPCRouter({
         performedAt: new Date(data.performedAt),
         nextDueDate: data.nextDueDate ? new Date(data.nextDueDate) : null,
       } as any;
-      const existing = await ctx.prisma.healthRecord.findFirst({
-        where: { externalId },
+
+      assertNoConflict({
+        existing: existing as any,
+        expectedUpdatedAt: data?.expectedUpdatedAt,
+        incoming: payload,
       });
+
       const saved = existing
         ? await ctx.prisma.healthRecord.update({
             where: { id: existing.id },
@@ -99,6 +138,9 @@ export const syncRouter = createTRPCRouter({
             where: { externalId: data.animalExternalId },
           })
         : null;
+      const existing = await ctx.prisma.breedingRecord.findFirst({
+        where: { externalId },
+      });
       const payload = {
         externalId,
         userId: user.id,
@@ -117,9 +159,13 @@ export const syncRouter = createTRPCRouter({
         offspringCount: data.offspringCount ?? null,
         notes: data.notes ?? null,
       } as any;
-      const existing = await ctx.prisma.breedingRecord.findFirst({
-        where: { externalId },
+
+      assertNoConflict({
+        existing: existing as any,
+        expectedUpdatedAt: data?.expectedUpdatedAt,
+        incoming: payload,
       });
+
       const saved = existing
         ? await ctx.prisma.breedingRecord.update({
             where: { id: existing.id },
@@ -154,6 +200,13 @@ export const syncRouter = createTRPCRouter({
         supplier: data.supplier ?? null,
         notes: data.notes ?? null,
       } as any;
+
+      assertNoConflict({
+        existing: existing as any,
+        expectedUpdatedAt: data?.expectedUpdatedAt,
+        incoming: payload,
+      });
+
       const saved = existing
         ? await ctx.prisma.product.update({
             where: { id: existing.id },
@@ -194,6 +247,13 @@ export const syncRouter = createTRPCRouter({
         relatedEntity: data.relatedEntity ?? null,
         occurredAt: new Date(data.occurredAt),
       } as any;
+
+      assertNoConflict({
+        existing: existing as any,
+        expectedUpdatedAt: data?.expectedUpdatedAt,
+        incoming: payload,
+      });
+
       const saved = existing
         ? await ctx.prisma.stockMovement.update({
             where: { id: existing.id },
@@ -234,6 +294,13 @@ export const syncRouter = createTRPCRouter({
         notes: data.notes ?? null,
         recordedAt: new Date(data.recordedAt),
       } as any;
+
+      assertNoConflict({
+        existing: existing as any,
+        expectedUpdatedAt: data?.expectedUpdatedAt,
+        incoming: payload,
+      });
+
       const saved = existing
         ? await ctx.prisma.milkRecord.update({
             where: { id: existing.id },
@@ -266,6 +333,13 @@ export const syncRouter = createTRPCRouter({
           : null,
         notes: data.notes ?? null,
       } as any;
+
+      assertNoConflict({
+        existing: existing as any,
+        expectedUpdatedAt: data?.expectedUpdatedAt,
+        incoming: payload,
+      });
+
       const saved = existing
         ? await ctx.prisma.pasture.update({
             where: { id: existing.id },
@@ -307,6 +381,13 @@ export const syncRouter = createTRPCRouter({
         antibiogram: data.antibiogram ?? null,
         notes: data.notes ?? null,
       } as any;
+
+      assertNoConflict({
+        existing: existing as any,
+        expectedUpdatedAt: data?.expectedUpdatedAt,
+        incoming: payload,
+      });
+
       const saved = existing
         ? await ctx.prisma.labExam.update({
             where: { id: existing.id },

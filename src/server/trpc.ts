@@ -12,7 +12,14 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
     } as const;
   }
 
-  const { userId } = await auth();
+  let userId: string | null = null;
+  try {
+    const res = await auth();
+    userId = res.userId;
+  } catch (_e) {
+    // If Clerk middleware is not configured or we are offline, leave userId as null.
+    // Client should queue writes locally and sync when online.
+  }
 
   return {
     prisma,
@@ -23,7 +30,7 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
 
 const t = initTRPC.context<typeof createTRPCContext>().create({
   transformer: superjson,
-  errorFormatter({ shape, error }) {
+  errorFormatter({ shape }) {
     return {
       ...shape,
       data: {
@@ -59,3 +66,4 @@ const enforceUserIsAuthed = t.middleware(async ({ ctx, next }) => {
 
 export const publicProcedure = t.procedure;
 export const protectedProcedure = t.procedure.use(enforceUserIsAuthed);
+export const router = t.router;

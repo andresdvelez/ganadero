@@ -1,10 +1,10 @@
-import CryptoJS from 'crypto-js';
+import CryptoJS from "crypto-js";
 
 // Generate a secure key from user password and salt
 export function generateKey(password: string, salt: string): string {
   return CryptoJS.PBKDF2(password, salt, {
     keySize: 256 / 32,
-    iterations: 1000
+    iterations: 1000,
   }).toString();
 }
 
@@ -21,7 +21,7 @@ export function decrypt(encryptedData: string, key: string): any {
     const decrypted = bytes.toString(CryptoJS.enc.Utf8);
     return JSON.parse(decrypted);
   } catch (error) {
-    console.error('Error decrypting data:', error);
+    console.error("Error decrypting data:", error);
     return null;
   }
 }
@@ -46,10 +46,10 @@ export class SecureStorage {
   }
 
   private getSalt(): string {
-    let salt = localStorage.getItem('_app_salt');
+    let salt = localStorage.getItem("_app_salt");
     if (!salt) {
       salt = generateSalt();
-      localStorage.setItem('_app_salt', salt);
+      localStorage.setItem("_app_salt", salt);
     }
     return salt;
   }
@@ -72,7 +72,7 @@ export class SecureStorage {
   clear(): void {
     const salt = this.getSalt();
     localStorage.clear();
-    localStorage.setItem('_app_salt', salt);
+    localStorage.setItem("_app_salt", salt);
   }
 }
 
@@ -80,13 +80,13 @@ export class SecureStorage {
 export function encryptSensitiveFields(data: any, fields: string[]): any {
   const key = getEncryptionKey();
   const encrypted = { ...data };
-  
-  fields.forEach(field => {
+
+  fields.forEach((field) => {
     if (data[field] !== undefined && data[field] !== null) {
       encrypted[field] = encrypt(data[field], key);
     }
   });
-  
+
   return encrypted;
 }
 
@@ -94,8 +94,8 @@ export function encryptSensitiveFields(data: any, fields: string[]): any {
 export function decryptSensitiveFields(data: any, fields: string[]): any {
   const key = getEncryptionKey();
   const decrypted = { ...data };
-  
-  fields.forEach(field => {
+
+  fields.forEach((field) => {
     if (data[field]) {
       const decryptedValue = decrypt(data[field], key);
       if (decryptedValue !== null) {
@@ -103,23 +103,43 @@ export function decryptSensitiveFields(data: any, fields: string[]): any {
       }
     }
   });
-  
+
   return decrypted;
 }
 
 // Get or generate encryption key for the session
 let sessionKey: string | null = null;
+let externalKey: string | null = null;
+
+export function setExternalEncryptionKey(key: string | null): void {
+  externalKey = key;
+  if (!key) {
+    // Clear ephemeral session key as well on lock, if present
+    sessionKey = null;
+    try {
+      sessionStorage.removeItem("_session_key");
+    } catch {}
+  }
+}
 
 export function getEncryptionKey(): string {
+  if (externalKey) {
+    return externalKey;
+  }
   if (!sessionKey) {
     // In production, this should be derived from user auth
     // For now, generate a session key
-    const stored = sessionStorage.getItem('_session_key');
-    if (stored) {
-      sessionKey = stored;
-    } else {
+    try {
+      const stored = sessionStorage.getItem("_session_key");
+      if (stored) {
+        sessionKey = stored;
+      } else {
+        sessionKey = CryptoJS.lib.WordArray.random(256 / 8).toString();
+        sessionStorage.setItem("_session_key", sessionKey);
+      }
+    } catch {
+      // sessionStorage may be unavailable in some environments
       sessionKey = CryptoJS.lib.WordArray.random(256 / 8).toString();
-      sessionStorage.setItem('_session_key', sessionKey);
     }
   }
   return sessionKey;
@@ -128,5 +148,8 @@ export function getEncryptionKey(): string {
 // Clear encryption key on logout
 export function clearEncryptionKey(): void {
   sessionKey = null;
-  sessionStorage.removeItem('_session_key');
-} 
+  externalKey = null;
+  try {
+    sessionStorage.removeItem("_session_key");
+  } catch {}
+}

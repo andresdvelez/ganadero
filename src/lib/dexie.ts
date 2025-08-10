@@ -182,6 +182,30 @@ export interface OfflineChatMessage {
   createdAt: Date;
 }
 
+export interface OfflineIdentity {
+  id?: number;
+  clerkId: string;
+  orgId?: string;
+  email?: string;
+  name?: string;
+  avatarUrl?: string;
+  passcodeHash: string;
+  passcodeSalt: string;
+  encryptionSalt: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface DeviceInfo {
+  id?: number;
+  deviceId: string;
+  boundClerkId: string;
+  boundOrgId?: string;
+  name?: string;
+  platform?: string;
+  boundAt: Date;
+}
+
 export class GanadoDB extends Dexie {
   animals!: Table<OfflineAnimal>;
   healthRecords!: Table<OfflineHealthRecord>;
@@ -194,6 +218,8 @@ export class GanadoDB extends Dexie {
   syncQueue!: Table<SyncQueueItem>;
   chats!: Table<OfflineChat>;
   chatMessages!: Table<OfflineChatMessage>;
+  identities!: Table<OfflineIdentity>;
+  deviceInfo!: Table<DeviceInfo>;
 
   constructor() {
     super("GanadoDB");
@@ -227,6 +253,24 @@ export class GanadoDB extends Dexie {
       .stores({
         chats: "++id, uuid, userId, updatedAt, title",
         chatMessages: "++id, chatUuid, createdAt, role",
+      })
+      .upgrade(() => {
+        // nothing to migrate
+      });
+
+    // Version 4: offline identity for device unlock
+    this.version(4)
+      .stores({
+        identities: "++id, clerkId, email, orgId",
+      })
+      .upgrade(() => {
+        // nothing to migrate
+      });
+
+    // Version 5: device binding info
+    this.version(5)
+      .stores({
+        deviceInfo: "++id, deviceId, boundClerkId, boundOrgId",
       })
       .upgrade(() => {
         // nothing to migrate
