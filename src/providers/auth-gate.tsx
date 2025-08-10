@@ -15,8 +15,8 @@ export function AuthGate() {
     (async () => {
       // Allow public auth pages
       if (
-        pathname?.startsWith("/_/sign-in") ||
-        pathname?.startsWith("/_/sign-up") ||
+        pathname?.startsWith("/sign-in") ||
+        pathname?.startsWith("/sign-up") ||
         pathname?.startsWith("/_/device-unlock") ||
         pathname?.startsWith("/_/offline")
       ) {
@@ -26,7 +26,7 @@ export function AuthGate() {
       if (typeof navigator !== "undefined" && navigator.onLine) {
         // Online: require Clerk session
         if (isLoaded && !isSignedIn) {
-          router.replace("/_/sign-in");
+          router.replace("/sign-in");
         }
         return;
       }

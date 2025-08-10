@@ -65,8 +65,13 @@ export default function OfflineSetupPage() {
         <SignedIn>
           <Card>
             <CardContent>
-              <h1 className="text-xl font-semibold mb-2">Configurar acceso offline</h1>
-              <p className="text-neutral-600 mb-4">Crea una clave local para usar la app sin Internet en este dispositivo.</p>
+              <h1 className="text-xl font-semibold mb-2">
+                Configurar acceso offline
+              </h1>
+              <p className="text-neutral-600 mb-4">
+                Crea una clave local para usar la app sin Internet en este
+                dispositivo.
+              </p>
               <form onSubmit={onSubmit} className="space-y-3">
                 <Input
                   type="password"
@@ -85,7 +90,12 @@ export default function OfflineSetupPage() {
                   required
                 />
                 {error && <div className="text-red-600 text-sm">{error}</div>}
-                <Button type="submit" color="primary" isLoading={loading} className="w-full">
+                <Button
+                  type="submit"
+                  color="primary"
+                  isLoading={loading}
+                  className="w-full"
+                >
                   Guardar clave
                 </Button>
               </form>
@@ -99,7 +109,7 @@ export default function OfflineSetupPage() {
               <p className="text-neutral-600 mb-4">
                 Debes iniciar sesión para configurar el acceso offline.
               </p>
-              <Button onPress={() => router.push("/_/sign-in")}>
+              <Button onPress={() => router.push("/sign-in")}>
                 Ir a iniciar sesión
               </Button>
             </CardContent>
