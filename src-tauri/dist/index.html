@@ -8,31 +8,7 @@
   <body>
     <div id="app-root">Cargando Ganado AI…</div>
     <script>
-      (function () {
-        var PORT = 4317;
-        var localUrl = "http://127.0.0.1:" + PORT;
-        var fallbackUrl = "https://ganadero-nine.vercel.app";
-        var deadlineMs = Date.now() + 20000; // 20s to give the server time to boot
-
-        function pingAndRedirect() {
-          // If deadline exceeded, fallback to remote so the app is not stuck
-          if (Date.now() > deadlineMs) {
-            location.replace(fallbackUrl);
-            return;
-          }
-          var img = new Image();
-          img.onload = function () {
-            location.replace(localUrl);
-          };
-          img.onerror = function () {
-            setTimeout(pingAndRedirect, 600);
-          };
-          img.src = localUrl + "/favicon.ico?_=" + Date.now();
-        }
-
-        // Start polling immediately
-        pingAndRedirect();
-      })();
+      // El contenido real será servido por http://localhost:PORT lanzado por Tauri
     </script>
   </body>
 </html>

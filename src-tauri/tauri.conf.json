@@ -15,11 +15,7 @@
       "active": true,
       "targets": "all",
       "identifier": "ai.ganado.app",
-      "resources": [
-        "../.next/standalone/**",
-        "../.next/static/**",
-        "../.next/standalone/server.js"
-      ],
+      "resources": ["../.next/standalone/**", "../.next/static/**"],
       "externalBin": ["sidecar/node"],
       "icon": [
         "icons/32x32.png",

@@ -23,8 +23,8 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
     const explicit = process.env.NEXT_PUBLIC_TRPC_URL;
     if (explicit && explicit.length > 0) return explicit;
     if (typeof window !== "undefined" && (window as any).__TAURI__) {
-      // En Tauri, el frontend se sirve desde http://localhost:4317
-      return "http://127.0.0.1:4317/api/trpc";
+      // Fallback para Tauri si no hay env var pública definida
+      return "https://ganadero-nine.vercel.app/api/trpc";
     }
     return "/api/trpc";
   }, []);
