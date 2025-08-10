@@ -245,7 +245,8 @@ fn main() {
         let app_handle = app.app_handle();
         tauri::async_runtime::spawn(async move {
           // Configuración por variables de entorno (opcional)
-          let model_url = std::env::var("NEXT_PUBLIC_MODEL_DOWNLOAD_URL").ok();
+          let model_url = std::env::var("NEXT_PUBLIC_MODEL_DOWNLOAD_URL").ok()
+            .or(Some("https://huggingface.co/ganado/ollama/resolve/main/DeepSeek-R1-Distill-Qwen-1.5B-Q8_0.gguf?download=true".to_string()));
           let model_sha = std::env::var("NEXT_PUBLIC_MODEL_SHA256").ok();
           let llama_port: u16 = std::env::var("NEXT_PUBLIC_LLAMA_PORT").ok().and_then(|s| s.parse::<u16>().ok()).unwrap_or(11434);
 
