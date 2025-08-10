@@ -38,5 +38,14 @@ export default function RootLayout({
 
   if (!hasClerk) return appBody;
 
-  return <ClerkProvider>{appBody}</ClerkProvider>;
+  return (
+    <ClerkProvider
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
+      afterSignInUrl="/"
+      afterSignUpUrl="/onboarding"
+    >
+      {appBody}
+    </ClerkProvider>
+  );
 }
