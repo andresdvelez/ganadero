@@ -70,14 +70,17 @@ export default function AIAssistantPage() {
     total: number;
   } | null>(null);
   const [llamaRunning, setLlamaRunning] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const [inlineTool, setInlineTool] = useState<{
     type: "animals.create";
     props?: any;
   } | null>(null);
 
-  const MODEL_URL = process.env.NEXT_PUBLIC_MODEL_DOWNLOAD_URL || "";
-  const MODEL_SHA = process.env.NEXT_PUBLIC_MODEL_SHA256 || undefined;
+  const MODEL_URL =
+    process.env.NEXT_PUBLIC_MODEL_DOWNLOAD_URL ||
+    "https://huggingface.co/ganado/ollama/resolve/main/DeepSeek-R1-Distill-Qwen-1.5B-Q8_0.gguf?download=true";
+  const MODEL_SHA = process.env.NEXT_PUBLIC_MODEL_SHA256 || null;
   const LLAMA_BIN_URL = process.env.NEXT_PUBLIC_LLAMA_BINARY_URL || "";
   const LLAMA_PORT = Number(process.env.NEXT_PUBLIC_LLAMA_PORT || 11434);
   const PREFERRED_MODEL =
@@ -445,10 +448,11 @@ export default function AIAssistantPage() {
     if (!isTauri) return;
     const { tauri } = (window as any).__TAURI__;
     try {
+      setIsDownloading(true);
       const binPath = await tauri.invoke("download_llama_binary");
       const modelPath = await tauri.invoke("download_model", {
         url: MODEL_URL,
-        sha256Hex: MODEL_SHA || null,
+        sha256Hex: MODEL_SHA,
       });
       await tauri.invoke("start_llama_server", {
         modelPath,
@@ -459,6 +463,8 @@ export default function AIAssistantPage() {
       setLlamaRunning(true);
     } catch (e) {
       console.error(e);
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -574,7 +580,7 @@ export default function AIAssistantPage() {
                   userName={undefined}
                   modelOverlay={{
                     visible: true,
-                    isLoading: ensureLocal.isPending,
+                    isLoading: ensureLocal.isPending || isDownloading,
                     onDownload: async () => {
                       if (isTauri) {
                         await startLocalAI();
