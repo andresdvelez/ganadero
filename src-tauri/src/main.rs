@@ -172,8 +172,12 @@ fn main() {
           .or_else(|| app.path_resolver().resolve_resource("sidecar/node-aarch64-apple-darwin"))
           .or_else(|| app.path_resolver().resolve_resource("sidecar/node.exe"));
 
+        // Fallback: binario node copiado por externalBin en Contents/MacOS
+        let exe_dir = std::env::current_exe().ok().and_then(|p| p.parent().map(|p| p.to_path_buf()));
+        let node_in_macos = exe_dir.as_ref().map(|d| d.join("node"));
+
         // Primer intento: sidecar/node si está presente
-        if let Some(node_bin) = node_path {
+        if let Some(node_bin) = node_path.or(node_in_macos.filter(|p| p.exists())) {
           let mut cmd = Command::new(node_bin);
           let sidecar_attempt = cmd
             .arg(&srv)
