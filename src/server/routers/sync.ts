@@ -27,6 +27,76 @@ function assertNoConflict<T extends { updatedAt: Date }>(opts: {
 }
 
 export const syncRouter = createTRPCRouter({
+  pull: protectedProcedure
+    .input(z.object({ cursor: z.string().nullable().optional() }))
+    .query(async ({ ctx, input }) => {
+      const user = await ctx.prisma.user.findUnique({
+        where: { clerkId: ctx.userId },
+      });
+      if (!user) throw new Error("User not found");
+      const since = input.cursor ? new Date(input.cursor) : new Date(0);
+
+      const [
+        animals,
+        health,
+        breeding,
+        products,
+        stocks,
+        milk,
+        pastures,
+        labs,
+        tombs,
+      ] = await Promise.all([
+        ctx.prisma.animal.findMany({
+          where: { userId: user.id, updatedAt: { gt: since } },
+        }),
+        ctx.prisma.healthRecord.findMany({
+          where: { userId: user.id, updatedAt: { gt: since } },
+        }),
+        ctx.prisma.breedingRecord.findMany({
+          where: { userId: user.id, updatedAt: { gt: since } },
+        }),
+        ctx.prisma.product.findMany({
+          where: { userId: user.id, updatedAt: { gt: since } },
+        }),
+        ctx.prisma.stockMovement.findMany({
+          where: { userId: user.id, updatedAt: { gt: since } },
+        }),
+        ctx.prisma.milkRecord.findMany({
+          where: { userId: user.id, updatedAt: { gt: since } },
+        }),
+        ctx.prisma.pasture.findMany({
+          where: { userId: user.id, updatedAt: { gt: since } },
+        }),
+        ctx.prisma.labExam.findMany({
+          where: { userId: user.id, updatedAt: { gt: since } },
+        }),
+        ctx.prisma.deletionLog.findMany({
+          where: { userId: user.id, deletedAt: { gt: since } },
+        }),
+      ]);
+
+      const nextCursor = new Date().toISOString();
+      return {
+        cursor: nextCursor,
+        changes: {
+          animals,
+          health,
+          breeding,
+          products,
+          stocks,
+          milk,
+          pastures,
+          labs,
+        },
+        tombstones: tombs.map((t) => ({
+          entityType: t.entityType,
+          entityId: t.entityId,
+          deletedAt: t.deletedAt,
+        })),
+      };
+    }),
+
   upsertAnimal: protectedProcedure
     .input(
       z.object({

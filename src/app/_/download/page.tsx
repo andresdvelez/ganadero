@@ -4,19 +4,29 @@ import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { TRPCProvider } from "@/lib/trpc/provider";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useUser } from "@clerk/nextjs";
 import { trpc } from "@/lib/trpc/client";
-import { bindDeviceLocally } from "@/lib/auth/offline-auth";
+import {
+  bindDeviceLocally,
+  hasOfflineIdentity,
+  provisionFromClerk,
+} from "@/lib/auth/offline-auth";
+import { useMemo, useState } from "react";
 
 export default function DownloadPage() {
   const { user } = useUser();
   const registerDevice = trpc.device.register.useMutation();
+  const [showPasscode, setShowPasscode] = useState(false);
+  const [passcode, setPasscode] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
-  const deviceId = (() => {
+  const deviceId = useMemo(() => {
     if (typeof window === "undefined") return "";
     const { robustDeviceId } = require("@/lib/utils");
     return robustDeviceId();
-  })();
+  }, []);
 
   const modelUrl =
     process.env.NEXT_PUBLIC_MODEL_DOWNLOAD_URL ||
@@ -30,6 +40,45 @@ export default function DownloadPage() {
   const desktopLinuxUrl =
     process.env.NEXT_PUBLIC_DESKTOP_LINUX_DOWNLOAD_URL ||
     "/downloads/ganado-ai-desktop.AppImage";
+
+  const onBind = async () => {
+    setError(null);
+    if (!user) return;
+    const hasId = await hasOfflineIdentity();
+    if (!hasId) {
+      setShowPasscode(true);
+      return;
+    }
+    await registerDevice.mutateAsync({
+      deviceId,
+      name: "Este equipo",
+      platform: navigator.platform,
+    });
+    await bindDeviceLocally({
+      deviceId,
+      clerkId: user.id,
+      name: "Este equipo",
+      platform: navigator.platform,
+    });
+  };
+
+  const onSavePasscode = async () => {
+    setError(null);
+    if (!user) return;
+    if (passcode.length < 6 || passcode !== confirm) {
+      setError("Passcode inválido o no coincide");
+      return;
+    }
+    await provisionFromClerk({
+      clerkId: user.id,
+      email: user.primaryEmailAddress?.emailAddress,
+      name: user.fullName ?? undefined,
+      avatarUrl: user.imageUrl,
+      passcode,
+    });
+    setShowPasscode(false);
+    await onBind();
+  };
 
   return (
     <TRPCProvider>
@@ -74,28 +123,43 @@ export default function DownloadPage() {
                   Vincular este dispositivo
                 </h2>
                 <p className="text-neutral-600 mb-4">
-                  Asocia este equipo a tu cuenta para desbloqueo offline con tu
-                  passcode.
+                  Asocia este equipo a tu cuenta. Si aún no tienes passcode
+                  local, te lo pediremos ahora.
                 </p>
-                <Button
-                  isLoading={registerDevice.isPending}
-                  onPress={async () => {
-                    if (!user) return;
-                    await registerDevice.mutateAsync({
-                      deviceId,
-                      name: "Este equipo",
-                      platform: navigator.platform,
-                    });
-                    await bindDeviceLocally({
-                      deviceId,
-                      clerkId: user.id,
-                      name: "Este equipo",
-                      platform: navigator.platform,
-                    });
-                  }}
-                >
+                <Button isLoading={registerDevice.isPending} onPress={onBind}>
                   Vincular ahora
                 </Button>
+
+                {showPasscode && (
+                  <div className="mt-4 space-y-3">
+                    <Input
+                      type="password"
+                      label="Passcode"
+                      value={passcode}
+                      onChange={(e: any) => setPasscode(e.target.value)}
+                    />
+                    <Input
+                      type="password"
+                      label="Confirmar passcode"
+                      value={confirm}
+                      onChange={(e: any) => setConfirm(e.target.value)}
+                    />
+                    {error && (
+                      <div className="text-red-600 text-sm">{error}</div>
+                    )}
+                    <div className="flex gap-2">
+                      <Button color="primary" onPress={onSavePasscode}>
+                        Guardar y continuar
+                      </Button>
+                      <Button
+                        variant="bordered"
+                        onPress={() => setShowPasscode(false)}
+                      >
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

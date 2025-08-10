@@ -41,6 +41,7 @@ model User {
   memberships       OrganizationMembership[]
   organizations     Organization[]     @relation("OrgCreatedBy")
   devices           Device[]
+  deletionLogs      DeletionLog[]
   
   @@index([clerkId])
   @@index([email])
@@ -382,4 +383,18 @@ model AIConversation {
   @@index([userId])
   @@index([sessionId])
   @@index([createdAt])
+}
+
+model DeletionLog {
+  id         String   @id @default(cuid())
+  userId     String
+  entityType String
+  entityId   String
+  deletedAt  DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([deletedAt])
 }

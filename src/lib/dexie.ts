@@ -206,6 +206,12 @@ export interface DeviceInfo {
   boundAt: Date;
 }
 
+export interface SyncState {
+  id?: number;
+  lastPullCursor?: string;
+  lastSyncedAt?: Date;
+}
+
 export class GanadoDB extends Dexie {
   animals!: Table<OfflineAnimal>;
   healthRecords!: Table<OfflineHealthRecord>;
@@ -220,6 +226,7 @@ export class GanadoDB extends Dexie {
   chatMessages!: Table<OfflineChatMessage>;
   identities!: Table<OfflineIdentity>;
   deviceInfo!: Table<DeviceInfo>;
+  syncState!: Table<SyncState>;
 
   constructor() {
     super("GanadoDB");
@@ -275,6 +282,13 @@ export class GanadoDB extends Dexie {
       .upgrade(() => {
         // nothing to migrate
       });
+
+    // Version 6: sync state
+    this.version(6)
+      .stores({
+        syncState: "++id",
+      })
+      .upgrade(() => {});
   }
 }
 
@@ -308,4 +322,17 @@ export async function addToSyncQueue(
     retryCount: 0,
     createdAt: new Date(),
   });
+}
+
+export async function getSyncState(): Promise<SyncState> {
+  const s = await db.syncState.toCollection().first();
+  if (s) return s;
+  const def: SyncState = { lastPullCursor: undefined, lastSyncedAt: undefined };
+  await db.syncState.add(def);
+  return (await db.syncState.toCollection().first()) as SyncState;
+}
+
+export async function setSyncState(partial: Partial<SyncState>) {
+  const s = await getSyncState();
+  await db.syncState.update(s.id!, { ...s, ...partial });
 }
