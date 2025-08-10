@@ -579,7 +579,7 @@ export default function AIAssistantPage() {
                   onSample={(cmd) => handleSampleCommand(cmd)}
                   userName={undefined}
                   modelOverlay={{
-                    visible: true,
+                    visible: localModelAvailable === false,
                     isLoading: ensureLocal.isPending || isDownloading,
                     onDownload: async () => {
                       if (isTauri) {
