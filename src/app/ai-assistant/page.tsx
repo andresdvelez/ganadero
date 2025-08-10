@@ -137,13 +137,22 @@ export default function AIAssistantPage() {
     window.addEventListener("ai-new-chat", onNewChat as any);
     window.addEventListener("ai-open-chat", onOpenChat as any);
 
+    // If running inside Tauri, force AI client to use the local Ollama host directly
+    try {
+      const isTauriEnv =
+        typeof window !== "undefined" && !!(window as any).__TAURI__;
+      if (isTauriEnv) {
+        setAIClientHost(`http://127.0.0.1:${LLAMA_PORT}`);
+      }
+    } catch {}
+
     // Client-side probe of local model to drive overlay reliably
     (async () => {
       try {
         const available = await aiClient.checkLocalAvailability();
-        setLocalModelAvailable(available);
+        setLocalModelAvailable((prev) => (prev === true ? true : !!available));
       } catch {
-        setLocalModelAvailable(false);
+        setLocalModelAvailable((prev) => (prev === true ? true : false));
       }
     })();
 
@@ -161,9 +170,11 @@ export default function AIAssistantPage() {
     (async () => {
       try {
         const res = await checkLocal.mutateAsync();
-        setLocalModelAvailable(res.available);
+        setLocalModelAvailable((prev) =>
+          prev === true ? true : !!res.available
+        );
       } catch {
-        setLocalModelAvailable(false);
+        setLocalModelAvailable((prev) => (prev === true ? true : false));
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -378,8 +389,8 @@ export default function AIAssistantPage() {
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
-      // Si falla, sugerir descarga del modelo local
-      setLocalModelAvailable(false);
+      // Si falla, no sobreescribir disponibilidad si ya se detectó verdadero
+      setLocalModelAvailable((prev) => (prev === true ? true : false));
     } finally {
       setIsLoading(false);
     }

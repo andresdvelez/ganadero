@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { getAIClient } from "@/services/ai/ollama-client";
 import { moduleRegistry } from "@/modules";
 
 export const aiRouter = createTRPCRouter({
-  checkLocalModel: protectedProcedure.mutation(async () => {
+  checkLocalModel: publicProcedure.mutation(async () => {
     // Always check a local/explicit Ollama server; never fallback to remote deploy base
     const base =
       process.env.NEXT_PUBLIC_OLLAMA_HOST ||
@@ -24,7 +24,7 @@ export const aiRouter = createTRPCRouter({
     }
   }),
 
-  ensureLocalModel: protectedProcedure
+  ensureLocalModel: publicProcedure
     .input(z.object({ model: z.string().default("deepseek-r1:latest") }))
     .mutation(async ({ input }) => {
       // Always pull from local/explicit Ollama, not remote deploy base

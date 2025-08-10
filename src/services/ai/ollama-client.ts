@@ -20,8 +20,18 @@ export class AIClient {
   private useCloud: boolean = false;
 
   constructor(config: AIClientConfig = {}) {
-    this._ollamaHost =
-      config.ollamaHost || process.env.NEXT_PUBLIC_OLLAMA_HOST || "/api/ollama"; // proxy en web hasta que fijemos host local
+    const isBrowser = typeof window !== "undefined";
+    const isTauri = isBrowser && !!(window as any).__TAURI__;
+    const defaultHost = isTauri
+      ? `http://127.0.0.1:${process.env.NEXT_PUBLIC_LLAMA_PORT || 11434}`
+      : process.env.NODE_ENV === "development"
+      ? "http://127.0.0.1:11434"
+      : "/api/ollama"; // proxy only on web prod
+    this._ollamaHost = (
+      config.ollamaHost ||
+      process.env.NEXT_PUBLIC_OLLAMA_HOST ||
+      defaultHost
+    ).replace(/\/$/, "");
     this.model =
       config.model ||
       process.env.NEXT_PUBLIC_OLLAMA_MODEL ||
