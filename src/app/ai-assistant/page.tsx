@@ -146,6 +146,18 @@ export default function AIAssistantPage() {
       }
     } catch {}
 
+    // Debug override via query param: ?forceLocal=1|0|true|false
+    try {
+      const usp = new URLSearchParams(window.location.search);
+      const force = usp.get("forceLocal");
+      if (force !== null) {
+        const truthy = ["1", "true", "yes"].includes(force.toLowerCase());
+        const falsy = ["0", "false", "no"].includes(force.toLowerCase());
+        if (truthy) setLocalModelAvailable(true);
+        else if (falsy) setLocalModelAvailable(false);
+      }
+    } catch {}
+
     // Client-side probe of local model to drive overlay reliably
     (async () => {
       try {
