@@ -21,11 +21,11 @@ export class AIClient {
 
   constructor(config: AIClientConfig = {}) {
     this._ollamaHost =
-      config.ollamaHost || process.env.NEXT_PUBLIC_OLLAMA_HOST || "/api/ollama"; // proxy a servidor gestionado
+      config.ollamaHost || process.env.NEXT_PUBLIC_OLLAMA_HOST || "/api/ollama"; // proxy en web hasta que fijemos host local
     this.model =
       config.model ||
       process.env.NEXT_PUBLIC_OLLAMA_MODEL ||
-      "deepseek-r1:latest";
+      "deepseek-r1-qwen-1_5b:latest";
   }
 
   get ollamaHost() {
@@ -40,9 +40,23 @@ export class AIClient {
       const response = await fetch(`${this._ollamaHost}/api/tags`);
       if (response.ok) {
         const data = await response.json();
-        return (
-          data.models?.some((m: any) => m.name?.includes("deepseek")) || false
+        const models: Array<{ name?: string }> = data?.models || [];
+        const preferred =
+          process.env.NEXT_PUBLIC_OLLAMA_MODEL ||
+          "deepseek-r1-qwen-1_5b:latest";
+        const hasPreferred = models.some((m) => m.name === preferred);
+        if (hasPreferred) {
+          this.model = preferred;
+          return true;
+        }
+        const deepseekAny = models.find((m) =>
+          (m.name || "").includes("deepseek")
         );
+        if (deepseekAny?.name) {
+          this.model = deepseekAny.name;
+          return true;
+        }
+        return models.length > 0;
       }
     } catch (error) {
       // Silenciar en cliente web cuando Ollama no está disponible
@@ -84,7 +98,6 @@ export class AIClient {
             { role: "user", content: userPrompt },
           ],
           stream: false,
-          format: "json",
         }),
       });
 
@@ -118,7 +131,8 @@ export class AIClient {
       });
 
       if (!response.ok) {
-        throw new Error("Error en API de IA");
+        const body = await response.text();
+        throw new Error(`Error en API de IA: ${body}`);
       }
 
       const data = await response.json();
@@ -219,19 +233,13 @@ Reglas:
                 field.validation?.positive ? "Debe ser positivo" : undefined
               );
             break;
-          case "date":
-            schema[field.name] = z.date();
-            break;
-          case "select":
-            schema[field.name] = z.enum(field.options || []);
-            break;
           default:
             schema[field.name] = z.any();
         }
       });
     }
 
-    return z.object(schema);
+    return schema;
   }
 
   // Método para routing de módulos basado en intención
@@ -250,20 +258,12 @@ Reglas:
   }
 }
 
-// Singleton instance
 let aiClientInstance: AIClient | null = null;
-
-export function getAIClient(): AIClient {
-  if (!aiClientInstance) {
-    aiClientInstance = new AIClient();
-  }
+export function getAIClient() {
+  if (!aiClientInstance) aiClientInstance = new AIClient();
   return aiClientInstance;
 }
-
 export function setAIClientHost(host: string) {
-  if (!aiClientInstance) {
-    aiClientInstance = new AIClient({ ollamaHost: host });
-  } else {
-    aiClientInstance.setHost(host);
-  }
+  const client = getAIClient();
+  client.setHost(host);
 }

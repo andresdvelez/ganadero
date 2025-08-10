@@ -153,6 +153,10 @@ fn main() {
       let candidate_paths = [
         exe_dir.join("..").join("..").join(".next").join("standalone").join("server.js"),
         exe_dir.join("..").join("Resources").join(".next").join("standalone").join("server.js"),
+        // Some bundles place app assets under Resources/_up_
+        exe_dir.join("..").join("Resources").join("_up_").join(".next").join("standalone").join("server.js"),
+        app_dir.join(".next").join("standalone").join("server.js"),
+        app_dir.join("_up_").join(".next").join("standalone").join("server.js"),
       ];
       let server_js = candidate_paths.iter().find(|p| p.exists()).cloned();
 
@@ -164,14 +168,24 @@ fn main() {
         let node_path = app
           .path_resolver()
           .resolve_resource("sidecar/node")
+          .or_else(|| app.path_resolver().resolve_resource("sidecar/node-x86_64-apple-darwin"))
+          .or_else(|| app.path_resolver().resolve_resource("sidecar/node-aarch64-apple-darwin"))
           .or_else(|| app.path_resolver().resolve_resource("sidecar/node.exe"));
 
+        // Nuevo: fallback al binario copiado como externalBin en Contents/MacOS
+        let exe_dir = std::env::current_exe()
+          .ok()
+          .and_then(|p| p.parent().map(|p| p.to_path_buf()));
+        let node_in_macos = exe_dir.as_ref().map(|d| d.join("node"));
+
         // Primer intento: sidecar/node si está presente
-        if let Some(node_bin) = node_path {
+        if let Some(node_bin) = node_path.or(node_in_macos.filter(|p| p.exists())) {
           let mut cmd = Command::new(node_bin);
           let sidecar_attempt = cmd
             .arg(&srv)
             .env("PORT", port.to_string())
+            .env("ALLOW_DEV_UNAUTH", "1")
+            .current_dir(srv.parent().unwrap_or(&app_dir))
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn();
@@ -189,6 +203,8 @@ fn main() {
               if let Ok(child) = Command::new("node")
                 .arg(&srv)
                 .env("PORT", port.to_string())
+                .env("ALLOW_DEV_UNAUTH", "1")
+                .current_dir(srv.parent().unwrap_or(&app_dir))
                 .stdout(Stdio::null())
                 .stderr(Stdio::null())
                 .spawn() {
@@ -205,6 +221,8 @@ fn main() {
           if let Ok(child) = Command::new("node")
             .arg(&srv)
             .env("PORT", port.to_string())
+            .env("ALLOW_DEV_UNAUTH", "1")
+            .current_dir(srv.parent().unwrap_or(&app_dir))
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn() {
@@ -226,6 +244,35 @@ fn main() {
           } else {
             // Fallback remoto si no hay Node en el sistema
             let _ = w.eval("window.location.replace('https://ganadero-nine.vercel.app')");
+          }
+        });
+
+        // Auto-descarga e inicio del servidor local de IA en segundo plano (primer arranque)
+        let app_handle = app.app_handle();
+        tauri::async_runtime::spawn(async move {
+          // Configuración por variables de entorno (opcional)
+          let model_url = std::env::var("NEXT_PUBLIC_MODEL_DOWNLOAD_URL").ok();
+          let model_sha = std::env::var("NEXT_PUBLIC_MODEL_SHA256").ok();
+          let llama_port: u16 = std::env::var("NEXT_PUBLIC_LLAMA_PORT").ok().and_then(|s| s.parse::<u16>().ok()).unwrap_or(11434);
+
+          // Asegurar binario llama
+          let _ = download_llama_binary(app_handle.clone()).await;
+
+          // Determinar si ya existe un modelo
+          let models_dir = app_handle.path_resolver().app_data_dir().map(|p| p.join("models"));
+          let existing_model = models_dir.as_ref().and_then(|dir| std::fs::read_dir(dir).ok()).and_then(|mut rd| {
+            rd.find_map(|e| e.ok()).and_then(|e| {
+              let p = e.path();
+              if p.extension().and_then(|s| s.to_str()).unwrap_or("") == "gguf" { Some(p) } else { None }
+              })
+          });
+
+          let model_path_res = if let Some(p) = existing_model { Ok(p.to_string_lossy().into_owned()) } else if let Some(url) = model_url.clone() {
+            download_model(url, model_sha.clone(), app_handle.clone(), app_handle.get_window("main").unwrap()).await
+          } else { Err("no model url configured".to_string()) };
+
+          if let Ok(model_path) = model_path_res {
+            let _ = start_llama_server(app_handle.clone(), model_path, llama_port).await;
           }
         });
 

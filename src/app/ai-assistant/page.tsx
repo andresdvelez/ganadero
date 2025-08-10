@@ -80,6 +80,8 @@ export default function AIAssistantPage() {
   const MODEL_SHA = process.env.NEXT_PUBLIC_MODEL_SHA256 || undefined;
   const LLAMA_BIN_URL = process.env.NEXT_PUBLIC_LLAMA_BINARY_URL || "";
   const LLAMA_PORT = Number(process.env.NEXT_PUBLIC_LLAMA_PORT || 11434);
+  const PREFERRED_MODEL =
+    process.env.NEXT_PUBLIC_OLLAMA_MODEL || "deepseek-r1-qwen-1_5b:latest";
 
   // Sample commands for quick actions
   const sampleCommands = [
@@ -107,7 +109,6 @@ export default function AIAssistantPage() {
       const ev = new CustomEvent("open-modules");
       window.dispatchEvent(ev);
     };
-    // No-op here; DashboardLayout listens to open-modules already
     // Listen for layout chat events
     const onNewChat = () => {
       setChatUuid(null);
@@ -132,6 +133,17 @@ export default function AIAssistantPage() {
     };
     window.addEventListener("ai-new-chat", onNewChat as any);
     window.addEventListener("ai-open-chat", onOpenChat as any);
+
+    // Client-side probe of local model to drive overlay reliably
+    (async () => {
+      try {
+        const available = await aiClient.checkLocalAvailability();
+        setLocalModelAvailable(available);
+      } catch {
+        setLocalModelAvailable(false);
+      }
+    })();
+
     return () => {
       window.removeEventListener("ai-new-chat", onNewChat as any);
       window.removeEventListener("ai-open-chat", onOpenChat as any);
@@ -356,10 +368,15 @@ export default function AIAssistantPage() {
         id: (Date.now() + 1).toString(),
         role: "assistant",
         content:
-          "Lo siento, ocurrió un error procesando tu consulta. Por favor, intenta de nuevo.",
+          "Lo siento, ocurrió un error procesando tu consulta. Por favor, intenta de nuevo." +
+          (error instanceof Error && error.message
+            ? `\nDetalle: ${error.message}`
+            : ""),
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
+      // Si falla, sugerir descarga del modelo local
+      setLocalModelAvailable(false);
     } finally {
       setIsLoading(false);
     }
@@ -555,6 +572,26 @@ export default function AIAssistantPage() {
                   onMic={handleVoiceInput}
                   onSample={(cmd) => handleSampleCommand(cmd)}
                   userName={undefined}
+                  modelOverlay={{
+                    visible: true,
+                    isLoading: ensureLocal.isPending,
+                    onDownload: async () => {
+                      if (isTauri) {
+                        await startLocalAI();
+                      } else {
+                        const res = await ensureLocal.mutateAsync({
+                          model: PREFERRED_MODEL,
+                        });
+                        if (res.ok) {
+                          const chk = await checkLocal.mutateAsync();
+                          setLocalModelAvailable(chk.available);
+                        }
+                      }
+                    },
+                  }}
+                  debugText={`localModelAvailable: ${String(
+                    localModelAvailable
+                  )}`}
                 />
               </div>
             )}
@@ -570,7 +607,7 @@ export default function AIAssistantPage() {
                       ref={inputRef}
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
-                      onKeyPress={handleKeyPress}
+                      onKeyDown={handleKeyPress}
                       placeholder={translations.ai.placeholder}
                       className="w-full px-4 py-2 border border-ranch-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-ranch-500 resize-none"
                       rows={1}

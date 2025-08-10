@@ -57,6 +57,17 @@ function downloadNodeDarwin(archLabel /* 'arm64' | 'x64' */) {
   return nodeBin;
 }
 
+function isUniversalBinary(p) {
+  try {
+    const out = execSync(`file "${p}"`).toString();
+    return (
+      /universal binary/.test(out) && /x86_64/.test(out) && /arm64/.test(out)
+    );
+  } catch {
+    return false;
+  }
+}
+
 (function main() {
   const { triple, ext } = getTargetTriple();
   const projectRoot = process.cwd();
@@ -77,20 +88,18 @@ function downloadNodeDarwin(archLabel /* 'arm64' | 'x64' */) {
     console.log(`[prepare-node-sidecar] Listo: ${nodeBase}`);
   }
 
-  // Si estamos en macOS, también preparar el binario de la otra arquitectura para Universal 2
-  let armNodePath = null;
-  let x64NodePath = null;
+  // Si estamos en macOS, preparar binario universal solo si hace falta
   if (process.platform === "darwin") {
-    const otherArch = process.arch === "arm64" ? "x64" : "arm64";
-    const otherTriple =
-      otherArch === "arm64" ? "aarch64-apple-darwin" : "x86_64-apple-darwin";
-    const otherDst = path.join(sidecarDir, `node-${otherTriple}`);
+    const armPath = path.join(sidecarDir, "node-aarch64-apple-darwin");
+    const x64Path = path.join(sidecarDir, "node-x86_64-apple-darwin");
 
-    // Rutas de ambos
-    armNodePath = path.join(sidecarDir, "node-aarch64-apple-darwin");
-    x64NodePath = path.join(sidecarDir, "node-x86_64-apple-darwin");
-
-    if (!fs.existsSync(otherDst)) {
+    // Descargar el otro arch si falta
+    const needOther = process.arch === "arm64" ? x64Path : armPath;
+    if (!fs.existsSync(needOther)) {
+      const otherArch = process.arch === "arm64" ? "x64" : "arm64";
+      const otherTriple =
+        otherArch === "arm64" ? "aarch64-apple-darwin" : "x86_64-apple-darwin";
+      const otherDst = path.join(sidecarDir, `node-${otherTriple}`);
       try {
         const downloadedNode = downloadNodeDarwin(otherArch);
         console.log(
@@ -102,38 +111,41 @@ function downloadNodeDarwin(archLabel /* 'arm64' | 'x64' */) {
           `[prepare-node-sidecar] Error preparando Node ${otherArch} para Universal:`,
           e
         );
-        process.exit(1);
+        // No abortar; continuamos con binario host
       }
-    } else {
-      console.log(
-        `[prepare-node-sidecar] Ya existe ${path.basename(
-          otherDst
-        )}, omitiendo.`
-      );
     }
 
-    // Crear binario universal combinando ambos
     const universalOut = path.join(sidecarDir, "node-universal-apple-darwin");
     try {
-      if (!fs.existsSync(armNodePath) || !fs.existsSync(x64NodePath)) {
-        throw new Error(
-          "Faltan uno o ambos binarios arm64/x86_64 para crear universal"
+      // Si ya tenemos un binario universal (por ejemplo, el x86_64 descargado es universal), no crear otro
+      if (fs.existsSync(x64Path) && isUniversalBinary(x64Path)) {
+        console.log(
+          `[prepare-node-sidecar] ${path.basename(
+            x64Path
+          )} ya es universal; usando tal cual.`
+        );
+        copyFile(x64Path, universalOut);
+        fs.chmodSync(universalOut, 0o755);
+      } else if (fs.existsSync(armPath) && fs.existsSync(x64Path)) {
+        console.log(
+          `[prepare-node-sidecar] Creando binario universal con lipo -> ${universalOut}`
+        );
+        execSync(
+          `lipo -create -output "${universalOut}" "${armPath}" "${x64Path}"`,
+          { stdio: "inherit" }
+        );
+        fs.chmodSync(universalOut, 0o755);
+      } else {
+        console.log(
+          `[prepare-node-sidecar] Faltan binarios para universal; se usará el binario host.`
         );
       }
-      console.log(
-        `[prepare-node-sidecar] Creando binario universal con lipo -> ${universalOut}`
-      );
-      execSync(
-        `lipo -create -output "${universalOut}" "${armNodePath}" "${x64NodePath}"`,
-        { stdio: "inherit" }
-      );
-      fs.chmodSync(universalOut, 0o755);
     } catch (e) {
-      console.error(
-        `[prepare-node-sidecar] No se pudo crear node-universal-apple-darwin:`,
-        e
+      console.warn(
+        `[prepare-node-sidecar] No se pudo crear universal; se usará el binario host.`,
+        e.message || e
       );
-      process.exit(1);
+      // No abortar
     }
   }
 
