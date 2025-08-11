@@ -61,6 +61,11 @@ export class AIClient {
     } catch {}
   }
 
+  private hasInternet(): boolean {
+    if (typeof navigator === "undefined") return true;
+    return navigator.onLine !== false;
+  }
+
   async checkLocalAvailability(): Promise<boolean> {
     const preferred =
       process.env.NEXT_PUBLIC_OLLAMA_MODEL || "deepseek-r1-qwen-1_5b:latest";
@@ -110,19 +115,29 @@ export class AIClient {
   }
 
   async processQuery(query: string, context?: any): Promise<AIResponse> {
+    // Prefer cloud when online and key exists
+    const hasKey = !!process.env.OPENROUTER_API_KEY;
+    const online = this.hasInternet();
+
+    if (hasKey && online) {
+      return this.processCloudQuery(query, context);
+    }
+
     const isLocalAvailable = await this.checkLocalAvailability();
 
     if (isLocalAvailable) {
       return this.processLocalQuery(query, context);
-    } else if (process.env.NEXT_PUBLIC_OPENAI_API_KEY) {
-      return this.processCloudQuery(query, context);
-    } else {
-      return {
-        content:
-          "El asistente de IA no está disponible en este momento. Por favor, verifica la configuración.",
-        module: "error",
-      };
     }
+
+    if (hasKey) {
+      return this.processCloudQuery(query, context);
+    }
+
+    return {
+      content:
+        "El asistente de IA no está disponible en este momento. Por favor, verifica la configuración.",
+      module: "error",
+    };
   }
 
   private async processLocalQuery(
