@@ -26,7 +26,6 @@ import { useRouter } from "next/navigation";
 import { moduleRegistry } from "@/modules";
 import { trpc } from "@/lib/trpc/client";
 import { AnimalNewEmbedded } from "@/components/embedded/animal-new-embedded";
-import { AIAssistantDashboard } from "@/components/ai/ai-dashboard";
 import {
   db,
   generateUUID,
@@ -60,6 +59,8 @@ export default function AIAssistantPage() {
   const routeIntent = trpc.ai.routeIntent.useMutation();
   const checkLocal = trpc.ai.checkLocalModel.useMutation();
   const ensureLocal = trpc.ai.ensureLocalModel.useMutation();
+  const cloud = trpc.ai.checkCloudAvailable.useQuery();
+  const cloudAvailable = !!cloud.data?.available;
   const [localModelAvailable, setLocalModelAvailable] = useState<
     boolean | null
   >(null);
@@ -491,6 +492,10 @@ export default function AIAssistantPage() {
     }
   };
 
+  const isOnline =
+    typeof navigator === "undefined" ? true : navigator.onLine !== false;
+  const overlayVisible = !isOnline && localModelAvailable === false;
+
   return (
     <TRPCProvider>
       <DashboardLayout>
@@ -602,7 +607,7 @@ export default function AIAssistantPage() {
                   onSample={(cmd) => handleSampleCommand(cmd)}
                   userName={undefined}
                   modelOverlay={{
-                    visible: localModelAvailable === false,
+                    visible: overlayVisible,
                     isLoading: ensureLocal.isPending || isDownloading,
                     onDownload: async () => {
                       if (isTauri) {
@@ -620,7 +625,7 @@ export default function AIAssistantPage() {
                   }}
                   debugText={`localModelAvailable: ${String(
                     localModelAvailable
-                  )}`}
+                  )}, cloudAvailable: ${String(cloudAvailable)}`}
                 />
               </div>
             )}
