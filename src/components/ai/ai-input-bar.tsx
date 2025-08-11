@@ -50,6 +50,7 @@ export function AIInputBar({
   // Oscilloscope canvas refs
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const rafRef = useRef<number | null>(null);
+  const scaleRef = useRef<number>(1.6);
 
   useEffect(() => {
     if (!isListening || !analyser || !canvasRef.current) {
@@ -61,7 +62,8 @@ export function AIInputBar({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     const context = ctx as CanvasRenderingContext2D;
-    analyser.fftSize = 2048;
+    analyser.fftSize = 1024;
+    analyser.smoothingTimeConstant = 0.5;
     const bufferLength = analyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
 
@@ -84,7 +86,7 @@ export function AIInputBar({
       // clear
       context.clearRect(0, 0, WIDTH, HEIGHT);
       // baseline
-      context.strokeStyle = "#d1d5db"; // neutral-300 baseline dots
+      context.strokeStyle = "#e5e7eb"; // neutral-200
       context.setLineDash([3, 4]);
       context.beginPath();
       context.moveTo(0, HEIGHT / 2);
@@ -92,15 +94,30 @@ export function AIInputBar({
       context.stroke();
       context.setLineDash([]);
 
+      // auto-gain based on average absolute deviation
+      let sumAbs = 0;
+      for (let i = 0; i < bufferLength; i++)
+        sumAbs += Math.abs(dataArray[i] - 128);
+      const avgAbs = sumAbs / bufferLength; // 0..128
+      const currentAmp = Math.max(1, avgAbs);
+      const targetFill = 0.42; // target 42% of half-height
+      const proposedScale = Math.min(
+        4,
+        Math.max(0.8, (targetFill * 128) / currentAmp)
+      );
+      // smooth scale to avoid jitter
+      scaleRef.current =
+        scaleRef.current + (proposedScale - scaleRef.current) * 0.15;
+
       // waveform
-      context.lineWidth = 2;
-      context.strokeStyle = "#9ca3af"; // neutral-400 line
+      context.lineWidth = 3;
+      context.strokeStyle = "#6b7280"; // neutral-500 line for more contraste
       context.beginPath();
       const sliceWidth = WIDTH / bufferLength;
       let x = 0;
       for (let i = 0; i < bufferLength; i++) {
-        const v = dataArray[i] / 128.0;
-        const y = (v * HEIGHT) / 2;
+        const centered = (dataArray[i] - 128) / 128; // -1..1
+        const y = HEIGHT / 2 + centered * (HEIGHT / 2) * scaleRef.current;
         if (i === 0) context.moveTo(x, y);
         else context.lineTo(x, y);
         x += sliceWidth;

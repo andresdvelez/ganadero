@@ -179,6 +179,13 @@ export default function AIAssistantPage() {
     })();
   }, []);
 
+  // Listen to sidebar event to open modules
+  useEffect(() => {
+    const handler = () => setModulesOpen(true);
+    window.addEventListener("open-modules", handler as any);
+    return () => window.removeEventListener("open-modules", handler as any);
+  }, []);
+
   const scrollToBottom = () =>
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   useEffect(scrollToBottom, [messages, inlineTool]);
@@ -697,7 +704,6 @@ export default function AIAssistantPage() {
                     webSearch={webSearch}
                     onToggleWebSearch={setWebSearch}
                     analyser={audioAnalyserRef.current}
-                    onOpenModules={() => setModulesOpen(true)}
                   />
                 </div>
               </div>
