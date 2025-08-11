@@ -79,6 +79,10 @@ export default function AIAssistantPage() {
   const [voiceTranscript, setVoiceTranscript] = useState<string | null>(null);
   const [listenStartedAt, setListenStartedAt] = useState<number | null>(null);
   const [listenElapsedMs, setListenElapsedMs] = useState<number>(0);
+  const [levels, setLevels] = useState<number[] | undefined>(undefined);
+  const audioAnalyserRef = useRef<AnalyserNode | null>(null);
+  const audioStreamRef = useRef<MediaStream | null>(null);
+  const rafRef = useRef<number | null>(null);
 
   // New TRPC hooks for AI context/memories
   const recordMessage = trpc.ai.recordMessage.useMutation();
@@ -184,6 +188,36 @@ export default function AIAssistantPage() {
     }, 200);
     return () => clearInterval(id);
   }, [isListening, listenStartedAt]);
+
+  // analyser loop for waveform
+  useEffect(() => {
+    if (!isListening || !audioAnalyserRef.current) return;
+    const analyser = audioAnalyserRef.current;
+    const fft = 256;
+    analyser.fftSize = fft;
+    const bufferLen = analyser.frequencyBinCount;
+    const data = new Uint8Array(bufferLen);
+    const render = () => {
+      analyser.getByteTimeDomainData(data);
+      // Convert to normalized levels across the bar count
+      const bars = 64;
+      const step = Math.floor(bufferLen / bars);
+      const arr: number[] = [];
+      for (let i = 0; i < bars; i++) {
+        let sum = 0;
+        for (let j = 0; j < step; j++)
+          sum += Math.abs(data[i * step + j] - 128);
+        const avg = sum / step; // 0..128
+        arr.push(Math.min(1, avg / 64));
+      }
+      setLevels(arr);
+      rafRef.current = requestAnimationFrame(render);
+    };
+    rafRef.current = requestAnimationFrame(render);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [isListening]);
 
   const handleSend = async (overrideText?: string) => {
     const textToSend = (overrideText ?? input).trim();
@@ -395,6 +429,24 @@ export default function AIAssistantPage() {
       });
       return;
     }
+    // Prepare WebAudio stream for visual levels
+    async function setupAnalyser() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
+        const ctx = new (window.AudioContext ||
+          (window as any).webkitAudioContext)();
+        const src = ctx.createMediaStreamSource(stream);
+        const analyser = ctx.createAnalyser();
+        analyser.smoothingTimeConstant = 0.8;
+        analyser.minDecibels = -90;
+        analyser.maxDecibels = -10;
+        src.connect(analyser);
+        audioAnalyserRef.current = analyser;
+        audioStreamRef.current = stream;
+      } catch {}
+    }
     const SpeechRecognition =
       (window as any).webkitSpeechRecognition ||
       (window as any).SpeechRecognition;
@@ -406,26 +458,47 @@ export default function AIAssistantPage() {
       recognition.stop();
       setIsListening(false);
       setListenStartedAt(null);
+      setLevels(undefined);
+      if (audioStreamRef.current) {
+        audioStreamRef.current.getTracks().forEach((t) => t.stop());
+        audioStreamRef.current = null;
+      }
       return;
     }
     recognition.onstart = () => {
       setIsListening(true);
       setListenStartedAt(Date.now());
       setListenElapsedMs(0);
+      setupAnalyser();
     };
     recognition.onresult = (event: any) => {
       const transcript = event.results[0][0].transcript as string;
       setIsListening(false);
       setListenStartedAt(null);
+      setLevels(undefined);
+      if (audioStreamRef.current) {
+        audioStreamRef.current.getTracks().forEach((t) => t.stop());
+        audioStreamRef.current = null;
+      }
       handleSend(transcript);
     };
     recognition.onerror = () => {
       setIsListening(false);
       setListenStartedAt(null);
+      setLevels(undefined);
+      if (audioStreamRef.current) {
+        audioStreamRef.current.getTracks().forEach((t) => t.stop());
+        audioStreamRef.current = null;
+      }
     };
     recognition.onend = () => {
       setIsListening(false);
       setListenStartedAt(null);
+      setLevels(undefined);
+      if (audioStreamRef.current) {
+        audioStreamRef.current.getTracks().forEach((t) => t.stop());
+        audioStreamRef.current = null;
+      }
     };
     recognition.start();
   };
@@ -614,25 +687,29 @@ export default function AIAssistantPage() {
                     )}, cloudAvailable: ${String(cloudAvailable)}`}
                     isListening={isListening}
                     listenElapsedMs={listenElapsedMs}
+                    levels={levels}
                   />
                 </div>
               </div>
             )}
           </div>
           {/* Bottom input with same design as hero */}
-          <div className="bg-white border-t border-neutral-200 p-4">
-            <div className="max-w-4xl mx-auto">
-              <AIInputBar
-                value={input}
-                onChange={(v) => setInput(v)}
-                onSend={() => handleSend()}
-                onMic={handleVoiceInput}
-                isListening={isListening}
-                elapsedMs={listenElapsedMs}
-                disabled={isLoading}
-              />
+          {messages.length > 0 && (
+            <div className="bg-white border-t border-neutral-200 p-4 animate-in fade-in slide-in-from-bottom-2">
+              <div className="max-w-4xl mx-auto">
+                <AIInputBar
+                  value={input}
+                  onChange={(v) => setInput(v)}
+                  onSend={() => handleSend()}
+                  onMic={handleVoiceInput}
+                  isListening={isListening}
+                  elapsedMs={listenElapsedMs}
+                  disabled={isLoading}
+                  levels={levels}
+                />
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </DashboardLayout>
     </TRPCProvider>

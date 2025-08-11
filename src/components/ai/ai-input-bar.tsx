@@ -16,6 +16,7 @@ export function AIInputBar({
   disabled,
   placeholder,
   className,
+  levels,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -26,6 +27,7 @@ export function AIInputBar({
   disabled?: boolean;
   placeholder?: string;
   className?: string;
+  levels?: number[];
 }) {
   const hasText = (value || "").trim().length > 0;
   const timeLabel = useMemo(() => {
@@ -69,7 +71,7 @@ export function AIInputBar({
       {isListening && (
         <div className="pointer-events-none absolute inset-0 flex items-center pl-16 pr-24">
           <div className="flex items-center gap-3 text-neutral-700">
-            <WaveBars />
+            <WaveBars levels={levels} />
             <span className="text-sm font-medium tabular-nums">
               {timeLabel}
             </span>
@@ -110,16 +112,31 @@ export function AIInputBar({
   );
 }
 
-function WaveBars() {
+function WaveBars({ levels }: { levels?: number[] }) {
+  const bars = levels && levels.length > 0 ? levels : undefined;
+  if (bars) {
+    return (
+      <div className="flex items-end justify-between h-6 w-full">
+        {bars.map((v, i) => (
+          <span
+            key={i}
+            className="bg-neutral-700/80 rounded-sm inline-block"
+            style={{ width: 2, height: Math.max(3, Math.min(20, 3 + v * 18)) }}
+          />
+        ))}
+      </div>
+    );
+  }
   return (
-    <div className="flex items-end gap-[3px] h-5">
-      {Array.from({ length: 10 }).map((_, i) => (
+    <div className="flex items-end justify-between h-6 w-full">
+      {Array.from({ length: 48 }).map((_, i) => (
         <span
           key={i}
-          className="w-[3px] bg-neutral-700 rounded-sm inline-block animate-pulse"
+          className="bg-neutral-700/70 rounded-sm inline-block animate-pulse"
           style={{
-            height: `${6 + ((i * 7) % 12)}px`,
-            animationDelay: `${(i % 5) * 120}ms`,
+            width: 2,
+            height: 6 + ((i * 7) % 12),
+            animationDelay: `${(i % 6) * 100}ms`,
           }}
         />
       ))}

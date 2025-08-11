@@ -26,6 +26,7 @@ export function AIAssistantDashboard({
   debugText,
   isListening,
   listenElapsedMs,
+  levels,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -41,6 +42,7 @@ export function AIAssistantDashboard({
   debugText?: string;
   isListening?: boolean;
   listenElapsedMs?: number;
+  levels?: number[];
 }) {
   const categories = useMemo(
     () => [
@@ -57,17 +59,27 @@ export function AIAssistantDashboard({
 
   return (
     <div
-      className={cn("w-full flex flex-col items-center", "min-h-[calc(100vh-4rem)]")}
+      className={cn(
+        "w-full flex flex-col items-center",
+        "min-h-[calc(100vh-4rem)]"
+      )}
     >
       <div className="text-center mt-8 sm:mt-12 mb-5 sm:mb-7">
         <h1 className="text-5xl sm:text-6xl font-extrabold text-neutral-900 tracking-tight">
           Hola
         </h1>
-        <p className="mt-2 text-2xl text-neutral-700">¿Qué puedo hacer por ti?</p>
+        <p className="mt-2 text-2xl text-neutral-700">
+          ¿Qué puedo hacer por ti?
+        </p>
       </div>
 
       {/* Big input bar with inner light field */}
-      <div className={cn("relative w-full max-w-4xl", overlayActive && "opacity-60")}>
+      <div
+        className={cn(
+          "relative w-full max-w-4xl",
+          overlayActive && "opacity-60"
+        )}
+      >
         <AIInputBar
           value={value}
           onChange={onChange}
@@ -76,6 +88,7 @@ export function AIAssistantDashboard({
           isListening={isListening}
           elapsedMs={listenElapsedMs}
           disabled={overlayActive}
+          levels={levels}
         />
 
         {/* Action chips under the left edge */}
@@ -151,7 +164,9 @@ export function AIAssistantDashboard({
         ))}
       </div>
 
-      <div className="mt-12 text-neutral-600 text-sm">Explora preguntas y usos frecuentes ↑</div>
+      <div className="mt-12 text-neutral-600 text-sm">
+        Explora preguntas y usos frecuentes ↑
+      </div>
     </div>
   );
 }
