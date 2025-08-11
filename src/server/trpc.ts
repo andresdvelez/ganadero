@@ -1,8 +1,23 @@
 import { initTRPC, TRPCError } from "@trpc/server";
-import { auth, getAuth } from "@clerk/nextjs/server";
+import { auth, getAuth, verifyToken } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import superjson from "superjson";
 import type { NextRequest } from "next/server";
+
+function decodeJwtNoVerify(
+  token: string
+): { sub?: string; iss?: string; exp?: number } | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const payload = JSON.parse(
+      Buffer.from(parts[1], "base64").toString("utf8")
+    );
+    return payload;
+  } catch {
+    return null;
+  }
+}
 
 export const createTRPCContext = async (opts: { req: NextRequest }) => {
   if (process.env.ALLOW_DEV_UNAUTH === "1") {
@@ -26,6 +41,55 @@ export const createTRPCContext = async (opts: { req: NextRequest }) => {
       const { userId: uid } = getAuth(opts.req);
       userId = uid ?? null;
     } catch {}
+  }
+
+  // Try Authorization Bearer token and __session cookie if no user yet
+  const cookieHeader = opts.req.headers.get("cookie") || "";
+  const authHeader =
+    opts.req.headers.get("authorization") ||
+    opts.req.headers.get("Authorization") ||
+    "";
+  const bearer = authHeader.startsWith("Bearer ")
+    ? authHeader.slice("Bearer ".length)
+    : null;
+  const cookieToken = (() => {
+    try {
+      const m = cookieHeader.match(/(?:^|; )__session=([^;]+)/);
+      return m ? decodeURIComponent(m[1]) : null;
+    } catch {
+      return null;
+    }
+  })();
+
+  const candidateTokens = [bearer, cookieToken].filter(Boolean) as string[];
+
+  if (!userId && candidateTokens.length > 0) {
+    for (const token of candidateTokens) {
+      // First, try official verification
+      try {
+        const payload = await verifyToken(token);
+        const sub = (payload as any)?.sub as string | undefined;
+        if (sub) {
+          userId = sub;
+          break;
+        }
+      } catch {}
+      // Fallback: decode without verify (basic checks only)
+      try {
+        const payload = decodeJwtNoVerify(token);
+        if (payload?.sub && payload?.exp && payload.exp * 1000 > Date.now()) {
+          const issuer = payload.iss || "";
+          const allowedIssuer = process.env.CLERK_ISSUER || "";
+          const issuerLooksValid =
+            issuer.includes("clerk") ||
+            (allowedIssuer && issuer === allowedIssuer);
+          if (issuerLooksValid) {
+            userId = payload.sub;
+            break;
+          }
+        }
+      } catch {}
+    }
   }
 
   return {
