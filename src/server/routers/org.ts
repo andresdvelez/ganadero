@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { prisma } from "@/lib/prisma";
+import { clerkClient } from "@clerk/nextjs/server";
 
 export const orgRouter = createTRPCRouter({
   myOrganizations: protectedProcedure.query(async ({ ctx }) => {
@@ -22,8 +23,30 @@ export const orgRouter = createTRPCRouter({
     .input(z.object({ name: z.string().min(2).max(100) }))
     .mutation(async ({ ctx, input }) => {
       const clerkId = ctx.userId!;
-      const me = await prisma.user.findUnique({ where: { clerkId } });
-      if (!me) throw new Error("Usuario no encontrado");
+      let me = await prisma.user.findUnique({ where: { clerkId } });
+      if (!me) {
+        try {
+          const user = await clerkClient.users.getUser(clerkId);
+          const primaryEmailId = user.primaryEmailAddressId;
+          const emailFromPrimary = user.emailAddresses?.find(
+            (e) => e.id === primaryEmailId
+          )?.emailAddress;
+          const fallbackEmail = user.emailAddresses?.[0]?.emailAddress;
+          const email =
+            emailFromPrimary || fallbackEmail || `user_${clerkId}@ganado.ai`;
+          const fullName =
+            [user.firstName, user.lastName].filter(Boolean).join(" ") || null;
+          me = await prisma.user.create({
+            data: {
+              clerkId,
+              email,
+              name: fullName,
+            },
+          });
+        } catch {
+          throw new Error("Usuario no encontrado");
+        }
+      }
       const org = await prisma.organization.create({
         data: {
           name: input.name,
