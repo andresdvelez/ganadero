@@ -27,6 +27,7 @@ import { AnimalNewEmbedded } from "@/components/embedded/animal-new-embedded";
 import { AIAssistantDashboard } from "@/components/ai/ai-dashboard";
 import { AIInputBar } from "@/components/ai/ai-input-bar";
 import { AISidebar } from "@/components/ai/ai-sidebar";
+import { ModuleLauncher } from "@/components/modules/module-launcher";
 import {
   db,
   generateUUID,
@@ -81,6 +82,7 @@ export default function AIAssistantPage() {
   const [listenElapsedMs, setListenElapsedMs] = useState<number>(0);
   const [levels, setLevels] = useState<number[] | undefined>(undefined);
   const [webSearch, setWebSearch] = useState<boolean>(false);
+  const [modulesOpen, setModulesOpen] = useState(false);
   const audioAnalyserRef = useRef<AnalyserNode | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -695,6 +697,7 @@ export default function AIAssistantPage() {
                     webSearch={webSearch}
                     onToggleWebSearch={setWebSearch}
                     analyser={audioAnalyserRef.current}
+                    onOpenModules={() => setModulesOpen(true)}
                   />
                 </div>
               </div>
@@ -719,6 +722,12 @@ export default function AIAssistantPage() {
                 />
               </div>
             </div>
+          )}
+          {modulesOpen && (
+            <ModuleLauncher
+              open={modulesOpen}
+              onClose={() => setModulesOpen(false)}
+            />
           )}
         </div>
       </DashboardLayout>

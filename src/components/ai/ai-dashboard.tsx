@@ -30,6 +30,7 @@ export function AIAssistantDashboard({
   webSearch,
   onToggleWebSearch,
   analyser,
+  onOpenModules,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -49,6 +50,7 @@ export function AIAssistantDashboard({
   webSearch?: boolean;
   onToggleWebSearch?: (v: boolean) => void;
   analyser?: AnalyserNode | null;
+  onOpenModules?: () => void;
 }) {
   const categories = useMemo(
     () => [
@@ -110,6 +112,17 @@ export function AIAssistantDashboard({
             disabled={overlayActive}
           >
             <Paperclip className="h-4 w-4" />
+          </Button>
+          {/* Open modules */}
+          <Button
+            isIconOnly
+            variant="solid"
+            className="h-12 w-12 rounded-full bg-white text-neutral-700 shadow-[0_10px_20px_rgba(0,0,0,0.08)] border border-neutral-200 pointer-events-auto"
+            aria-label="Módulos"
+            disabled={overlayActive}
+            onPress={onOpenModules}
+          >
+            <span className="text-[13px] font-semibold">≡</span>
           </Button>
           <Button
             isIconOnly
