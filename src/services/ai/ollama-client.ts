@@ -246,16 +246,20 @@ Reglas:
   }
 
   private parseAIResponse(content: string): AIResponse {
+    // 1) Try to extract fenced JSON ```json ... ``` or ``` ... ```
+    const fenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    const candidate = fenceMatch ? fenceMatch[1] : content;
+
     try {
-      const parsed = JSON.parse(content);
+      const parsed = JSON.parse(candidate);
       return {
-        content: parsed.content || content,
+        content: parsed.content || "",
         module: parsed.module,
         action: parsed.action,
         data: parsed.data,
       };
-    } catch (error) {
-      // Si no es JSON válido, devolver como contenido simple
+    } catch (_e) {
+      // If still not JSON, return as plain text
       return { content };
     }
   }
