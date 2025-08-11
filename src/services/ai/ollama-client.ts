@@ -149,7 +149,7 @@ export class AIClient {
     query: string,
     context?: any
   ): Promise<AIResponse> {
-    const systemPrompt = this.buildSystemPrompt();
+    const systemPrompt = this.buildSystemPrompt(context);
     const userPrompt = this.buildUserPrompt(query, context);
 
     try {
@@ -232,6 +232,7 @@ export class AIClient {
 
   private buildSystemPrompt(context?: any): string {
     let prompt = `Eres el orquestador de módulos de Ganado AI para Colombia. Siempre responde en JSON válido y en español colombiano.
+    No utilices inglés bajo ninguna circunstancia. Si el usuario escribe en otro idioma, responde en español y aclara que mantienes el idioma español por consistencia.
     Dispones de módulos y acciones:
     ${aiModuleSpecs
       .map(
@@ -287,6 +288,19 @@ Responde priorizando prácticas locales y terminología usada en Colombia.`;
         }
       }
     }
+    if (
+      context?.recentMessages &&
+      Array.isArray(context.recentMessages) &&
+      context.recentMessages.length > 0
+    ) {
+      try {
+        const serialized = context.recentMessages
+          .slice(-10)
+          .map((m: any) => `${m.role}: ${m.content}`)
+          .join("\n");
+        prompt += `\n\nHistorial reciente (para mantener continuidad):\n${serialized}`;
+      } catch {}
+    }
     return prompt;
   }
 
@@ -307,6 +321,19 @@ Responde priorizando prácticas locales y terminología usada en Colombia.`;
         prompt += `Tareas pendientes: ${JSON.stringify(
           context.pendingTasks
         )}\n`;
+      }
+      if (
+        context.recentMessages &&
+        Array.isArray(context.recentMessages) &&
+        context.recentMessages.length > 0
+      ) {
+        try {
+          const lastTwo = context.recentMessages
+            .slice(-2)
+            .map((m: any) => `${m.role}: ${m.content}`)
+            .join("\n");
+          prompt += `\nÚltimos turnos:\n${lastTwo}\n`;
+        } catch {}
       }
     }
 

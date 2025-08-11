@@ -318,8 +318,21 @@ export const aiModuleSpecs: AIModuleSpec[] = [
     id: "pastures",
     name: "Potreros",
     category: "Productividad",
-    description: "Potreros, áreas y ocupación para rotación.",
-    tags: ["pastoreo", "praderas", "rotación", "forraje", "lotes"],
+    description:
+      "Pasturas y Nutrición: potreros, áreas y ocupación para rotación.",
+    tags: [
+      "pastura",
+      "pasturas",
+      "potrero",
+      "potreros",
+      "pastoreo",
+      "praderas",
+      "rotación",
+      "forraje",
+      "lotes",
+      "nutricion",
+      "nutrición",
+    ],
     actions: [
       { id: "list", label: "Ver potreros", patterns: ACTION_PATTERNS.list },
       {

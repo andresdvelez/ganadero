@@ -534,12 +534,18 @@ export const aiRouter = createTRPCRouter({
         chosenAction = bestAction?.id;
       }
 
-      // Fallback heuristics for animals/health if module detection is weak
+      // Domain keyword heuristics to override when module detection is weak
+      const isAnimal =
+        /\banimal(es)?\b|\bvaca\b|\bternero\b|\btoro\b|\bganado\b/.test(q);
+      const isHealth = /salud|vacuna|tratamiento|enfermedad/.test(q);
+      const isPastures =
+        /pastura(s)?|potrero(s)?|pastoreo|pradera(s)?|forraje|rotacion|rotación|nutricion|nutrición/.test(
+          q
+        );
+
       if (!current || (bestModule && bestModule.score < 0.05)) {
-        const isAnimal =
-          /\banimal(es)?\b|\bvaca\b|\bternero\b|\btoro\b|\bganado\b/.test(q);
-        const isHealth = /salud|vacuna|tratamiento|enfermedad/.test(q);
-        if (isAnimal) chosenModule = "animals";
+        if (isPastures) chosenModule = "pastures";
+        else if (isAnimal) chosenModule = "animals";
         else if (isHealth) chosenModule = "health";
       }
 

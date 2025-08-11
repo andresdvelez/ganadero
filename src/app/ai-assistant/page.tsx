@@ -18,7 +18,21 @@ import {
   User,
   X,
   Check,
+  Edit3,
+  Flag,
+  Repeat2,
+  PauseCircle,
+  PlayCircle,
+  MoreHorizontal,
+  Copy,
+  Reply,
 } from "lucide-react";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  Button as HeroUIButton,
+} from "@heroui/react";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { moduleRegistry } from "@/modules";
@@ -96,6 +110,24 @@ export default function AIAssistantPage() {
   const audioAnalyserRef = useRef<AnalyserNode | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
+  const [isPaused, setIsPaused] = useState(false);
+  const [editFromMessageId, setEditFromMessageId] = useState<string | null>(
+    null
+  );
+  const [checkpoints, setCheckpoints] = useState<
+    Array<{ messageId: string; createdAt: Date; label?: string }>
+  >([]);
+  const pastureList = trpc.pasture.getAll.useQuery(undefined, {
+    enabled: false,
+  });
+  const longPressTimerRef = useRef<number | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    open: boolean;
+    x: number;
+    y: number;
+    messageId: string | null;
+  }>({ open: false, x: 0, y: 0, messageId: null });
+  const [checkpointsOpen, setCheckpointsOpen] = useState(false);
 
   // New TRPC hooks for AI context/memories
   const recordMessage = trpc.ai.recordMessage.useMutation();
@@ -240,6 +272,14 @@ export default function AIAssistantPage() {
   }, [isListening]);
 
   const handleSend = async (overrideText?: string) => {
+    if (isPaused) {
+      addToast({
+        variant: "warning",
+        title: "Chat en pausa",
+        description: "Reanuda para enviar mensajes.",
+      });
+      return;
+    }
     const textToSend = (overrideText ?? input).trim();
     if (!textToSend || isLoading) return;
 
@@ -252,6 +292,14 @@ export default function AIAssistantPage() {
     setMessages((prev) => [...prev, userMessage]);
     setInput(overrideText ? "" : "");
     setIsLoading(true);
+    setCheckpoints((prev) => [
+      ...prev,
+      {
+        messageId: userMessage.id,
+        createdAt: new Date(),
+        label: textToSend.slice(0, 40),
+      },
+    ]);
 
     try {
       // Ensure chat exists
@@ -316,6 +364,56 @@ export default function AIAssistantPage() {
       const intent = await routeIntent.mutateAsync({
         query: userMessage.content,
       });
+      // Inline handling for pastures
+      if (intent?.module === "pastures") {
+        if (intent?.action === "list") {
+          const list = await utils.pasture.getAll.fetch();
+          const items = list
+            .map((p) => `- ${p.name}${p.areaHa ? ` (${p.areaHa} ha)` : ""}`)
+            .join("\n");
+          const content =
+            items.length > 0
+              ? `Estas son tus pasturas registradas:\n${items}`
+              : "No encontré pasturas registradas.";
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: (Date.now() + 1).toString(),
+              role: "assistant",
+              content,
+              timestamp: new Date(),
+              module: "pastures",
+              action: "list",
+            },
+          ]);
+          // Persist assistant message
+          await db.chatMessages.add({
+            chatUuid: currentChatUuid!,
+            role: "assistant",
+            content,
+            createdAt: new Date(),
+          } as OfflineChatMessage);
+          await db.chats
+            .where({ uuid: currentChatUuid! })
+            .modify({ updatedAt: new Date() });
+          setIsLoading(false);
+          return;
+        }
+        if (intent?.action === "create") {
+          const assistantMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: "Abrí el formulario para registrar un nuevo potrero.",
+            timestamp: new Date(),
+            module: intent.module,
+            action: intent.action,
+          };
+          setMessages((prev) => [...prev, assistantMessage]);
+          router.push("/_/pastures/new");
+          setIsLoading(false);
+          return;
+        }
+      }
       if (intent?.module === "animals" && intent?.action === "create") {
         const assistantMessage: Message = {
           id: (Date.now() + 1).toString(),
@@ -445,6 +543,41 @@ export default function AIAssistantPage() {
         });
       } catch {}
 
+      if (response.module === "pastures" && response.action === "list") {
+        const list = await utils.pasture.getAll.fetch();
+        const items = list
+          .map((p) => `- ${p.name}${p.areaHa ? ` (${p.areaHa} ha)` : ""}`)
+          .join("\n");
+        const extra =
+          items.length > 0
+            ? `\n\n${items}`
+            : "\n\nNo encontré pasturas registradas.";
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 2).toString(),
+            role: "assistant",
+            content: extra,
+            timestamp: new Date(),
+            module: "pastures",
+            action: "list",
+          },
+        ]);
+        await db.chatMessages.add({
+          chatUuid: currentChatUuid!,
+          role: "assistant",
+          content: extra,
+          createdAt: new Date(),
+        } as OfflineChatMessage);
+        await db.chats
+          .where({ uuid: currentChatUuid! })
+          .modify({ updatedAt: new Date() });
+        return;
+      }
+      if (response.module === "pastures" && response.action === "create") {
+        router.push("/_/pastures/new");
+        return;
+      }
       if (response.module === "animals" && response.action === "create") {
         setInlineTool({ type: "animals.create" });
         return;
@@ -504,6 +637,60 @@ export default function AIAssistantPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleResendLast = async () => {
+    const lastUser = [...messages].reverse().find((m) => m.role === "user");
+    if (!lastUser) return;
+    await handleSend(lastUser.content);
+  };
+
+  const handleContinue = async () => {
+    await handleSend("continúa");
+  };
+
+  const startEditFrom = (messageId: string) => {
+    const msg = messages.find((m) => m.id === messageId);
+    if (!msg) return;
+    setEditFromMessageId(messageId);
+    setInput(msg.content);
+    inputRef.current?.focus();
+  };
+
+  const applyEditForkIfNeeded = () => {
+    if (!editFromMessageId) return false;
+    const idx = messages.findIndex((m) => m.id === editFromMessageId);
+    if (idx <= 0) return false;
+    const subset = messages.slice(0, idx);
+    setMessages(subset);
+    setChatUuid(null); // force new session
+    setEditFromMessageId(null);
+    return true;
+  };
+
+  // Refs por mensaje para saltar a un checkpoint
+  const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const scrollToMessage = (messageId: string) => {
+    const el = messageRefs.current[messageId];
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+  const restoreToCheckpoint = (messageId: string) => {
+    const idx = messages.findIndex((m) => m.id === messageId);
+    if (idx < 0) return;
+    const subset = messages.slice(0, idx + 1);
+    setMessages(subset);
+    setChatUuid(null); // Fork desde aquí
+    addToast({
+      variant: "success",
+      title: "Restaurado",
+      description: "La conversación se restauró al checkpoint.",
+    });
+  };
+
+  // Intercept Enter send to fork when editing
+  const onSendWithFork = async () => {
+    const forked = applyEditForkIfNeeded();
+    await handleSend();
   };
 
   const handleVoiceInput = () => {
@@ -785,12 +972,48 @@ export default function AIAssistantPage() {
                     {messages.map((message) => (
                       <div
                         key={message.id}
+                        ref={(el) => {
+                          messageRefs.current[message.id] = el;
+                        }}
                         className={cn(
                           "animate-message",
                           message.role === "user"
                             ? "flex justify-end"
                             : "flex justify-start"
                         )}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          setContextMenu({
+                            open: true,
+                            x: e.clientX,
+                            y: e.clientY,
+                            messageId: message.id,
+                          });
+                        }}
+                        onPointerDown={(e) => {
+                          if (longPressTimerRef.current)
+                            window.clearTimeout(longPressTimerRef.current);
+                          const px = (e as any).clientX || 0;
+                          const py = (e as any).clientY || 0;
+                          longPressTimerRef.current = window.setTimeout(() => {
+                            setContextMenu({
+                              open: true,
+                              x: px,
+                              y: py,
+                              messageId: message.id,
+                            });
+                          }, 550);
+                        }}
+                        onPointerUp={() => {
+                          if (longPressTimerRef.current)
+                            window.clearTimeout(longPressTimerRef.current);
+                          longPressTimerRef.current = null;
+                        }}
+                        onPointerLeave={() => {
+                          if (longPressTimerRef.current)
+                            window.clearTimeout(longPressTimerRef.current);
+                          longPressTimerRef.current = null;
+                        }}
                       >
                         <div
                           className={cn(
@@ -814,7 +1037,7 @@ export default function AIAssistantPage() {
                           </div>
                           <div
                             className={cn(
-                              "rounded-2xl px-4 py-3 max-w-[80%] transition-all",
+                              "relative rounded-2xl px-4 py-3 max-w-[80%] transition-all",
                               message.role === "user"
                                 ? "bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white shadow-md"
                                 : "bg-white border border-neutral-200 shadow-sm text-neutral-800"
@@ -832,6 +1055,207 @@ export default function AIAssistantPage() {
                         </div>
                       </div>
                     ))}
+                    {contextMenu.open && contextMenu.messageId && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-40"
+                          onClick={() =>
+                            setContextMenu({
+                              open: false,
+                              x: 0,
+                              y: 0,
+                              messageId: null,
+                            })
+                          }
+                        />
+                        <div
+                          className="fixed z-50 bg-white border border-neutral-200 rounded-lg shadow-lg min-w-[200px] p-1"
+                          style={{ left: contextMenu.x, top: contextMenu.y }}
+                          role="menu"
+                        >
+                          <div
+                            role="menuitem"
+                            tabIndex={0}
+                            className="w-full text-left px-3 py-2 rounded-md hover:bg-neutral-100 flex items-center gap-2 cursor-pointer"
+                            onClick={() => {
+                              setContextMenu({
+                                open: false,
+                                x: 0,
+                                y: 0,
+                                messageId: null,
+                              });
+                              startEditFrom(contextMenu.messageId!);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                setContextMenu({
+                                  open: false,
+                                  x: 0,
+                                  y: 0,
+                                  messageId: null,
+                                });
+                                startEditFrom(contextMenu.messageId!);
+                              }
+                            }}
+                          >
+                            <Edit3 className="h-4 w-4" /> Editar
+                          </div>
+                          <div
+                            role="menuitem"
+                            tabIndex={0}
+                            className="w-full text-left px-3 py-2 rounded-md hover:bg-neutral-100 flex items-center gap-2 cursor-pointer"
+                            onClick={async () => {
+                              const msg = messages.find(
+                                (m) => m.id === contextMenu.messageId
+                              );
+                              if (msg) {
+                                try {
+                                  await navigator.clipboard.writeText(
+                                    msg.content
+                                  );
+                                  addToast({
+                                    variant: "success",
+                                    title: "Copiado",
+                                    description:
+                                      "Mensaje copiado al portapapeles.",
+                                  });
+                                } catch {}
+                              }
+                              setContextMenu({
+                                open: false,
+                                x: 0,
+                                y: 0,
+                                messageId: null,
+                              });
+                            }}
+                            onKeyDown={async (e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                const msg = messages.find(
+                                  (m) => m.id === contextMenu.messageId
+                                );
+                                if (msg) {
+                                  try {
+                                    await navigator.clipboard.writeText(
+                                      msg.content
+                                    );
+                                    addToast({
+                                      variant: "success",
+                                      title: "Copiado",
+                                      description:
+                                        "Mensaje copiado al portapapeles.",
+                                    });
+                                  } catch {}
+                                }
+                                setContextMenu({
+                                  open: false,
+                                  x: 0,
+                                  y: 0,
+                                  messageId: null,
+                                });
+                              }
+                            }}
+                          >
+                            <Copy className="h-4 w-4" /> Copiar
+                          </div>
+                          <div
+                            role="menuitem"
+                            tabIndex={0}
+                            className="w-full text-left px-3 py-2 rounded-md hover:bg-neutral-100 flex items-center gap-2 cursor-pointer"
+                            onClick={() => {
+                              const msg = messages.find(
+                                (m) => m.id === contextMenu.messageId
+                              );
+                              if (msg) {
+                                setInput(`> ${msg.content.split("\n")[0]}\n`);
+                                inputRef.current?.focus();
+                              }
+                              setContextMenu({
+                                open: false,
+                                x: 0,
+                                y: 0,
+                                messageId: null,
+                              });
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                const msg = messages.find(
+                                  (m) => m.id === contextMenu.messageId
+                                );
+                                if (msg) {
+                                  setInput(`> ${msg.content.split("\n")[0]}\n`);
+                                  inputRef.current?.focus();
+                                }
+                                setContextMenu({
+                                  open: false,
+                                  x: 0,
+                                  y: 0,
+                                  messageId: null,
+                                });
+                              }
+                            }}
+                          >
+                            <Reply className="h-4 w-4" /> Responder
+                          </div>
+                          <div
+                            role="menuitem"
+                            tabIndex={0}
+                            className="w-full text-left px-3 py-2 rounded-md hover:bg-neutral-100 flex items-center gap-2 cursor-pointer"
+                            onClick={() => {
+                              const id = contextMenu.messageId!;
+                              const msg = messages.find((m) => m.id === id);
+                              setCheckpoints((prev) => [
+                                ...prev,
+                                {
+                                  messageId: id,
+                                  createdAt: new Date(),
+                                  label: (msg?.content || "").slice(0, 40),
+                                },
+                              ]);
+                              addToast({
+                                variant: "success",
+                                title: "Checkpoint creado",
+                              });
+                              setContextMenu({
+                                open: false,
+                                x: 0,
+                                y: 0,
+                                messageId: null,
+                              });
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                const id = contextMenu.messageId!;
+                                const msg = messages.find((m) => m.id === id);
+                                setCheckpoints((prev) => [
+                                  ...prev,
+                                  {
+                                    messageId: id,
+                                    createdAt: new Date(),
+                                    label: (msg?.content || "").slice(0, 40),
+                                  },
+                                ]);
+                                addToast({
+                                  variant: "success",
+                                  title: "Checkpoint creado",
+                                });
+                                setContextMenu({
+                                  open: false,
+                                  x: 0,
+                                  y: 0,
+                                  messageId: null,
+                                });
+                              }
+                            }}
+                          >
+                            <Flag className="h-4 w-4" /> Checkpoint
+                          </div>
+                        </div>
+                      </>
+                    )}
                     {isLoading && (
                       <div className="mx-auto max-w-3xl">
                         <div className="inline-flex items-center gap-2 rounded-2xl bg-white border border-neutral-200 px-4 py-2 shadow-sm">
@@ -888,10 +1312,24 @@ export default function AIAssistantPage() {
           {messages.length > 0 && (
             <div className="bg-white border-t border-neutral-200 p-4 animate-in fade-in slide-in-from-bottom-2">
               <div className="max-w-4xl mx-auto">
+                {/* Timeline de checkpoints */}
+                {checkpoints.length > 0 && (
+                  <div className="max-w-4xl mx-auto mb-3 flex items-center justify-between">
+                    <div className="text-sm text-neutral-600">
+                      {checkpoints.length} checkpoints
+                    </div>
+                    <Button
+                      variant="flat"
+                      onPress={() => setCheckpointsOpen(true)}
+                    >
+                      Ver checkpoints
+                    </Button>
+                  </div>
+                )}
                 <AIInputBar
                   value={input}
                   onChange={(v) => setInput(v)}
-                  onSend={() => handleSend()}
+                  onSend={() => onSendWithFork()}
                   onMic={handleVoiceInput}
                   isListening={isListening}
                   elapsedMs={listenElapsedMs}
@@ -901,6 +1339,27 @@ export default function AIAssistantPage() {
                   onToggleWebSearch={setWebSearch}
                   analyser={audioAnalyserRef.current}
                 />
+                <div className="max-w-4xl mx-auto mt-3 flex gap-2">
+                  <Button
+                    variant="flat"
+                    onPress={() => setIsPaused((v) => !v)}
+                    startContent={
+                      isPaused ? (
+                        <PlayCircle className="h-4 w-4" />
+                      ) : (
+                        <PauseCircle className="h-4 w-4" />
+                      )
+                    }
+                  >
+                    {isPaused ? "Reanudar" : "Pausar"}
+                  </Button>
+                  <Button variant="flat" onPress={handleResendLast}>
+                    Reenviar último
+                  </Button>
+                  <Button variant="flat" onPress={handleContinue}>
+                    Continuar
+                  </Button>
+                </div>
               </div>
             </div>
           )}
@@ -910,6 +1369,82 @@ export default function AIAssistantPage() {
               onClose={() => setModulesOpen(false)}
             />
           )}
+          <HeroDrawer
+            open={checkpointsOpen}
+            onClose={() => setCheckpointsOpen(false)}
+            title="Checkpoints"
+            width={520}
+          >
+            <div className="space-y-2">
+              {checkpoints.length === 0 && (
+                <p className="text-sm text-neutral-600">No hay checkpoints.</p>
+              )}
+              {checkpoints.map((cp, idx) => {
+                const msg = messages.find((m) => m.id === cp.messageId);
+                return (
+                  <div
+                    key={cp.messageId + idx}
+                    className="border border-neutral-200 rounded-lg p-2 flex items-start gap-2"
+                  >
+                    <div className="flex-1">
+                      <input
+                        className="w-full text-sm border border-neutral-200 rounded px-2 py-1 mb-1"
+                        value={cp.label || ""}
+                        placeholder={
+                          (msg?.content || "").slice(0, 40) || "Etiqueta"
+                        }
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setCheckpoints((prev) =>
+                            prev.map((it, i) =>
+                              i === idx ? { ...it, label: v } : it
+                            )
+                          );
+                        }}
+                      />
+                      <div className="text-xs text-neutral-500">
+                        {new Date(cp.createdAt).toLocaleString()}
+                      </div>
+                      {msg && (
+                        <div className="text-xs text-neutral-600 mt-1 truncate">
+                          {msg.content}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <Button
+                        size="sm"
+                        variant="flat"
+                        onPress={() => scrollToMessage(cp.messageId)}
+                      >
+                        Saltar
+                      </Button>
+                      <Button
+                        size="sm"
+                        color="primary"
+                        variant="flat"
+                        onPress={() => restoreToCheckpoint(cp.messageId)}
+                      >
+                        Restaurar
+                      </Button>
+                      <Button
+                        size="sm"
+                        color="danger"
+                        variant="flat"
+                        onPress={() =>
+                          setCheckpoints((prev) =>
+                            prev.filter((_, i) => i !== idx)
+                          )
+                        }
+                      >
+                        Eliminar
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </HeroDrawer>
         </div>
       </DashboardLayout>
     </TRPCProvider>
