@@ -1,4 +1,5 @@
 import { translations } from "@/lib/constants/translations";
+import { aiModuleSpecs } from "@/modules/ai-specs";
 
 // AI Client configuration
 interface AIResponse {
@@ -232,8 +233,11 @@ export class AIClient {
   private buildSystemPrompt(context?: any): string {
     let prompt = `Eres el orquestador de módulos de Ganado AI para Colombia. Siempre responde en JSON válido y en español colombiano.
     Dispones de módulos y acciones:
-    - animals: ["list", "create"]
-    - health: ["list", "create"]
+    ${aiModuleSpecs
+      .map(
+        (m) => `- ${m.id}: [${m.actions.map((a) => `"${a.id}"`).join(", ")}]`
+      )
+      .join("\n")} 
     Reglas:
     - Si el usuario pide navegar a una sección/listar, usa action "list".
     - Si el usuario pide registrar/crear/agregar, usa action "create".
@@ -241,8 +245,8 @@ export class AIClient {
     - Formato de respuesta estricto:
     {
       "content": "mensaje breve para el usuario",
-      "module": "animals|health|dashboard",
-      "action": "list|create|none",
+      "module": "<moduleId>",
+      "action": "<actionId|none>",
       "data": { }
     }`;
 

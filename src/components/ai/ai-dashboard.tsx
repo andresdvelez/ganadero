@@ -30,7 +30,6 @@ export function AIAssistantDashboard({
   webSearch,
   onToggleWebSearch,
   analyser,
-  onOpenModules,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -50,7 +49,6 @@ export function AIAssistantDashboard({
   webSearch?: boolean;
   onToggleWebSearch?: (v: boolean) => void;
   analyser?: AnalyserNode | null;
-  onOpenModules?: () => void;
 }) {
   const categories = useMemo(
     () => [

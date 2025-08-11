@@ -28,6 +28,9 @@ import { AIAssistantDashboard } from "@/components/ai/ai-dashboard";
 import { AIInputBar } from "@/components/ai/ai-input-bar";
 import { AISidebar } from "@/components/ai/ai-sidebar";
 import { ModuleLauncher } from "@/components/modules/module-launcher";
+import { HealthNewEmbedded } from "@/components/embedded/health-new-embedded";
+import { MilkNewEmbedded } from "@/components/embedded/milk-new-embedded";
+import { HeroModal } from "@/components/ui/hero-modal";
 import {
   db,
   generateUUID,
@@ -74,7 +77,7 @@ export default function AIAssistantPage() {
   const [llamaRunning, setLlamaRunning] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [inlineTool, setInlineTool] = useState<{
-    type: "animals.create";
+    type: "animals.create" | "health.create" | "milk.create";
     props?: any;
   } | null>(null);
   const [voiceTranscript, setVoiceTranscript] = useState<string | null>(null);
@@ -319,6 +322,32 @@ export default function AIAssistantPage() {
         setInlineTool({ type: "animals.create" });
         return;
       }
+      if (intent?.module === "health" && intent?.action === "create") {
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: "Abrí el formulario para registrar un evento de salud.",
+          timestamp: new Date(),
+          module: intent.module,
+          action: intent.action,
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+        setInlineTool({ type: "health.create" });
+        return;
+      }
+      if (intent?.module === "milk" && intent?.action === "create") {
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: "Abrí el formulario para registrar producción de leche.",
+          timestamp: new Date(),
+          module: intent.module,
+          action: intent.action,
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+        setInlineTool({ type: "milk.create" });
+        return;
+      }
 
       // Build richer context from server
       let context: any = null;
@@ -385,6 +414,14 @@ export default function AIAssistantPage() {
 
       if (response.module === "animals" && response.action === "create") {
         setInlineTool({ type: "animals.create" });
+        return;
+      }
+      if (response.module === "health" && response.action === "create") {
+        setInlineTool({ type: "health.create" });
+        return;
+      }
+      if (response.module === "milk" && response.action === "create") {
+        setInlineTool({ type: "milk.create" });
         return;
       }
 
@@ -581,8 +618,21 @@ export default function AIAssistantPage() {
             {messages.length > 0 ? (
               <div className="flex h-full">
                 <div className="flex-1 overflow-y-auto p-6">
-                  {inlineTool?.type === "animals.create" && (
-                    <div className="max-w-3xl mx-auto mb-4">
+                  <HeroModal
+                    open={!!inlineTool}
+                    onClose={() => setInlineTool(null)}
+                    title={
+                      inlineTool?.type === "animals.create"
+                        ? "Registrar nuevo animal"
+                        : inlineTool?.type === "health.create"
+                        ? "Registrar evento de salud"
+                        : inlineTool?.type === "milk.create"
+                        ? "Registrar producción de leche"
+                        : undefined
+                    }
+                    size="lg"
+                  >
+                    {inlineTool?.type === "animals.create" && (
                       <AnimalNewEmbedded
                         onCompleted={() => {
                           setInlineTool(null);
@@ -598,8 +648,44 @@ export default function AIAssistantPage() {
                         }}
                         onClose={() => setInlineTool(null)}
                       />
-                    </div>
-                  )}
+                    )}
+                    {inlineTool?.type === "health.create" && (
+                      <HealthNewEmbedded
+                        onCompleted={() => {
+                          setInlineTool(null);
+                          setMessages((prev) => [
+                            ...prev,
+                            {
+                              id: (Date.now() + 3).toString(),
+                              role: "assistant",
+                              content:
+                                "Evento de salud registrado correctamente.",
+                              timestamp: new Date(),
+                            },
+                          ]);
+                        }}
+                        onClose={() => setInlineTool(null)}
+                      />
+                    )}
+                    {inlineTool?.type === "milk.create" && (
+                      <MilkNewEmbedded
+                        onCompleted={() => {
+                          setInlineTool(null);
+                          setMessages((prev) => [
+                            ...prev,
+                            {
+                              id: (Date.now() + 3).toString(),
+                              role: "assistant",
+                              content:
+                                "Registro de leche guardado correctamente.",
+                              timestamp: new Date(),
+                            },
+                          ]);
+                        }}
+                        onClose={() => setInlineTool(null)}
+                      />
+                    )}
+                  </HeroModal>
 
                   <div
                     className={cn(

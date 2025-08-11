@@ -2,6 +2,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { prisma } from "@/lib/prisma";
 import { getAIClient } from "@/services/ai/ollama-client";
+import { aiModuleSpecs } from "@/modules/ai-specs";
 
 // -------- Helpers --------
 function tokenize(text: string): string[] {
@@ -500,21 +501,59 @@ export const aiRouter = createTRPCRouter({
         .toLowerCase()
         .normalize("NFD")
         .replace(/\p{Diacritic}/gu, "");
-      const isAnimalContext =
-        /\banimal(es)?\b|\bvaca\b|\bternero\b|\btoro\b|\bganado\b/.test(q);
-      const wantsCreate =
-        /\b(agregar|registrar|crear|anadir|nuevo|cargar)\b/.test(q) ||
-        /\b(nuevo\s+animal)\b/.test(q);
-      const wantsList = /\b(ver|listar|mostrar)\b/.test(q);
-      if (isAnimalContext && wantsCreate)
-        return { module: "animals", action: "create", data: {} } as any;
-      if (isAnimalContext && wantsList)
-        return { module: "animals", action: "list", data: {} } as any;
-      const isHealth = /salud|vacuna|tratamiento|enfermedad/.test(q);
-      if (isHealth && wantsCreate)
-        return { module: "health", action: "create", data: {} } as any;
-      if (isHealth && wantsList)
-        return { module: "health", action: "list", data: {} } as any;
-      return { module: "dashboard", action: "none", data: {} } as any;
+
+      // Find best matching module by tags/id/name tokens
+      const modules = aiModuleSpecs;
+      let bestModule: { id: string; score: number } | null = null;
+      for (const m of modules) {
+        const haystack = [m.id, m.name, ...(m.tags || [])]
+          .join(" ")
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/\p{Diacritic}/gu, "");
+        const hit = buildTfIdfCosine(q, [haystack])[0];
+        const score = hit?.score ?? 0;
+        if (!bestModule || score > bestModule.score)
+          bestModule = { id: m.id, score };
+      }
+
+      let chosenModule = bestModule?.id || "dashboard";
+
+      // Choose action from module action patterns
+      let chosenAction: string | undefined = undefined;
+      const current = modules.find((m) => m.id === chosenModule);
+      if (current) {
+        let bestAction: { id: string; score: number } | null = null;
+        for (const a of current.actions) {
+          const pats = (a.patterns || []).join(" ");
+          const hit = buildTfIdfCosine(q, [pats])[0];
+          const score = hit?.score ?? 0;
+          if (!bestAction || score > bestAction.score)
+            bestAction = { id: a.id, score };
+        }
+        chosenAction = bestAction?.id;
+      }
+
+      // Fallback heuristics for animals/health if module detection is weak
+      if (!current || (bestModule && bestModule.score < 0.05)) {
+        const isAnimal =
+          /\banimal(es)?\b|\bvaca\b|\bternero\b|\btoro\b|\bganado\b/.test(q);
+        const isHealth = /salud|vacuna|tratamiento|enfermedad/.test(q);
+        if (isAnimal) chosenModule = "animals";
+        else if (isHealth) chosenModule = "health";
+      }
+
+      // Default action based on verbs present
+      if (!chosenAction) {
+        const wantsCreate =
+          /\b(agregar|registrar|crear|anadir|añadir|nuevo|cargar|ingresar)\b/.test(
+            q
+          );
+        const wantsList =
+          /\b(ver|listar|mostrar|consultar|abrir|revisar)\b/.test(q);
+        chosenAction = wantsCreate ? "create" : wantsList ? "list" : "none";
+      }
+
+      return { module: chosenModule, action: chosenAction, data: {} } as any;
     }),
 });
