@@ -24,6 +24,11 @@ export const aiRouter = createTRPCRouter({
     }
   }),
 
+  checkCloudAvailable: publicProcedure.query(async () => {
+    const hasKey = !!process.env.OPENROUTER_API_KEY;
+    return { available: hasKey };
+  }),
+
   ensureLocalModel: publicProcedure
     .input(z.object({ model: z.string().default("deepseek-r1:latest") }))
     .mutation(async ({ input }) => {

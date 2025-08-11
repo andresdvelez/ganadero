@@ -115,12 +115,15 @@ export class AIClient {
   }
 
   async processQuery(query: string, context?: any): Promise<AIResponse> {
-    // Prefer cloud when online and key exists
-    const hasKey = !!process.env.OPENROUTER_API_KEY;
+    // Prefer cloud when online; server will decide if key exists
     const online = this.hasInternet();
 
-    if (hasKey && online) {
-      return this.processCloudQuery(query, context);
+    if (online) {
+      try {
+        return await this.processCloudQuery(query, context);
+      } catch {
+        // fall through to local
+      }
     }
 
     const isLocalAvailable = await this.checkLocalAvailability();
@@ -129,9 +132,10 @@ export class AIClient {
       return this.processLocalQuery(query, context);
     }
 
-    if (hasKey) {
-      return this.processCloudQuery(query, context);
-    }
+    // Last attempt: try cloud even if earlier failed (in case network recovered quickly)
+    try {
+      return await this.processCloudQuery(query, context);
+    } catch {}
 
     return {
       content:
@@ -178,29 +182,24 @@ export class AIClient {
     const systemPrompt = this.buildSystemPrompt();
     const userPrompt = this.buildUserPrompt(query, context);
 
-    try {
-      const response = await fetch("/api/ai/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-        }),
-      });
+    const response = await fetch("/api/ai/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      }),
+    });
 
-      if (!response.ok) {
-        const body = await response.text();
-        throw new Error(`Error en API de IA: ${body}`);
-      }
-
-      const data = await response.json();
-      return this.parseAIResponse(data.content);
-    } catch (error) {
-      console.error("Error en consulta cloud:", error);
-      throw error;
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(`Error en API de IA: ${body}`);
     }
+
+    const data = await response.json();
+    return this.parseAIResponse(data.content);
   }
 
   private buildSystemPrompt(): string {
