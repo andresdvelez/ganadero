@@ -67,7 +67,12 @@ export const createTRPCContext = async (opts: { req: NextRequest }) => {
     for (const token of candidateTokens) {
       // First, try official verification
       try {
-        const payload = await verifyToken(token);
+        const verifyOptions: any = {
+          secretKey: process.env.CLERK_SECRET_KEY || undefined,
+        };
+        const configuredIssuer = process.env.CLERK_ISSUER || process.env.NEXT_PUBLIC_CLERK_ISSUER;
+        if (configuredIssuer) verifyOptions.issuer = configuredIssuer;
+        const payload = await verifyToken(token, verifyOptions);
         const sub = (payload as any)?.sub as string | undefined;
         if (sub) {
           userId = sub;
