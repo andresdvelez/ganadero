@@ -500,7 +500,24 @@ export default function AIAssistantPage() {
 
   return (
     <TRPCProvider>
-      <DashboardLayout>
+      <DashboardLayout
+        rightSlot={
+          <AISidebar
+            chats={chatList.map((c) => ({
+              uuid: c.uuid,
+              title: c.title,
+              updatedAt: c.updatedAt,
+            }))}
+            activeChatUuid={chatUuid}
+            onNewChat={() => window.dispatchEvent(new Event("ai-new-chat"))}
+            onSelectChat={(uuid) =>
+              window.dispatchEvent(
+                new CustomEvent("ai-open-chat", { detail: { uuid } })
+              )
+            }
+          />
+        }
+      >
         <div className="flex flex-col h-[calc(100vh-4rem)]">
           {/* Header removed per new design */}
 
@@ -597,22 +614,6 @@ export default function AIAssistantPage() {
                     <div ref={messagesEndRef} />
                   </div>
                 </div>
-                <AISidebar
-                  chats={chatList.map((c) => ({
-                    uuid: c.uuid,
-                    title: c.title,
-                    updatedAt: c.updatedAt,
-                  }))}
-                  activeChatUuid={chatUuid}
-                  onNewChat={() =>
-                    window.dispatchEvent(new Event("ai-new-chat"))
-                  }
-                  onSelectChat={(uuid) =>
-                    window.dispatchEvent(
-                      new CustomEvent("ai-open-chat", { detail: { uuid } })
-                    )
-                  }
-                />
               </div>
             ) : (
               <div className="flex h-full">
@@ -646,22 +647,6 @@ export default function AIAssistantPage() {
                     )}, cloudAvailable: ${String(cloudAvailable)}`}
                   />
                 </div>
-                <AISidebar
-                  chats={chatList.map((c) => ({
-                    uuid: c.uuid,
-                    title: c.title,
-                    updatedAt: c.updatedAt,
-                  }))}
-                  activeChatUuid={chatUuid}
-                  onNewChat={() =>
-                    window.dispatchEvent(new Event("ai-new-chat"))
-                  }
-                  onSelectChat={(uuid) =>
-                    window.dispatchEvent(
-                      new CustomEvent("ai-open-chat", { detail: { uuid } })
-                    )
-                  }
-                />
               </div>
             )}
           </div>

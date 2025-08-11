@@ -7,9 +7,10 @@ import { UserButton } from "@clerk/nextjs";
 
 interface DashboardLayoutProps {
   children: ReactNode;
+  rightSlot?: ReactNode;
 }
 
-export function DashboardLayout({ children }: DashboardLayoutProps) {
+export function DashboardLayout({ children, rightSlot }: DashboardLayoutProps) {
   const hasClerk = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
   return (
@@ -29,7 +30,12 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           {hasClerk && <UserButton />}
         </nav>
       </header>
-      <main className="p-4">{children}</main>
+      <div className="grid grid-cols-[1fr_auto] min-h-0">
+        <main className="p-4 overflow-auto min-h-0">{children}</main>
+        {rightSlot ? (
+          <div className="border-l bg-white/80 min-h-0">{rightSlot}</div>
+        ) : null}
+      </div>
     </div>
   );
 }
