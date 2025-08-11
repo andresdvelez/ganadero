@@ -46,31 +46,50 @@ export class AIClient {
   }
 
   async checkLocalAvailability(): Promise<boolean> {
-    try {
-      const response = await fetch(`${this._ollamaHost}/api/tags`);
-      if (response.ok) {
-        const data = await response.json();
-        const models: Array<{ name?: string }> = data?.models || [];
-        const preferred =
-          process.env.NEXT_PUBLIC_OLLAMA_MODEL ||
-          "deepseek-r1-qwen-1_5b:latest";
-        const hasPreferred = models.some((m) => m.name === preferred);
-        if (hasPreferred) {
-          this.model = preferred;
-          return true;
-        }
-        const deepseekAny = models.find((m) =>
-          (m.name || "").includes("deepseek")
-        );
-        if (deepseekAny?.name) {
-          this.model = deepseekAny.name;
-          return true;
-        }
-        return models.length > 0;
+    const preferred =
+      process.env.NEXT_PUBLIC_OLLAMA_MODEL || "deepseek-r1-qwen-1_5b:latest";
+
+    const tryCheck = async (base: string) => {
+      const res = await fetch(`${base.replace(/\/$/, "")}/api/tags`);
+      if (!res.ok) return false;
+      const data = await res.json();
+      const models: Array<{ name?: string }> = data?.models || [];
+      const hasPreferred = models.some((m) => m.name === preferred);
+      if (hasPreferred) {
+        this.model = preferred;
+        return true;
       }
-    } catch (error) {
-      // Silenciar en cliente web cuando Ollama no está disponible
-    }
+      const deepseekAny = models.find((m) =>
+        (m.name || "").includes("deepseek")
+      );
+      if (deepseekAny?.name) {
+        this.model = deepseekAny.name;
+        return true;
+      }
+      return models.length > 0;
+    };
+
+    // 1) Try current host first
+    try {
+      const ok = await tryCheck(this._ollamaHost);
+      if (ok) return true;
+    } catch {}
+
+    // 2) Browser prod fallback: attempt direct localhost (user's machine)
+    try {
+      const isBrowser = typeof window !== "undefined";
+      const isTauri = isBrowser && !!(window as any).__TAURI__;
+      if (isBrowser && !isTauri) {
+        const port = Number(process.env.NEXT_PUBLIC_LLAMA_PORT || 11434);
+        const direct = `http://127.0.0.1:${port}`;
+        const ok = await tryCheck(direct);
+        if (ok) {
+          this.setHost(direct);
+          return true;
+        }
+      }
+    } catch {}
+
     return false;
   }
 
