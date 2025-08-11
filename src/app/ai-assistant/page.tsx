@@ -694,6 +694,7 @@ export default function AIAssistantPage() {
                     levels={levels}
                     webSearch={webSearch}
                     onToggleWebSearch={setWebSearch}
+                    analyser={audioAnalyserRef.current}
                   />
                 </div>
               </div>
@@ -714,6 +715,7 @@ export default function AIAssistantPage() {
                   levels={levels}
                   webSearch={webSearch}
                   onToggleWebSearch={setWebSearch}
+                  analyser={audioAnalyserRef.current}
                 />
               </div>
             </div>

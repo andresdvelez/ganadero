@@ -180,7 +180,30 @@ export class AIClient {
     context?: any
   ): Promise<AIResponse> {
     const systemPrompt = this.buildSystemPrompt(context);
-    const userPrompt = this.buildUserPrompt(query, context);
+    let userPrompt = this.buildUserPrompt(query, context);
+    if (context?.webSearch) {
+      try {
+        const s = await fetch("/api/ai/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query }),
+        });
+        if (s.ok) {
+          const data = await s.json();
+          const items = (data?.results || []) as Array<{
+            title: string;
+            url: string;
+            snippet: string;
+          }>;
+          if (items.length > 0) {
+            const snippetText = items
+              .map((it) => `- ${it.title}\n${it.url}\n${it.snippet}`)
+              .join("\n\n");
+            userPrompt = `Consulta del usuario: ${query}\n\nFragmentos web relevantes:\n${snippetText}\n\nResponde usando los fragmentos cuando apliquen, citando las URLs.`;
+          }
+        }
+      } catch {}
+    }
 
     const response = await fetch("/api/ai/chat", {
       method: "POST",

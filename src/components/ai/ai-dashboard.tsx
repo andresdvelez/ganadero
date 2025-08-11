@@ -29,6 +29,7 @@ export function AIAssistantDashboard({
   levels,
   webSearch,
   onToggleWebSearch,
+  analyser,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -47,6 +48,7 @@ export function AIAssistantDashboard({
   levels?: number[];
   webSearch?: boolean;
   onToggleWebSearch?: (v: boolean) => void;
+  analyser?: AnalyserNode | null;
 }) {
   const categories = useMemo(
     () => [
@@ -95,6 +97,7 @@ export function AIAssistantDashboard({
           levels={levels}
           webSearch={webSearch}
           onToggleWebSearch={onToggleWebSearch}
+          analyser={analyser}
         />
 
         {/* Action chips under the left edge */}

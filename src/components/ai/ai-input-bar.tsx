@@ -160,7 +160,7 @@ export function AIInputBar({
 
       {/* Web search toggle */}
       <div className="absolute right-[6.5rem] top-1/2 -translate-y-1/2 flex items-center gap-2 text-neutral-600 select-none">
-        <span className="hidden sm:inline text-sm">Web search</span>
+        <span className="hidden sm:inline text-sm">Búsqueda web</span>
         <Switch
           size="sm"
           isSelected={!!webSearch}
