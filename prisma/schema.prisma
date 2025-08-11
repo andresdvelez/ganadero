@@ -42,6 +42,8 @@ model User {
   organizations     Organization[]     @relation("OrgCreatedBy")
   devices           Device[]
   deletionLogs      DeletionLog[]
+  aiUserProfile     AIUserProfile?
+  aiMemories        AIMemory[]
   
   @@index([clerkId])
   @@index([email])
@@ -382,6 +384,37 @@ model AIConversation {
   
   @@index([userId])
   @@index([sessionId])
+  @@index([createdAt])
+}
+
+// AI user profile and long-term memory
+model AIUserProfile {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  bio       String?  // free text about the user
+  preferences String? // JSON with tone, language, module prefs
+  goals     String?  // JSON list of goals
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model AIMemory {
+  id         String   @id @default(cuid())
+  userId     String
+  content    String   // normalized fact or preference
+  importance Int      @default(1) // 1-5 heuristic
+  tags       String?  // comma-separated or JSON
+  source     String?  // chat, form, import
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime?
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, importance])
   @@index([createdAt])
 }
 

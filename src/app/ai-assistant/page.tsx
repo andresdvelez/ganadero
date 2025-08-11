@@ -10,16 +10,14 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getAIClient, setAIClientHost } from "@/services/ai/ollama-client";
 import {
-  Send,
+  ArrowUp,
   Mic,
   MicOff,
   Loader2,
   Bot,
   User,
-  Sparkles,
-  Download,
-  Server,
-  Play,
+  X,
+  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -35,7 +33,7 @@ import {
   OfflineChatMessage,
   addToSyncQueue,
 } from "@/lib/dexie";
-// Sidebar is now handled globally in the layout
+import { addToast } from "@/components/ui/toast";
 
 interface Message {
   id: string;
@@ -67,39 +65,34 @@ export default function AIAssistantPage() {
     boolean | null
   >(null);
   const [isTauri, setIsTauri] = useState(false);
-
   const [dlProgress, setDlProgress] = useState<{
     downloaded: number;
     total: number;
   } | null>(null);
   const [llamaRunning, setLlamaRunning] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
-
   const [inlineTool, setInlineTool] = useState<{
     type: "animals.create";
     props?: any;
   } | null>(null);
+  const [voiceTranscript, setVoiceTranscript] = useState<string | null>(null);
+
+  // New TRPC hooks for AI context/memories
+  const recordMessage = trpc.ai.recordMessage.useMutation();
+  const utils = trpc.useUtils();
+  const confirmMemories = trpc.ai.confirmMemories.useMutation();
+  const summarizeSession = trpc.ai.summarizeSession.useMutation();
 
   const MODEL_URL =
     process.env.NEXT_PUBLIC_MODEL_DOWNLOAD_URL ||
     "https://huggingface.co/ganado/ollama/resolve/main/DeepSeek-R1-Distill-Qwen-1.5B-Q8_0.gguf?download=true";
   const MODEL_SHA = process.env.NEXT_PUBLIC_MODEL_SHA256 || null;
-  const LLAMA_BIN_URL = process.env.NEXT_PUBLIC_LLAMA_BINARY_URL || "";
   const LLAMA_PORT = Number(process.env.NEXT_PUBLIC_LLAMA_PORT || 11434);
   const PREFERRED_MODEL =
     process.env.NEXT_PUBLIC_OLLAMA_MODEL || "deepseek-r1-qwen-1_5b:latest";
 
-  // Sample commands for quick actions
-  const sampleCommands = [
-    "Agregar una vaca nueva",
-    "Ver animales que necesitan vacunación",
-    "Registrar un parto",
-    "Generar reporte mensual",
-  ];
-
   useEffect(() => {
     setIsTauri(typeof window !== "undefined" && !!(window as any).__TAURI__);
-    // Load recent chats
     (async () => {
       try {
         const items = await db.chats
@@ -110,12 +103,7 @@ export default function AIAssistantPage() {
         setChatList(items);
       } catch {}
     })();
-    // Hook up module launcher opener
-    const openListener = () => {
-      const ev = new CustomEvent("open-modules");
-      window.dispatchEvent(ev);
-    };
-    // Listen for layout chat events
+
     const onNewChat = () => {
       setChatUuid(null);
       setMessages([]);
@@ -140,28 +128,12 @@ export default function AIAssistantPage() {
     window.addEventListener("ai-new-chat", onNewChat as any);
     window.addEventListener("ai-open-chat", onOpenChat as any);
 
-    // If running inside Tauri, force AI client to use the local Ollama host directly
     try {
       const isTauriEnv =
         typeof window !== "undefined" && !!(window as any).__TAURI__;
-      if (isTauriEnv) {
-        setAIClientHost(`http://127.0.0.1:${LLAMA_PORT}`);
-      }
+      if (isTauriEnv) setAIClientHost(`http://127.0.0.1:${LLAMA_PORT}`);
     } catch {}
 
-    // Debug override via query param: ?forceLocal=1|0|true|false
-    try {
-      const usp = new URLSearchParams(window.location.search);
-      const force = usp.get("forceLocal");
-      if (force !== null) {
-        const truthy = ["1", "true", "yes"].includes(force.toLowerCase());
-        const falsy = ["0", "false", "no"].includes(force.toLowerCase());
-        if (truthy) setLocalModelAvailable(true);
-        else if (falsy) setLocalModelAvailable(false);
-      }
-    } catch {}
-
-    // Client-side probe of local model to drive overlay reliably
     (async () => {
       try {
         const available = await aiClient.checkLocalAvailability();
@@ -174,12 +146,15 @@ export default function AIAssistantPage() {
     return () => {
       window.removeEventListener("ai-new-chat", onNewChat as any);
       window.removeEventListener("ai-open-chat", onOpenChat as any);
+      // auto summarize on unmount if there is a session
+      if (chatUuid && messages.length >= 10) {
+        summarizeSession.mutate({
+          sessionId: chatUuid,
+          take: Math.min(50, messages.length),
+        });
+      }
     };
   }, []);
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, inlineTool]);
 
   useEffect(() => {
     (async () => {
@@ -192,34 +167,11 @@ export default function AIAssistantPage() {
         setLocalModelAvailable((prev) => (prev === true ? true : false));
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (!isTauri) return;
-    const unsubs: Array<() => void> = [];
-    const t = (window as any).__TAURI__;
-    if (t?.event) {
-      t.event
-        .listen("model-download-progress", (e: any) => {
-          const payload = e?.payload as any;
-          if (payload && typeof payload.downloaded === "number") {
-            setDlProgress({
-              downloaded: payload.downloaded,
-              total: payload.total || 0,
-            });
-          }
-        })
-        .then((un: any) => unsubs.push(un));
-    }
-    return () => {
-      unsubs.forEach((u) => u());
-    };
-  }, [isTauri]);
-
-  const scrollToBottom = () => {
+  const scrollToBottom = () =>
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  useEffect(scrollToBottom, [messages, inlineTool]);
 
   const handleSend = async (overrideText?: string) => {
     const textToSend = (overrideText ?? input).trim();
@@ -231,7 +183,6 @@ export default function AIAssistantPage() {
       content: textToSend,
       timestamp: new Date(),
     };
-
     setMessages((prev) => [...prev, userMessage]);
     setInput(overrideText ? "" : "");
     setIsLoading(true);
@@ -253,16 +204,15 @@ export default function AIAssistantPage() {
         setChatList(
           await db.chats.orderBy("updatedAt").reverse().limit(20).toArray()
         );
-        window.dispatchEvent(new Event("ai-chat-updated"));
       }
-      // Persist user message
+
+      // Persist user message locally and queue
       await db.chatMessages.add({
         chatUuid: currentChatUuid!,
         role: "user",
         content: textToSend,
         createdAt: new Date(),
       } as OfflineChatMessage);
-      // Queue sync for user message
       await addToSyncQueue(
         "create",
         "ai_conversation",
@@ -276,12 +226,30 @@ export default function AIAssistantPage() {
         "dev-user"
       );
 
-      // Primero: intentar enrutar intención para acciones CRUD/navegación
+      // Call server: record + get context with query for memory ranking
+      try {
+        const recorded = await recordMessage.mutateAsync({
+          sessionId: currentChatUuid!,
+          role: "user",
+          content: textToSend,
+        });
+        if (recorded?.suggestedMemories?.length) {
+          const id = addToast({
+            variant: "info",
+            title: "Preferencias detectadas",
+            description: recorded.suggestedMemories
+              .map((m: any) => `• ${m.content}`)
+              .join("\n"),
+            durationMs: 8000,
+          });
+          // Optionally we could render a UI accept button; here we auto-confirm important ones later
+        }
+      } catch {}
+
+      // Intent quick path
       const intent = await routeIntent.mutateAsync({
         query: userMessage.content,
       });
-
-      // Mostrar herramientas inline en lugar de navegar
       if (intent?.module === "animals" && intent?.action === "create") {
         const assistantMessage: Message = {
           id: (Date.now() + 1).toString(),
@@ -296,37 +264,22 @@ export default function AIAssistantPage() {
         return;
       }
 
-      if (intent?.action === "list_modules" && intent?.data?.modules) {
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content: "Estos son los módulos disponibles:",
-          timestamp: new Date(),
-          module: "assistant",
-          action: "list_modules",
-          data: intent.data,
-        };
-        setMessages((prev) => [...prev, assistantMessage]);
-        return;
-      }
-
-      if (intent?.navigateTo) {
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content: "Abriendo la pantalla solicitada...",
-          timestamp: new Date(),
-          module: intent.module ?? undefined,
-          action: intent.action ?? undefined,
-        };
-        setMessages((prev) => [...prev, assistantMessage]);
-        // router.push(intent.navigateTo) => ahora evitamos navegación
-        return;
-      }
+      // Build richer context from server
+      let context: any = null;
+      try {
+        context = await utils.ai.getContext.fetch({
+          sessionId: currentChatUuid!,
+          recent: 8,
+          memories: 10,
+          query: textToSend,
+        });
+      } catch {}
 
       const response = await aiClient.processQuery(textToSend, {
         currentModule: "chat",
         recentMessages: messages.slice(-5),
+        profile: context?.profile || null,
+        memories: context?.memories || [],
       });
 
       const assistantMessage: Message = {
@@ -337,34 +290,39 @@ export default function AIAssistantPage() {
         module: response.module,
         action: response.action,
       };
-
       setMessages((prev) => [...prev, assistantMessage]);
-      // Persist assistant message and update chat timestamp/title if needed
-      if (currentChatUuid) {
-        await db.chatMessages.add({
-          chatUuid: currentChatUuid,
+
+      // Persist assistant message + queue
+      await db.chatMessages.add({
+        chatUuid: currentChatUuid!,
+        role: "assistant",
+        content: assistantMessage.content,
+        createdAt: new Date(),
+      } as OfflineChatMessage);
+      await db.chats
+        .where({ uuid: currentChatUuid! })
+        .modify({ updatedAt: new Date() });
+      await addToSyncQueue(
+        "create",
+        "ai_conversation",
+        `${currentChatUuid}-assistant-${Date.now()}`,
+        {
+          sessionId: currentChatUuid,
           role: "assistant",
           content: assistantMessage.content,
-          createdAt: new Date(),
-        } as OfflineChatMessage);
-        await db.chats
-          .where({ uuid: currentChatUuid })
-          .modify({ updatedAt: new Date() });
-        window.dispatchEvent(new Event("ai-chat-updated"));
-        // Queue sync for assistant message
-        await addToSyncQueue(
-          "create",
-          "ai_conversation",
-          `${currentChatUuid}-assistant-${Date.now()}`,
-          {
-            sessionId: currentChatUuid,
-            role: "assistant",
-            content: assistantMessage.content,
-            createdAt: new Date().toISOString(),
-          },
-          "dev-user"
-        );
-      }
+          createdAt: new Date().toISOString(),
+        },
+        "dev-user"
+      );
+
+      // Record assistant server-side (for summaries, future extractions if needed)
+      try {
+        await recordMessage.mutateAsync({
+          sessionId: currentChatUuid!,
+          role: "assistant",
+          content: assistantMessage.content,
+        });
+      } catch {}
 
       if (response.module === "animals" && response.action === "create") {
         setInlineTool({ type: "animals.create" });
@@ -377,7 +335,6 @@ export default function AIAssistantPage() {
         const act = mod?.actions?.[response.action];
         if (act) {
           const result = await act.run(response.data);
-          // evitamos navegar, sólo informamos
           if (result?.message) {
             setMessages((prev) => [
               ...prev,
@@ -393,18 +350,19 @@ export default function AIAssistantPage() {
       }
     } catch (error) {
       console.error("Error procesando consulta:", error);
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content:
-          "Lo siento, ocurrió un error procesando tu consulta. Por favor, intenta de nuevo." +
-          (error instanceof Error && error.message
-            ? `\nDetalle: ${error.message}`
-            : ""),
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, errorMessage]);
-      // Si falla, no sobreescribir disponibilidad si ya se detectó verdadero
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content:
+            "Lo siento, ocurrió un error procesando tu consulta. Por favor, intenta de nuevo." +
+            (error instanceof Error && error.message
+              ? `\nDetalle: ${error.message}`
+              : ""),
+          timestamp: new Date(),
+        },
+      ]);
       setLocalModelAvailable((prev) => (prev === true ? true : false));
     } finally {
       setIsLoading(false);
@@ -413,48 +371,38 @@ export default function AIAssistantPage() {
 
   const handleVoiceInput = () => {
     if (
-      !(typeof window !== "undefined" && "webkitSpeechRecognition" in window) &&
-      !(typeof window !== "undefined" && "SpeechRecognition" in window)
+      !(
+        typeof window !== "undefined" &&
+        ("webkitSpeechRecognition" in window || "SpeechRecognition" in window)
+      )
     ) {
-      alert("Tu navegador no soporta reconocimiento de voz");
+      addToast({
+        variant: "warning",
+        title: "Sin soporte de voz",
+        description: "Tu navegador no soporta reconocimiento de voz.",
+      });
       return;
     }
-
     const SpeechRecognition =
       (window as any).webkitSpeechRecognition ||
       (window as any).SpeechRecognition;
     const recognition = new SpeechRecognition();
-
     recognition.lang = "es-CO";
     recognition.continuous = false;
     recognition.interimResults = false;
-
     if (isListening) {
       recognition.stop();
       setIsListening(false);
       return;
     }
-
-    recognition.onstart = () => {
-      setIsListening(true);
-    };
-
+    recognition.onstart = () => setIsListening(true);
     recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript;
+      const transcript = event.results[0][0].transcript as string;
       setIsListening(false);
-      // Auto-send immediately after transcription ends
-      handleSend(transcript);
+      setVoiceTranscript(transcript);
     };
-
-    recognition.onerror = (event: any) => {
-      console.error("Error en reconocimiento de voz:", event.error);
-      setIsListening(false);
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => setIsListening(false);
     recognition.start();
   };
 
@@ -519,14 +467,10 @@ export default function AIAssistantPage() {
         }
       >
         <div className="flex flex-col h-[calc(100vh-4rem)]">
-          {/* Header removed per new design */}
-
-          {/* Messages + Inline Tools */}
           <div className="flex-1 overflow-y-auto p-0">
             {messages.length > 0 ? (
               <div className="flex h-full">
                 <div className="flex-1 overflow-y-auto p-6">
-                  {/* Inline tool remains */}
                   {inlineTool?.type === "animals.create" && (
                     <div className="max-w-3xl mx-auto mb-4">
                       <AnimalNewEmbedded
@@ -629,9 +573,8 @@ export default function AIAssistantPage() {
                       visible: overlayVisible,
                       isLoading: ensureLocal.isPending || isDownloading,
                       onDownload: async () => {
-                        if (isTauri) {
-                          await startLocalAI();
-                        } else {
+                        if (isTauri) await startLocalAI();
+                        else {
                           const res = await ensureLocal.mutateAsync({
                             model: PREFERRED_MODEL,
                           });
@@ -651,53 +594,115 @@ export default function AIAssistantPage() {
             )}
           </div>
 
-          {/* Input Area (hidden on empty-state dashboard) */}
-          {messages.length > 0 && (
-            <div className="bg-white border-t border-ranch-200 p-4">
-              <div className="max-w-4xl mx-auto">
-                <div className="flex items-end space-x-2">
+          {/* Unified input bar shown always */}
+          <div className="bg-white border-t border-ranch-200 p-4">
+            <div className="max-w-4xl mx-auto">
+              <div className="flex items-end space-x-2">
+                {/* Recording state UI */}
+                {isListening || voiceTranscript !== null ? (
                   <div className="flex-1">
-                    <textarea
-                      ref={inputRef}
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyDown={handleKeyPress}
-                      placeholder={translations.ai.placeholder}
-                      className="w-full px-4 py-2 border border-ranch-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-ranch-500 resize-none"
-                      rows={1}
-                      style={{ minHeight: "40px", maxHeight: "120px" }}
-                    />
+                    <div className="w-full h-12 rounded-full bg-neutral-900 text-white px-4 flex items-center justify-between">
+                      <div className="flex-1 flex items-center gap-3">
+                        <span className="text-xl">+</span>
+                        <div className="flex-1">
+                          {voiceTranscript ? (
+                            <span className="text-neutral-200">
+                              {voiceTranscript}
+                            </span>
+                          ) : (
+                            <WaveIndicator />
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Button
+                          variant="light"
+                          isIconOnly
+                          onPress={() => {
+                            setIsListening(false);
+                            setVoiceTranscript(null);
+                          }}
+                          aria-label="Cancelar"
+                        >
+                          <X className="h-5 w-5" />
+                        </Button>
+                        <Button
+                          color="primary"
+                          isIconOnly
+                          onPress={() => {
+                            if (voiceTranscript) {
+                              handleSend(voiceTranscript);
+                              setVoiceTranscript(null);
+                            }
+                          }}
+                          aria-label="Enviar"
+                        >
+                          <Check className="h-5 w-5" />
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-                  <Button
-                    onPress={handleVoiceInput}
-                    variant="bordered"
-                    isIconOnly
-                    className={cn(isListening && "bg-red-100 border-red-300")}
-                  >
-                    {isListening ? (
-                      <MicOff className="h-5 w-5 text-red-600" />
-                    ) : (
-                      <Mic className="h-5 w-5" />
-                    )}
-                  </Button>
-                  <Button
-                    onPress={handleSend}
-                    isDisabled={!input.trim() || isLoading}
-                    color="primary"
-                    className="bg-pasture-500 hover:bg-pasture-600 text-white"
-                  >
-                    {isLoading ? (
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                    ) : (
-                      <Send className="h-5 w-5" />
-                    )}
-                  </Button>
-                </div>
+                ) : (
+                  <>
+                    <div className="flex-1">
+                      <div className="w-full h-12 rounded-full bg-neutral-900 text-white px-4 flex items-center gap-3">
+                        <span className="text-xl">+</span>
+                        <input
+                          value={input}
+                          onChange={(e) => setInput(e.target.value)}
+                          onKeyDown={(e) =>
+                            e.key === "Enter" && !e.shiftKey
+                              ? (e.preventDefault(), handleSend())
+                              : null
+                          }
+                          placeholder="Pregunta lo que quieras"
+                          className="flex-1 bg-transparent outline-none placeholder:text-neutral-400"
+                        />
+                      </div>
+                    </div>
+                    <Button
+                      onPress={handleVoiceInput}
+                      variant="bordered"
+                      isIconOnly
+                      className={cn(isListening && "bg-red-100 border-red-300")}
+                      aria-label="Voz"
+                    >
+                      {isListening ? (
+                        <MicOff className="h-5 w-5 text-red-600" />
+                      ) : (
+                        <Mic className="h-5 w-5" />
+                      )}
+                    </Button>
+                    <Button
+                      onPress={handleSend}
+                      isDisabled={!input.trim() || isLoading}
+                      color="primary"
+                      isIconOnly
+                      className="bg-pasture-500 hover:bg-pasture-600 text-white"
+                      aria-label="Enviar"
+                    >
+                      {isLoading ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : (
+                        <ArrowUp className="h-5 w-5" />
+                      )}
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
-          )}
+          </div>
         </div>
       </DashboardLayout>
     </TRPCProvider>
+  );
+}
+
+function WaveIndicator() {
+  return (
+    <div className="relative w-40 h-4">
+      <div className="absolute inset-0 border-t border-dotted border-neutral-500/60" />
+      <div className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-16 bg-white/70 rounded-sm animate-pulse" />
+    </div>
   );
 }

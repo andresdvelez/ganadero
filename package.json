@@ -46,7 +46,6 @@
     "next": "15.4.6",
     "next-pwa": "^5.6.0",
     "ollama": "^0.5.16",
-    "prisma": "^6.13.0",
     "qrcode": "^1.5.4",
     "react": "19.1.0",
     "react-dom": "19.1.0",
@@ -64,6 +63,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.54.2",
+    "@tauri-apps/cli": "^1.6.2",
     "@testing-library/jest-dom": "^6.6.4",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
@@ -74,11 +74,11 @@
     "@types/qrcode": "^1.5.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "autoprefixer": "^10.4.19",
     "jest": "^30.0.5",
     "jest-environment-jsdom": "^30.0.5",
-    "autoprefixer": "^10.4.19",
+    "prisma": "^6.13.0",
     "tailwindcss": "^3.4.15",
-    "typescript": "^5",
-    "@tauri-apps/cli": "^1.6.2"
+    "typescript": "^5"
   }
 }
