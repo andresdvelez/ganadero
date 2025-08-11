@@ -27,6 +27,8 @@ export function AIAssistantDashboard({
   isListening,
   listenElapsedMs,
   levels,
+  webSearch,
+  onToggleWebSearch,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -43,6 +45,8 @@ export function AIAssistantDashboard({
   isListening?: boolean;
   listenElapsedMs?: number;
   levels?: number[];
+  webSearch?: boolean;
+  onToggleWebSearch?: (v: boolean) => void;
 }) {
   const categories = useMemo(
     () => [
@@ -89,6 +93,8 @@ export function AIAssistantDashboard({
           elapsedMs={listenElapsedMs}
           disabled={overlayActive}
           levels={levels}
+          webSearch={webSearch}
+          onToggleWebSearch={onToggleWebSearch}
         />
 
         {/* Action chips under the left edge */}

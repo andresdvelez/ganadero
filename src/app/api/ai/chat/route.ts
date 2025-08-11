@@ -13,18 +13,32 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json().catch(() => ({}));
+    const body = (await req.json().catch(() => ({}))) as any;
     const messages = Array.isArray(body?.messages) ? body.messages : [];
     const model =
-      process.env.NEXT_PUBLIC_OPENROUTER_MODEL || "deepseek/deepseek-r1";
+      body?.model ||
+      process.env.NEXT_PUBLIC_OPENROUTER_MODEL ||
+      "deepseek/deepseek-r1-0528:free";
+    const webSearch = body?.webSearch === true;
+
+    // Optional: pass hint of webSearch to the model as a system prefix
+    if (webSearch) {
+      messages.unshift({
+        role: "system",
+        content:
+          "El usuario habilitó 'búsqueda web'. Usa conocimiento actualizado y, si no estás seguro, indica fuentes. No inventes URLs.",
+      });
+    }
 
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
-        "HTTP-Referer": "https://ganadero-nine.vercel.app",
-        "X-Title": "Ganado AI",
+        "HTTP-Referer":
+          process.env.NEXT_PUBLIC_SITE_URL ||
+          "https://ganadero-nine.vercel.app",
+        "X-Title": process.env.NEXT_PUBLIC_SITE_NAME || "Ganado AI",
       },
       body: JSON.stringify({
         model,

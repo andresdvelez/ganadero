@@ -80,6 +80,7 @@ export default function AIAssistantPage() {
   const [listenStartedAt, setListenStartedAt] = useState<number | null>(null);
   const [listenElapsedMs, setListenElapsedMs] = useState<number>(0);
   const [levels, setLevels] = useState<number[] | undefined>(undefined);
+  const [webSearch, setWebSearch] = useState<boolean>(false);
   const audioAnalyserRef = useRef<AnalyserNode | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -326,6 +327,9 @@ export default function AIAssistantPage() {
         recentMessages: messages.slice(-5),
         profile: context?.profile || null,
         memories: context?.memories || [],
+        webSearch:
+          webSearch &&
+          (typeof navigator === "undefined" || navigator.onLine !== false),
       });
 
       const assistantMessage: Message = {
@@ -688,6 +692,8 @@ export default function AIAssistantPage() {
                     isListening={isListening}
                     listenElapsedMs={listenElapsedMs}
                     levels={levels}
+                    webSearch={webSearch}
+                    onToggleWebSearch={setWebSearch}
                   />
                 </div>
               </div>
@@ -706,6 +712,8 @@ export default function AIAssistantPage() {
                   elapsedMs={listenElapsedMs}
                   disabled={isLoading}
                   levels={levels}
+                  webSearch={webSearch}
+                  onToggleWebSearch={setWebSearch}
                 />
               </div>
             </div>

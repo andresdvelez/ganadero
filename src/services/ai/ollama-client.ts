@@ -179,13 +179,17 @@ export class AIClient {
     query: string,
     context?: any
   ): Promise<AIResponse> {
-    const systemPrompt = this.buildSystemPrompt();
+    const systemPrompt = this.buildSystemPrompt(context);
     const userPrompt = this.buildUserPrompt(query, context);
 
     const response = await fetch("/api/ai/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        model:
+          process.env.NEXT_PUBLIC_OPENROUTER_MODEL ||
+          "deepseek/deepseek-r1-0528:free",
+        webSearch: !!context?.webSearch,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -202,24 +206,61 @@ export class AIClient {
     return this.parseAIResponse(data.content);
   }
 
-  private buildSystemPrompt(): string {
-    return `Eres el orquestador de módulos de Ganado AI para Colombia. Siempre responde en JSON válido y en español colombiano.
+  private buildSystemPrompt(context?: any): string {
+    let prompt = `Eres el orquestador de módulos de Ganado AI para Colombia. Siempre responde en JSON válido y en español colombiano.
+    Dispones de módulos y acciones:
+    - animals: ["list", "create"]
+    - health: ["list", "create"]
+    Reglas:
+    - Si el usuario pide navegar a una sección/listar, usa action "list".
+    - Si el usuario pide registrar/crear/agregar, usa action "create".
+    - Incluye en data los parámetros extraídos (por ejemplo, { name, weight, type }).
+    - Formato de respuesta estricto:
+    {
+      "content": "mensaje breve para el usuario",
+      "module": "animals|health|dashboard",
+      "action": "list|create|none",
+      "data": { }
+    }`;
 
-Dispones de módulos y acciones:
-- animals: ["list", "create"]
-- health: ["list", "create"]
+    // Dominio ganadero (conocimientos base para software de fincas)
+    prompt += `\n\nConocimientos de dominio (ganadería):
+- Identificación y trazabilidad: arete/siniiga, raza, sexo, fecha de nacimiento, lote/potrero.
+- Reproducción: celos, servicios, preñeces, partos, abortos, intervalos parto–parto.
+- Sanidad: calendario de vacunación (aftosa, brucelosis, clostridiales), desparasitación, tratamientos y diagnósticos.
+- Producción de leche: ordeños, litros por día, sólidos, eventos de mastitis, secado.
+- Nutrición y pasturas: rotación de potreros, aforo, suplementos, sales.
+- Inventario y movimientos: altas/bajas, compras/ventas, traslados entre lotes.
+- Bioseguridad y bienestar: cuarentena de ingresos, registros de mortalidad.
+Responde priorizando prácticas locales y terminología usada en Colombia.`;
 
-Reglas:
-- Si el usuario pide navegar a una sección/listar, usa action "list".
-- Si el usuario pide registrar/crear/agregar, usa action "create".
-- Incluye en data los parámetros extraídos (por ejemplo, { name, weight, type }).
-- Formato de respuesta estricto:
-{
-  "content": "mensaje breve para el usuario",
-  "module": "animals|health|dashboard",
-  "action": "list|create|none",
-  "data": { }
-}`;
+    if (context?.webSearch) {
+      prompt += `\n\nEl usuario habilitó búsqueda web. Si la pregunta requiere datos actualizados (precios, normas recientes, noticias sanitarias), explícitalo y asume que recibirás extractos del sistema; si no los tienes, responde con tu mejor criterio y recomienda verificar fuentes.`;
+    }
+
+    if (context?.profile || context?.memories?.length > 0) {
+      prompt += "\n\nContexto del usuario:\n";
+      if (context.profile) {
+        const p = context.profile;
+        prompt += `Bio: ${p.bio || "N/A"}\n`;
+        try {
+          const prefs = p.preferences ? JSON.parse(p.preferences) : {};
+          if (prefs.language) prompt += `Idioma preferido: ${prefs.language}\n`;
+          if (prefs.tone) prompt += `Tono preferido: ${prefs.tone}\n`;
+        } catch {}
+        try {
+          const goals = p.goals ? JSON.parse(p.goals) : [];
+          if (goals.length > 0) prompt += `Objetivos: ${goals.join(", ")}\n`;
+        } catch {}
+      }
+      if (context.memories?.length > 0) {
+        prompt += "Memorias clave:\n";
+        for (const m of context.memories) {
+          prompt += `- ${m.content}\n`;
+        }
+      }
+    }
+    return prompt;
   }
 
   private buildUserPrompt(query: string, context?: any): string {
