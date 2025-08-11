@@ -6,6 +6,7 @@ import { orgRouter } from "./org";
 import { deviceRouter } from "./device";
 import { healthRouter } from "./health";
 import { milkRouter } from "./milk";
+import { inventoryRouter } from "./inventory";
 
 export const appRouter = createTRPCRouter({
   animal: animalRouter,
@@ -15,6 +16,7 @@ export const appRouter = createTRPCRouter({
   device: deviceRouter,
   health: healthRouter,
   milk: milkRouter,
+  inventory: inventoryRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -10,6 +10,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader2, Save } from "lucide-react";
 import { AnimalPicker } from "./animal-picker";
+import { addToast } from "@/components/ui/toast";
 
 const PERSIST_KEY = "form.milk.create";
 
@@ -106,13 +107,31 @@ export function MilkNewEmbedded({
             notes: data.notes,
             recordedAt: new Date(data.recordedAt),
           });
-        } catch (e) {}
+        } catch (e) {
+          addToast({
+            variant: "warning",
+            title: "Sincronización pendiente",
+            description:
+              "Se guardó offline. Se sincronizará cuando haya internet.",
+          });
+        }
+      } else {
+        addToast({ variant: "info", title: "Guardado sin conexión" });
       }
 
+      addToast({ variant: "success", title: "Registro de leche guardado" });
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("milk-changed"));
       }
       onCompleted?.();
+    } catch (error: any) {
+      addToast({
+        variant: "error",
+        title: "Error guardando",
+        description: error?.message || "Intenta nuevamente",
+        actionLabel: "Reintentar",
+        onAction: () => handleSubmit(onSubmit)(),
+      });
     } finally {
       setIsLoading(false);
     }

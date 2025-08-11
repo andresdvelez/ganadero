@@ -20,6 +20,8 @@ export interface ToastItem {
   description?: string;
   variant?: ToastVariant;
   durationMs?: number;
+  actionLabel?: string;
+  onAction?: () => void;
 }
 
 interface ToastContextValue {
@@ -96,7 +98,7 @@ function ToastCard({
   toast: ToastItem;
   onClose: () => void;
 }) {
-  const { title, description, variant } = toast;
+  const { title, description, variant, actionLabel, onAction } = toast;
   const color =
     variant === "success"
       ? "border-green-500"
@@ -124,6 +126,16 @@ function ToastCard({
               <div className="text-sm text-neutral-700">{description}</div>
             )}
           </div>
+          {actionLabel && onAction && (
+            <Button
+              size="sm"
+              variant="flat"
+              onPress={onAction}
+              aria-label={actionLabel}
+            >
+              {actionLabel}
+            </Button>
+          )}
           <Button
             size="sm"
             variant="light"

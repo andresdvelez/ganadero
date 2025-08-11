@@ -31,6 +31,9 @@ import { ModuleLauncher } from "@/components/modules/module-launcher";
 import { HealthNewEmbedded } from "@/components/embedded/health-new-embedded";
 import { MilkNewEmbedded } from "@/components/embedded/milk-new-embedded";
 import { HeroModal } from "@/components/ui/hero-modal";
+import { HeroDrawer } from "@/components/ui/hero-drawer";
+import { InventoryProductNew } from "@/components/embedded/inventory-product-new";
+import { InventoryMovementNew } from "@/components/embedded/inventory-movement-new";
 import {
   db,
   generateUUID,
@@ -78,6 +81,10 @@ export default function AIAssistantPage() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [inlineTool, setInlineTool] = useState<{
     type: "animals.create" | "health.create" | "milk.create";
+    props?: any;
+  } | null>(null);
+  const [drawerTool, setDrawerTool] = useState<{
+    type: "inventory.create" | "inventory.movement";
     props?: any;
   } | null>(null);
   const [voiceTranscript, setVoiceTranscript] = useState<string | null>(null);
@@ -348,6 +355,32 @@ export default function AIAssistantPage() {
         setInlineTool({ type: "milk.create" });
         return;
       }
+      if (intent?.module === "inventory" && intent?.action === "create") {
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: "Abrí el panel para crear un producto de inventario.",
+          timestamp: new Date(),
+          module: intent.module,
+          action: intent.action,
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+        setDrawerTool({ type: "inventory.create" });
+        return;
+      }
+      if (intent?.module === "inventory" && intent?.action === "movement") {
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: "Abrí el panel para registrar un movimiento de stock.",
+          timestamp: new Date(),
+          module: intent.module,
+          action: intent.action,
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+        setDrawerTool({ type: "inventory.movement" });
+        return;
+      }
 
       // Build richer context from server
       let context: any = null;
@@ -422,6 +455,14 @@ export default function AIAssistantPage() {
       }
       if (response.module === "milk" && response.action === "create") {
         setInlineTool({ type: "milk.create" });
+        return;
+      }
+      if (response.module === "inventory" && response.action === "create") {
+        setDrawerTool({ type: "inventory.create" });
+        return;
+      }
+      if (response.module === "inventory" && response.action === "movement") {
+        setDrawerTool({ type: "inventory.movement" });
         return;
       }
 
@@ -686,6 +727,54 @@ export default function AIAssistantPage() {
                       />
                     )}
                   </HeroModal>
+
+                  <HeroDrawer
+                    open={!!drawerTool}
+                    onClose={() => setDrawerTool(null)}
+                    title={
+                      drawerTool?.type === "inventory.create"
+                        ? "Nuevo producto"
+                        : drawerTool?.type === "inventory.movement"
+                        ? "Movimiento de stock"
+                        : undefined
+                    }
+                    width={520}
+                  >
+                    {drawerTool?.type === "inventory.create" && (
+                      <InventoryProductNew
+                        onCompleted={() => {
+                          setDrawerTool(null);
+                          setMessages((prev) => [
+                            ...prev,
+                            {
+                              id: (Date.now() + 3).toString(),
+                              role: "assistant",
+                              content: "Producto creado correctamente.",
+                              timestamp: new Date(),
+                            },
+                          ]);
+                        }}
+                        onClose={() => setDrawerTool(null)}
+                      />
+                    )}
+                    {drawerTool?.type === "inventory.movement" && (
+                      <InventoryMovementNew
+                        onCompleted={() => {
+                          setDrawerTool(null);
+                          setMessages((prev) => [
+                            ...prev,
+                            {
+                              id: (Date.now() + 3).toString(),
+                              role: "assistant",
+                              content: "Movimiento registrado correctamente.",
+                              timestamp: new Date(),
+                            },
+                          ]);
+                        }}
+                        onClose={() => setDrawerTool(null)}
+                      />
+                    )}
+                  </HeroDrawer>
 
                   <div
                     className={cn(

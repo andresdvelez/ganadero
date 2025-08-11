@@ -10,6 +10,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader2, Save } from "lucide-react";
 import { AnimalPicker } from "./animal-picker";
+import { addToast } from "@/components/ui/toast";
 
 const PERSIST_KEY = "form.health.create";
 
@@ -121,14 +122,36 @@ export function HealthNewEmbedded({
               : undefined,
           });
         } catch (e) {
-          // keep offline, sync later
+          addToast({
+            variant: "warning",
+            title: "Sincronización pendiente",
+            description:
+              "Se guardó offline. Se sincronizará cuando haya internet.",
+            durationMs: 5000,
+          });
         }
+      } else {
+        addToast({
+          variant: "info",
+          title: "Guardado sin conexión",
+          description: "El registro se sincronizará automáticamente.",
+          durationMs: 4000,
+        });
       }
 
+      addToast({ variant: "success", title: "Salud registrada" });
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("health-changed"));
       }
       onCompleted?.();
+    } catch (error: any) {
+      addToast({
+        variant: "error",
+        title: "Error guardando",
+        description: error?.message || "Intenta nuevamente",
+        actionLabel: "Reintentar",
+        onAction: () => handleSubmit(onSubmit)(),
+      });
     } finally {
       setIsLoading(false);
     }

@@ -190,6 +190,128 @@ export const aiModuleSpecs: AIModuleSpec[] = [
           { name: "unit", type: "string" },
         ],
       },
+      {
+        id: "movement",
+        label: "Registrar movimiento de stock",
+        patterns: [
+          ...ACTION_PATTERNS.create,
+          "entrada",
+          "salida",
+          "ajuste",
+          "agregar stock",
+          "sacar stock",
+          "registrar stock",
+        ],
+        params: [
+          { name: "productCode", type: "string" },
+          { name: "type", type: "string" },
+          { name: "quantity", type: "number" },
+          { name: "unitCost", type: "number" },
+          { name: "occurredAt", type: "date" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "tasks",
+    name: "Tareas",
+    category: "Productividad",
+    description: "Planificación y seguimiento de tareas en la finca.",
+    tags: ["pendientes", "actividad", "recordatorio"],
+    actions: [
+      { id: "list", label: "Ver tareas", patterns: ACTION_PATTERNS.list },
+      { id: "create", label: "Crear tarea", patterns: ACTION_PATTERNS.create },
+    ],
+  },
+  {
+    id: "finance",
+    name: "Finanzas",
+    category: "Administración",
+    description: "Costos, ingresos y egresos.",
+    tags: ["costos", "ingresos", "egresos", "flujo"],
+    actions: [
+      { id: "list", label: "Ver finanzas", patterns: ACTION_PATTERNS.list },
+      {
+        id: "create",
+        label: "Registrar transacción",
+        patterns: ACTION_PATTERNS.create,
+      },
+    ],
+  },
+  {
+    id: "reports",
+    name: "Reportes",
+    category: "Administración",
+    description: "Informes operativos y productivos.",
+    tags: ["informe", "exportar", "PDF"],
+    actions: [
+      { id: "list", label: "Ver reportes", patterns: ACTION_PATTERNS.list },
+    ],
+  },
+  {
+    id: "sensors",
+    name: "Sensores",
+    category: "Integración",
+    description: "Lecturas IoT y telemetría.",
+    tags: ["iot", "temperatura", "humedad", "collares"],
+    actions: [
+      { id: "list", label: "Ver sensores", patterns: ACTION_PATTERNS.list },
+      {
+        id: "create",
+        label: "Agregar sensor",
+        patterns: ACTION_PATTERNS.create,
+      },
+    ],
+  },
+  {
+    id: "weather",
+    name: "Clima",
+    category: "Integración",
+    description: "Pronóstico y estación meteorológica.",
+    tags: ["pronóstico", "THI", "HLI"],
+    actions: [
+      { id: "list", label: "Ver clima", patterns: ACTION_PATTERNS.list },
+    ],
+  },
+  {
+    id: "locations",
+    name: "Ubicaciones",
+    category: "Administración",
+    description: "Georreferenciación y mapas de la finca.",
+    tags: ["mapas", "georreferenciación", "potreros"],
+    actions: [
+      { id: "list", label: "Ver ubicaciones", patterns: ACTION_PATTERNS.list },
+      {
+        id: "create",
+        label: "Crear ubicación",
+        patterns: ACTION_PATTERNS.create,
+      },
+    ],
+  },
+  {
+    id: "alerts",
+    name: "Alertas",
+    category: "Administración",
+    description: "Alertas configurables por métricas y eventos.",
+    tags: ["alertas", "notificaciones"],
+    actions: [
+      { id: "list", label: "Ver alertas", patterns: ACTION_PATTERNS.list },
+      { id: "create", label: "Crear alerta", patterns: ACTION_PATTERNS.create },
+    ],
+  },
+  {
+    id: "devices",
+    name: "Dispositivos",
+    category: "Integración",
+    description: "Básculas, lectores RFID y otros equipos.",
+    tags: ["básculas", "rfid", "equipo"],
+    actions: [
+      { id: "list", label: "Ver dispositivos", patterns: ACTION_PATTERNS.list },
+      {
+        id: "create",
+        label: "Agregar dispositivo",
+        patterns: ACTION_PATTERNS.create,
+      },
     ],
   },
   {

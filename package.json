@@ -11,7 +11,11 @@
     "lint": "next lint",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
-    "icons:gen": "node ./scripts/generate-placeholder-icon.mjs"
+    "icons:gen": "node ./scripts/generate-placeholder-icon.mjs",
+    "seed": "prisma db push && prisma db seed"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
   },
   "dependencies": {
     "@capacitor/camera": "^7.0.2",
