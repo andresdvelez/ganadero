@@ -60,9 +60,36 @@ export const aiRouter = createTRPCRouter({
   routeIntent: protectedProcedure
     .input(z.object({ query: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      const ai = getAIClient();
-      // Por ahora, extra: responder módulo dashboard por defecto
-      const content = `{"content":"${input.query}","module":"dashboard","action":"none","data":{}}`;
-      return { content, module: "dashboard", action: "none" } as any;
+      const q = input.query
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/\p{Diacritic}/gu, "");
+
+      // Simple Spanish synonyms
+      const isAnimalContext =
+        /\banimal(es)?\b|\bvaca\b|\bternero\b|\btoro\b|\bganado\b/.test(q);
+      const wantsCreate =
+        /\b(agregar|registrar|crear|anadir|nuevo|cargar)\b/.test(q) ||
+        /\b(nuevo\s+animal)\b/.test(q);
+      const wantsList = /\b(ver|listar|mostrar)\b/.test(q);
+
+      if (isAnimalContext && wantsCreate) {
+        return { module: "animals", action: "create", data: {} } as any;
+      }
+      if (isAnimalContext && wantsList) {
+        return { module: "animals", action: "list", data: {} } as any;
+      }
+
+      // Health placeholders
+      const isHealth = /salud|vacuna|tratamiento|enfermedad/.test(q);
+      if (isHealth && wantsCreate) {
+        return { module: "health", action: "create", data: {} } as any;
+      }
+      if (isHealth && wantsList) {
+        return { module: "health", action: "list", data: {} } as any;
+      }
+
+      // Default: no action
+      return { module: "dashboard", action: "none", data: {} } as any;
     }),
 });
