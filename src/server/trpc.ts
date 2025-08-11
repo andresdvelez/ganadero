@@ -106,7 +106,8 @@ export const createTRPCContext = async (opts: { req: NextRequest }) => {
       });
       if (!existing) {
         // Fetch profile from Clerk
-        const user = await clerkClient.users.getUser(userId);
+        const client = await clerkClient();
+        const user = await client.users.getUser(userId);
         const primaryEmailId = user.primaryEmailAddressId;
         const emailFromPrimary = user.emailAddresses?.find(
           (e) => e.id === primaryEmailId
