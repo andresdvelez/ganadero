@@ -1,16 +1,39 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 
 // Public routes: auth pages, offline unlock, offline page, downloads, static assets
 const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/_/(device-unlock|offline|download)(/.*)?",
+  "/device-unlock(.*)",
+  "/offline(.*)",
+  "/download(.*)",
   "/manifest.json",
   "/sw.js",
   "/workbox-:path*",
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
+  const { pathname } = req.nextUrl;
+
+  // Normalize legacy /_/ paths to clean paths
+  if (pathname.startsWith("/_/download")) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/download";
+    return NextResponse.rewrite(url);
+  }
+  if (pathname.startsWith("/_/device-unlock")) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/device-unlock";
+    return NextResponse.rewrite(url);
+  }
+  if (pathname.startsWith("/_/offline")) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/offline";
+    return NextResponse.rewrite(url);
+  }
+
   if (!isPublicRoute(req)) {
     await auth.protect();
   }

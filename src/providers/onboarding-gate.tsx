@@ -13,6 +13,9 @@ const ALLOW_ROUTES = [
   "/_/device-unlock",
   "/_/offline",
   "/_/download",
+  "/device-unlock",
+  "/offline",
+  "/download",
 ];
 
 export function OnboardingGate() {

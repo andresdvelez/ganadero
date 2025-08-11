@@ -19,7 +19,7 @@ export default function OfflinePage() {
         <div className="flex gap-3 justify-center">
           <Button onClick={reload}>Reintentar</Button>
           <Button asChild variant="outline">
-            <Link href="/_/download">Configurar dispositivo</Link>
+            <Link href="/download">Configurar dispositivo</Link>
           </Button>
         </div>
         <p className="text-xs text-neutral-500">
@@ -28,7 +28,7 @@ export default function OfflinePage() {
         </p>
         <div>
           <Button asChild variant="ghost">
-            <Link href="/_/device-unlock">Desbloquear dispositivo</Link>
+            <Link href="/device-unlock">Desbloquear dispositivo</Link>
           </Button>
         </div>
       </div>

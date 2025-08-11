@@ -18,7 +18,9 @@ export function AuthGate() {
         pathname?.startsWith("/sign-in") ||
         pathname?.startsWith("/sign-up") ||
         pathname?.startsWith("/_/device-unlock") ||
-        pathname?.startsWith("/_/offline")
+        pathname?.startsWith("/device-unlock") ||
+        pathname?.startsWith("/_/offline") ||
+        pathname?.startsWith("/offline")
       ) {
         return;
       }
@@ -35,11 +37,11 @@ export function AuthGate() {
       const hasIdentity = await hasOfflineIdentity();
       if (cancelled) return;
       if (hasIdentity) {
-        if (!isUnlocked()) router.replace("/_/device-unlock");
+        if (!isUnlocked()) router.replace("/device-unlock");
         return;
       }
       // No identity locally: send to offline help
-      router.replace("/_/offline");
+      router.replace("/offline");
     })();
     return () => {
       cancelled = true;

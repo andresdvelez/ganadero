@@ -1,31 +1,31 @@
 import { initTRPC, TRPCError } from "@trpc/server";
-import { auth } from "@clerk/nextjs/server";
+import { getAuth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import superjson from "superjson";
+import type { NextRequest } from "next/server";
 
-export const createTRPCContext = async (opts: { headers: Headers }) => {
+export const createTRPCContext = async (opts: { req: NextRequest }) => {
   if (process.env.ALLOW_DEV_UNAUTH === "1") {
     return {
       prisma,
       userId: "dev-user",
-      headers: opts.headers,
+      req: opts.req,
     } as const;
   }
 
   let userId: string | null = null;
   try {
-    const res = await auth();
-    userId = res.userId;
+    const { userId: uid } = getAuth(opts.req);
+    userId = uid ?? null;
   } catch (_e) {
-    // If Clerk middleware is not configured or we are offline, leave userId as null.
-    // Client should queue writes locally and sync when online.
+    // leave userId null
   }
 
   return {
     prisma,
     userId,
-    headers: opts.headers,
-  };
+    req: opts.req,
+  } as const;
 };
 
 const t = initTRPC.context<typeof createTRPCContext>().create({
@@ -44,7 +44,6 @@ export const createTRPCRouter = t.router;
 
 const enforceUserIsAuthed = t.middleware(async ({ ctx, next }) => {
   if (!ctx.userId) {
-    // Permitir bypass en desarrollo si ALLOW_DEV_UNAUTH=1
     if (process.env.ALLOW_DEV_UNAUTH === "1") {
       return next({
         ctx: {
