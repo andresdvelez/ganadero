@@ -1,5 +1,5 @@
 import { initTRPC, TRPCError } from "@trpc/server";
-import { getAuth } from "@clerk/nextjs/server";
+import { auth, getAuth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import superjson from "superjson";
 import type { NextRequest } from "next/server";
@@ -15,10 +15,17 @@ export const createTRPCContext = async (opts: { req: NextRequest }) => {
 
   let userId: string | null = null;
   try {
-    const { userId: uid } = getAuth(opts.req);
-    userId = uid ?? null;
+    const a = await auth();
+    userId = a.userId ?? null;
+    if (!userId) {
+      const { userId: uid } = getAuth(opts.req);
+      userId = uid ?? null;
+    }
   } catch (_e) {
-    // leave userId null
+    try {
+      const { userId: uid } = getAuth(opts.req);
+      userId = uid ?? null;
+    } catch {}
   }
 
   return {

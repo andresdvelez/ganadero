@@ -3,6 +3,9 @@ import { NextRequest } from "next/server";
 import { appRouter } from "@/server/routers/app";
 import { createTRPCContext } from "@/server/trpc";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 const handler = (req: NextRequest) =>
   fetchRequestHandler({
     endpoint: "/api/trpc",
