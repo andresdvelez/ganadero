@@ -506,25 +506,8 @@ export default function AIAssistantPage() {
 
           {/* Messages + Inline Tools */}
           <div className="flex-1 overflow-y-auto p-0">
-            {/* Conversation content only; sidebar handled in layout */}
             {messages.length > 0 ? (
               <div className="flex h-full">
-                <AISidebar
-                  chats={chatList.map((c) => ({
-                    uuid: c.uuid,
-                    title: c.title,
-                    updatedAt: c.updatedAt,
-                  }))}
-                  activeChatUuid={chatUuid}
-                  onNewChat={() =>
-                    window.dispatchEvent(new Event("ai-new-chat"))
-                  }
-                  onSelectChat={(uuid) =>
-                    window.dispatchEvent(
-                      new CustomEvent("ai-open-chat", { detail: { uuid } })
-                    )
-                  }
-                />
                 <div className="flex-1 overflow-y-auto p-6">
                   {/* Inline tool remains */}
                   {inlineTool?.type === "animals.create" && (
@@ -614,36 +597,70 @@ export default function AIAssistantPage() {
                     <div ref={messagesEndRef} />
                   </div>
                 </div>
+                <AISidebar
+                  chats={chatList.map((c) => ({
+                    uuid: c.uuid,
+                    title: c.title,
+                    updatedAt: c.updatedAt,
+                  }))}
+                  activeChatUuid={chatUuid}
+                  onNewChat={() =>
+                    window.dispatchEvent(new Event("ai-new-chat"))
+                  }
+                  onSelectChat={(uuid) =>
+                    window.dispatchEvent(
+                      new CustomEvent("ai-open-chat", { detail: { uuid } })
+                    )
+                  }
+                />
               </div>
             ) : (
-              <div className="p-6">
-                <AIAssistantDashboard
-                  value={input}
-                  onChange={(v) => setInput(v)}
-                  onSend={() => handleSend()}
-                  onMic={handleVoiceInput}
-                  onSample={(cmd) => handleSampleCommand(cmd)}
-                  userName={undefined}
-                  modelOverlay={{
-                    visible: overlayVisible,
-                    isLoading: ensureLocal.isPending || isDownloading,
-                    onDownload: async () => {
-                      if (isTauri) {
-                        await startLocalAI();
-                      } else {
-                        const res = await ensureLocal.mutateAsync({
-                          model: PREFERRED_MODEL,
-                        });
-                        if (res.ok) {
-                          const chk = await checkLocal.mutateAsync();
-                          setLocalModelAvailable(chk.available);
+              <div className="flex h-full">
+                <div className="flex-1 p-6">
+                  <AIAssistantDashboard
+                    value={input}
+                    onChange={(v) => setInput(v)}
+                    onSend={() => handleSend()}
+                    onMic={handleVoiceInput}
+                    onSample={(cmd) => handleSampleCommand(cmd)}
+                    userName={undefined}
+                    modelOverlay={{
+                      visible: overlayVisible,
+                      isLoading: ensureLocal.isPending || isDownloading,
+                      onDownload: async () => {
+                        if (isTauri) {
+                          await startLocalAI();
+                        } else {
+                          const res = await ensureLocal.mutateAsync({
+                            model: PREFERRED_MODEL,
+                          });
+                          if (res.ok) {
+                            const chk = await checkLocal.mutateAsync();
+                            setLocalModelAvailable(chk.available);
+                          }
                         }
-                      }
-                    },
-                  }}
-                  debugText={`localModelAvailable: ${String(
-                    localModelAvailable
-                  )}, cloudAvailable: ${String(cloudAvailable)}`}
+                      },
+                    }}
+                    debugText={`localModelAvailable: ${String(
+                      localModelAvailable
+                    )}, cloudAvailable: ${String(cloudAvailable)}`}
+                  />
+                </div>
+                <AISidebar
+                  chats={chatList.map((c) => ({
+                    uuid: c.uuid,
+                    title: c.title,
+                    updatedAt: c.updatedAt,
+                  }))}
+                  activeChatUuid={chatUuid}
+                  onNewChat={() =>
+                    window.dispatchEvent(new Event("ai-new-chat"))
+                  }
+                  onSelectChat={(uuid) =>
+                    window.dispatchEvent(
+                      new CustomEvent("ai-open-chat", { detail: { uuid } })
+                    )
+                  }
                 />
               </div>
             )}
