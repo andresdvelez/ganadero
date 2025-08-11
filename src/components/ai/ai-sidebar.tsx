@@ -32,7 +32,7 @@ export function AISidebar({
   }, [chats, query]);
 
   return (
-    <aside className="hidden md:flex md:flex-col w-72 border-r bg-white/80 p-3 gap-3">
+    <aside className="flex flex-col w-72 border-l bg-white/80 p-3 gap-3">
       <div className="flex gap-2">
         <Button
           onPress={onNewChat}
