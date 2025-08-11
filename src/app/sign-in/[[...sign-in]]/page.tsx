@@ -1,7 +1,1 @@
-"use client";
-
-import { SignIn } from "@clerk/nextjs";
-
-export default function Page() {
-  return <SignIn />;
-}
+export { default } from "@/app/sign-in/[[...sign-in]]/page";
