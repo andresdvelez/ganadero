@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ReactNode, useEffect } from "react";
 import { TRPCProvider } from "@/lib/trpc/provider";
 import { AuthGate } from "./auth-gate";
+import { OnboardingGate } from "./onboarding-gate";
 
 export function Providers({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -21,6 +22,7 @@ export function Providers({ children }: { children: ReactNode }) {
     <HeroUIProvider navigate={router.push} locale="es-CO">
       <TRPCProvider>
         <AuthGate />
+        <OnboardingGate />
         {children}
       </TRPCProvider>
     </HeroUIProvider>
