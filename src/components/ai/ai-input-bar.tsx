@@ -60,6 +60,7 @@ export function AIInputBar({
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+    const context = ctx as CanvasRenderingContext2D;
     analyser.fftSize = 2048;
     const bufferLength = analyser.frequencyBinCount;
     const dataArray = new Uint8Array(bufferLength);
@@ -70,7 +71,7 @@ export function AIInputBar({
       const logicalH = canvas.clientHeight || 20;
       canvas.width = Math.floor(logicalW * dpr);
       canvas.height = Math.floor(logicalH * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      context.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
     resize();
     const onResize = () => resize();
@@ -81,31 +82,31 @@ export function AIInputBar({
       const WIDTH = canvas.clientWidth;
       const HEIGHT = canvas.clientHeight;
       // clear
-      ctx.clearRect(0, 0, WIDTH, HEIGHT);
+      context.clearRect(0, 0, WIDTH, HEIGHT);
       // baseline
-      ctx.strokeStyle = "#d1d5db"; // neutral-300 baseline dots
-      ctx.setLineDash([3, 4]);
-      ctx.beginPath();
-      ctx.moveTo(0, HEIGHT / 2);
-      ctx.lineTo(WIDTH, HEIGHT / 2);
-      ctx.stroke();
-      ctx.setLineDash([]);
+      context.strokeStyle = "#d1d5db"; // neutral-300 baseline dots
+      context.setLineDash([3, 4]);
+      context.beginPath();
+      context.moveTo(0, HEIGHT / 2);
+      context.lineTo(WIDTH, HEIGHT / 2);
+      context.stroke();
+      context.setLineDash([]);
 
       // waveform
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = "#9ca3af"; // neutral-400 line
-      ctx.beginPath();
+      context.lineWidth = 2;
+      context.strokeStyle = "#9ca3af"; // neutral-400 line
+      context.beginPath();
       const sliceWidth = WIDTH / bufferLength;
       let x = 0;
       for (let i = 0; i < bufferLength; i++) {
         const v = dataArray[i] / 128.0;
         const y = (v * HEIGHT) / 2;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
+        if (i === 0) context.moveTo(x, y);
+        else context.lineTo(x, y);
         x += sliceWidth;
       }
-      ctx.lineTo(WIDTH, HEIGHT / 2);
-      ctx.stroke();
+      context.lineTo(WIDTH, HEIGHT / 2);
+      context.stroke();
 
       rafRef.current = requestAnimationFrame(draw);
     };
