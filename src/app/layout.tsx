@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Providers } from "@/providers/heroui-provider";
 import "./globals.css";
+import { GlobalHeader } from "@/components/layout/global-header";
+import { GlobalSidebar } from "@/components/layout/global-sidebar";
 
 export const metadata: Metadata = {
   title: "Ganado AI - Plataforma de Gestión Ganadera",
@@ -31,7 +33,13 @@ export default function RootLayout({
   const appBody = (
     <html lang="es">
       <body className="font-sans antialiased bg-neutral-50 text-neutral-900">
-        <Providers>{children}</Providers>
+        <Providers>
+          <GlobalHeader />
+          <div className="min-h-[calc(100vh-3.5rem)] grid grid-cols-[16rem_1fr]">
+            <GlobalSidebar />
+            <main className="min-h-0 overflow-auto">{children}</main>
+          </div>
+        </Providers>
       </body>
     </html>
   );
