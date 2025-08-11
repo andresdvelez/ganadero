@@ -22,16 +22,29 @@ export function OnboardingGate() {
   const router = useRouter();
   const pathname = usePathname();
   const { isSignedIn, isLoaded } = useAuth();
-  const { data: orgs } = trpc.org.myOrganizations.useQuery(undefined, {
-    enabled:
-      isLoaded &&
-      isSignedIn === true &&
-      typeof navigator !== "undefined" &&
-      navigator.onLine,
+
+  const enabledCheck =
+    isLoaded &&
+    isSignedIn === true &&
+    typeof navigator !== "undefined" &&
+    navigator.onLine;
+
+  const {
+    data: orgs,
+    isLoading,
+    isFetching,
+  } = trpc.org.myOrganizations.useQuery(undefined, {
+    enabled: enabledCheck,
   });
+
+  const checking =
+    enabledCheck && (isLoading || isFetching) && pathname !== undefined;
 
   useEffect(() => {
     (async () => {
+      // Do not redirect while validating
+      if (checking) return;
+
       // Handle onboarding page specifically: leave when org exists
       if (pathname === "/onboarding") {
         if (!isLoaded || !isSignedIn) return;
@@ -55,7 +68,18 @@ export function OnboardingGate() {
         router.replace("/onboarding");
       }
     })();
-  }, [pathname, router, isLoaded, isSignedIn, orgs]);
+  }, [pathname, router, isLoaded, isSignedIn, orgs, checking]);
+
+  // Visual loading guard while validating to avoid route flashes
+  if (checking) {
+    return (
+      <div className="fixed inset-0 z-50 grid place-items-center bg-white/70 backdrop-blur-sm">
+        <div className="rounded-2xl border border-neutral-200 bg-white px-4 py-3 shadow-sm text-neutral-700">
+          Validando tu acceso…
+        </div>
+      </div>
+    );
+  }
 
   return null;
 }
