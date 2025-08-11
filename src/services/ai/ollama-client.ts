@@ -22,16 +22,26 @@ export class AIClient {
   constructor(config: AIClientConfig = {}) {
     const isBrowser = typeof window !== "undefined";
     const isTauri = isBrowser && !!(window as any).__TAURI__;
+
+    // Allow runtime override via localStorage key 'OLLAMA_HOST'
+    let lsHost: string | null = null;
+    try {
+      if (isBrowser) lsHost = window.localStorage.getItem("OLLAMA_HOST");
+    } catch {}
+
     const defaultHost = isTauri
       ? `http://127.0.0.1:${process.env.NEXT_PUBLIC_LLAMA_PORT || 11434}`
       : process.env.NODE_ENV === "development"
       ? "http://127.0.0.1:11434"
       : "/api/ollama"; // proxy only on web prod
+
     this._ollamaHost = (
+      lsHost ||
       config.ollamaHost ||
       process.env.NEXT_PUBLIC_OLLAMA_HOST ||
       defaultHost
     ).replace(/\/$/, "");
+
     this.model =
       config.model ||
       process.env.NEXT_PUBLIC_OLLAMA_MODEL ||
@@ -42,7 +52,13 @@ export class AIClient {
     return this._ollamaHost;
   }
   setHost(newHost: string) {
-    this._ollamaHost = newHost.replace(/\/$/, "");
+    const cleaned = newHost.replace(/\/$/, "");
+    this._ollamaHost = cleaned;
+    try {
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("OLLAMA_HOST", cleaned);
+      }
+    } catch {}
   }
 
   async checkLocalAvailability(): Promise<boolean> {
