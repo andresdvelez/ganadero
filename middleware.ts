@@ -17,21 +17,21 @@ const isPublicRoute = createRouteMatcher([
 export default clerkMiddleware(async (auth, req) => {
   const { pathname } = req.nextUrl;
 
-  // Normalize legacy /_/ paths to clean paths
+  // Redirect legacy /_/ paths to clean paths
   if (pathname.startsWith("/_/download")) {
     const url = req.nextUrl.clone();
     url.pathname = "/download";
-    return NextResponse.rewrite(url);
+    return NextResponse.redirect(url, 308);
   }
   if (pathname.startsWith("/_/device-unlock")) {
     const url = req.nextUrl.clone();
     url.pathname = "/device-unlock";
-    return NextResponse.rewrite(url);
+    return NextResponse.redirect(url, 308);
   }
   if (pathname.startsWith("/_/offline")) {
     const url = req.nextUrl.clone();
     url.pathname = "/offline";
-    return NextResponse.rewrite(url);
+    return NextResponse.redirect(url, 308);
   }
 
   if (!isPublicRoute(req)) {
