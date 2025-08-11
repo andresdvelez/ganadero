@@ -31,11 +31,15 @@ export function AuthGate() {
         return;
       }
 
-      // Offline: require identity + unlock
+      // Offline: require identity + unlock, or show offline help
       const hasIdentity = await hasOfflineIdentity();
-      if (!cancelled && hasIdentity && !isUnlocked()) {
-        router.replace("/_/device-unlock");
+      if (cancelled) return;
+      if (hasIdentity) {
+        if (!isUnlocked()) router.replace("/_/device-unlock");
+        return;
       }
+      // No identity locally: send to offline help
+      router.replace("/_/offline");
     })();
     return () => {
       cancelled = true;
