@@ -5,6 +5,7 @@ import { httpBatchLink, loggerLink } from "@trpc/client";
 import { useEffect, useMemo, useState } from "react";
 import { trpc } from "./client";
 import superjson from "superjson";
+import { useAuth } from "@clerk/nextjs";
 
 async function probe(url: string, timeoutMs = 1200): Promise<boolean> {
   try {
@@ -38,6 +39,8 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
   const [resolvedUrl, setResolvedUrl] = useState<string>(
     explicit && explicit.length > 0 ? explicit : baseDefault
   );
+
+  const { getToken } = useAuth();
 
   useEffect(() => {
     let cancelled = false;
@@ -75,13 +78,23 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
           httpBatchLink({
             url: resolvedUrl,
             transformer: superjson,
-            fetch(url, opts) {
-              return fetch(url, { ...opts, credentials: "include" });
+            async fetch(url, opts) {
+              let token: string | null = null;
+              try {
+                token = await getToken();
+              } catch {
+                token = null;
+              }
+              const headers = new Headers(opts?.headers);
+              if (token) {
+                headers.set("authorization", `Bearer ${token}`);
+              }
+              return fetch(url, { ...opts, credentials: "include", headers });
             },
           }),
         ],
       }),
-    [resolvedUrl]
+    [resolvedUrl, getToken]
   );
 
   return (

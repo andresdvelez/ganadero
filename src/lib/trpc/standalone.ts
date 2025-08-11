@@ -12,8 +12,20 @@ export const trpcClient = createTRPCProxyClient<AppRouter>({
     httpBatchLink({
       url: "/api/trpc",
       transformer: superjson,
-      fetch(url, opts) {
-        return fetch(url, { ...opts, credentials: "include" });
+      async fetch(url, opts) {
+        // try to get Clerk token in browser
+        let token: string | null = null;
+        try {
+          // dynamic import to avoid SSR issues
+          const mod = await import("@clerk/nextjs");
+          const { getToken } = (mod as any).auth?.() || {};
+          if (typeof getToken === "function") {
+            token = await getToken();
+          }
+        } catch {}
+        const headers = new Headers(opts?.headers);
+        if (token) headers.set("authorization", `Bearer ${token}`);
+        return fetch(url, { ...opts, credentials: "include", headers });
       },
     }),
   ],

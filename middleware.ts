@@ -34,14 +34,14 @@ export default clerkMiddleware(async (auth, req) => {
     return NextResponse.redirect(url, 308);
   }
 
-  // Skip API routes; tRPC will enforce auth
-  if (pathname.startsWith("/api/") || pathname.startsWith("/trpc")) {
-    return NextResponse.next();
-  }
+  // Do not enforce protection on API routes, but still let Clerk run to set auth context
+  const isApiRoute = pathname.startsWith("/api/") || pathname.startsWith("/trpc");
 
-  if (!isPublicRoute(req)) {
+  if (!isPublicRoute(req) && !isApiRoute) {
     await auth.protect();
   }
+
+  return NextResponse.next();
 });
 
 export const config = {
