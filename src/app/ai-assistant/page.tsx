@@ -501,7 +501,7 @@ export default function AIAssistantPage() {
   return (
     <TRPCProvider>
       <DashboardLayout
-        rightSlot={
+        leftSlot={
           <AISidebar
             chats={chatList.map((c) => ({
               uuid: c.uuid,
