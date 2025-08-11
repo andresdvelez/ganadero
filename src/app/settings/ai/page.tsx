@@ -302,26 +302,41 @@ function MemoryRow({
   return (
     <tr className="border-t">
       <td className="p-2 text-center align-top">
-        <input type="checkbox" checked={selected} onChange={onToggle} />
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={onToggle}
+          aria-label="Seleccionar memoria"
+          title="Seleccionar memoria"
+        />
       </td>
       <td className="p-2">
         <Input
           value={content}
           onChange={(e: any) => setContent(e.target.value)}
+          placeholder="Contenido de la memoria"
+          aria-label="Contenido de la memoria"
         />
       </td>
       <td className="p-2 text-center">
         <Input
-          value={importance}
+          value={String(importance)}
           onChange={(e: any) => setImportance(Number(e.target.value) || 1)}
           type="number"
           min={1}
           max={5}
           className="w-20 mx-auto text-center"
+          aria-label="Importancia (1-5)"
+          placeholder="1-5"
         />
       </td>
       <td className="p-2">
-        <Input value={tags} onChange={(e: any) => setTags(e.target.value)} />
+        <Input
+          value={tags}
+          onChange={(e: any) => setTags(e.target.value)}
+          placeholder="Etiquetas (coma separadas)"
+          aria-label="Etiquetas"
+        />
       </td>
       <td className="p-2 text-center">
         <div className="flex gap-2 justify-center">
