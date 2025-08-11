@@ -6,6 +6,7 @@ import { unlock, hasOfflineIdentity } from "@/lib/auth/offline-auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { addToast } from "@/components/ui/toast";
 
 export default function DeviceUnlockPage() {
   const router = useRouter();
@@ -23,13 +24,24 @@ export default function DeviceUnlockPage() {
         setError(
           "Este dispositivo no está configurado para acceso offline. Conéctate y realiza la configuración inicial."
         );
+        addToast({
+          variant: "warning",
+          title: "Dispositivo sin configurar",
+          description: "Configura el passcode desde la descarga.",
+        });
         setLoading(false);
         return;
       }
       await unlock(passcode);
+      addToast({ variant: "success", title: "Dispositivo desbloqueado" });
       router.replace("/");
     } catch (err: any) {
       setError(err?.message ?? "Error al desbloquear");
+      addToast({
+        variant: "error",
+        title: "Error al desbloquear",
+        description: err?.message,
+      });
     } finally {
       setLoading(false);
     }
@@ -40,8 +52,12 @@ export default function DeviceUnlockPage() {
       <div className="w-full max-w-sm">
         <Card>
           <CardContent>
-            <h1 className="text-xl font-semibold mb-2">Desbloquear dispositivo</h1>
-            <p className="text-neutral-600 mb-4">Ingresa tu clave de acceso para trabajar sin Internet.</p>
+            <h1 className="text-xl font-semibold mb-2">
+              Desbloquear dispositivo
+            </h1>
+            <p className="text-neutral-600 mb-4">
+              Ingresa tu clave de acceso para trabajar sin Internet.
+            </p>
             <form onSubmit={onSubmit} className="space-y-3">
               <Input
                 type="password"
@@ -56,7 +72,12 @@ export default function DeviceUnlockPage() {
                   {error}
                 </div>
               )}
-              <Button type="submit" color="primary" isLoading={loading} className="w-full">
+              <Button
+                type="submit"
+                color="primary"
+                isLoading={loading}
+                className="w-full"
+              >
                 Desbloquear
               </Button>
             </form>

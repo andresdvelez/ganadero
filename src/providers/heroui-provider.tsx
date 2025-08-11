@@ -6,6 +6,7 @@ import { ReactNode, useEffect } from "react";
 import { TRPCProvider } from "@/lib/trpc/provider";
 import { AuthGate } from "./auth-gate";
 import { OnboardingGate } from "./onboarding-gate";
+import { ToastProvider } from "@/components/ui/toast";
 
 export function Providers({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -23,7 +24,7 @@ export function Providers({ children }: { children: ReactNode }) {
       <TRPCProvider>
         <AuthGate />
         <OnboardingGate />
-        {children}
+        <ToastProvider>{children}</ToastProvider>
       </TRPCProvider>
     </HeroUIProvider>
   );

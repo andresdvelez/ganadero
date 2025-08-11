@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { bindDeviceLocally } from "@/lib/auth/offline-auth";
+import { addToast } from "@/components/ui/toast";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -39,7 +40,18 @@ export default function OnboardingPage() {
 
 function OrgStep({ onCreated }: { onCreated: () => void }) {
   const { data: orgs } = trpc.org.myOrganizations.useQuery();
-  const createOrg = trpc.org.createOrganization.useMutation();
+  const createOrg = trpc.org.createOrganization.useMutation({
+    onError(error) {
+      addToast({
+        variant: "error",
+        title: "No se pudo crear",
+        description: error.message,
+      });
+    },
+    onSuccess() {
+      addToast({ variant: "success", title: "Organización creada" });
+    },
+  });
   const [name, setName] = useState("");
 
   const hasOrg = !!orgs && orgs.length > 0;
@@ -82,7 +94,18 @@ function OrgStep({ onCreated }: { onCreated: () => void }) {
 
 function LinkDeviceStep() {
   const { user } = useUser();
-  const registerDevice = trpc.device.register.useMutation();
+  const registerDevice = trpc.device.register.useMutation({
+    onError(error) {
+      addToast({
+        variant: "error",
+        title: "No se pudo vincular",
+        description: error.message,
+      });
+    },
+    onSuccess() {
+      addToast({ variant: "success", title: "Dispositivo vinculado" });
+    },
+  });
 
   const deviceId = (() => {
     const { robustDeviceId } = require("@/lib/utils");

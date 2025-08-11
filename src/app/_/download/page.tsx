@@ -13,10 +13,22 @@ import {
   provisionFromClerk,
 } from "@/lib/auth/offline-auth";
 import { useMemo, useState } from "react";
+import { addToast } from "@/components/ui/toast";
 
 export default function DownloadPage() {
   const { user } = useUser();
-  const registerDevice = trpc.device.register.useMutation();
+  const registerDevice = trpc.device.register.useMutation({
+    onError(error) {
+      addToast({
+        variant: "error",
+        title: "No se pudo vincular",
+        description: error.message,
+      });
+    },
+    onSuccess() {
+      addToast({ variant: "success", title: "Dispositivo vinculado" });
+    },
+  });
   const [showPasscode, setShowPasscode] = useState(false);
   const [passcode, setPasscode] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -67,17 +79,31 @@ export default function DownloadPage() {
     if (!user) return;
     if (passcode.length < 6 || passcode !== confirm) {
       setError("Passcode inválido o no coincide");
+      addToast({
+        variant: "warning",
+        title: "Revisa tu passcode",
+        description: "Debe tener al menos 6 caracteres y coincidir.",
+      });
       return;
     }
-    await provisionFromClerk({
-      clerkId: user.id,
-      email: user.primaryEmailAddress?.emailAddress,
-      name: user.fullName ?? undefined,
-      avatarUrl: user.imageUrl,
-      passcode,
-    });
-    setShowPasscode(false);
-    await onBind();
+    try {
+      await provisionFromClerk({
+        clerkId: user.id,
+        email: user.primaryEmailAddress?.emailAddress,
+        name: user.fullName ?? undefined,
+        avatarUrl: user.imageUrl,
+        passcode,
+      });
+      addToast({ variant: "success", title: "Passcode guardado" });
+      setShowPasscode(false);
+      await onBind();
+    } catch (e: any) {
+      addToast({
+        variant: "error",
+        title: "No se pudo guardar el passcode",
+        description: e?.message,
+      });
+    }
   };
 
   return (
