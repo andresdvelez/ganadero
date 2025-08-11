@@ -9,7 +9,7 @@ import { hasOfflineIdentity } from "@/lib/auth/offline-auth";
 const ALLOW_ROUTES = [
   "/sign-in",
   "/sign-up",
-  "/onboarding",
+  // Note: do not skip onboarding here so we can redirect away when complete
   "/_/device-unlock",
   "/_/offline",
   "/_/download",
@@ -32,15 +32,26 @@ export function OnboardingGate() {
 
   useEffect(() => {
     (async () => {
-      // Skip allowed routes
+      // Handle onboarding page specifically: leave when org exists
+      if (pathname === "/onboarding") {
+        if (!isLoaded || !isSignedIn) return;
+        if (typeof navigator !== "undefined" && !navigator.onLine) return;
+        const hasOrg = !!orgs && orgs.length > 0;
+        if (hasOrg) {
+          router.replace("/");
+        }
+        return;
+      }
+
+      // Skip other allowed routes
       if (ALLOW_ROUTES.some((p) => pathname?.startsWith(p))) return;
       if (!isLoaded || !isSignedIn) return;
       if (typeof navigator !== "undefined" && !navigator.onLine) return; // offline: let AuthGate handle
 
       const hasOrg = !!orgs && orgs.length > 0;
-      const hasPasscode = await hasOfflineIdentity();
 
-      if ((!hasOrg || !hasPasscode) && pathname !== "/onboarding") {
+      // Only require organization to proceed; passcode/identity is optional
+      if (!hasOrg) {
         router.replace("/onboarding");
       }
     })();
