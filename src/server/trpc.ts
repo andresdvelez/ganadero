@@ -1,5 +1,5 @@
 import { initTRPC, TRPCError } from "@trpc/server";
-import { auth, getAuth, verifyToken } from "@clerk/nextjs/server";
+import { auth, getAuth, verifyToken, clerkClient } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import superjson from "superjson";
 import type { NextRequest } from "next/server";
@@ -70,7 +70,8 @@ export const createTRPCContext = async (opts: { req: NextRequest }) => {
         const verifyOptions: any = {
           secretKey: process.env.CLERK_SECRET_KEY || undefined,
         };
-        const configuredIssuer = process.env.CLERK_ISSUER || process.env.NEXT_PUBLIC_CLERK_ISSUER;
+        const configuredIssuer =
+          process.env.CLERK_ISSUER || process.env.NEXT_PUBLIC_CLERK_ISSUER;
         if (configuredIssuer) verifyOptions.issuer = configuredIssuer;
         const payload = await verifyToken(token, verifyOptions);
         const sub = (payload as any)?.sub as string | undefined;
@@ -94,6 +95,38 @@ export const createTRPCContext = async (opts: { req: NextRequest }) => {
           }
         }
       } catch {}
+    }
+  }
+
+  // Ensure a User record exists for this Clerk user
+  if (userId) {
+    try {
+      const existing = await prisma.user.findUnique({
+        where: { clerkId: userId },
+      });
+      if (!existing) {
+        // Fetch profile from Clerk
+        const user = await clerkClient.users.getUser(userId);
+        const primaryEmailId = user.primaryEmailAddressId;
+        const emailFromPrimary = user.emailAddresses?.find(
+          (e) => e.id === primaryEmailId
+        )?.emailAddress;
+        const fallbackEmail = user.emailAddresses?.[0]?.emailAddress;
+        const email =
+          emailFromPrimary || fallbackEmail || `user_${userId}@ganado.ai`;
+        const fullName =
+          [user.firstName, user.lastName].filter(Boolean).join(" ") || null;
+
+        await prisma.user.create({
+          data: {
+            clerkId: userId,
+            email,
+            name: fullName,
+          },
+        });
+      }
+    } catch (e) {
+      // Swallow provisioning errors to avoid blocking auth; downstream routes may still handle not found
     }
   }
 
