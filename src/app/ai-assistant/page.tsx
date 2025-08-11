@@ -26,6 +26,7 @@ import { useRouter } from "next/navigation";
 import { moduleRegistry } from "@/modules";
 import { trpc } from "@/lib/trpc/client";
 import { AnimalNewEmbedded } from "@/components/embedded/animal-new-embedded";
+import { AIAssistantDashboard } from "@/components/ai/ai-dashboard";
 import {
   db,
   generateUUID,
