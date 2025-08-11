@@ -25,6 +25,7 @@ import { moduleRegistry } from "@/modules";
 import { trpc } from "@/lib/trpc/client";
 import { AnimalNewEmbedded } from "@/components/embedded/animal-new-embedded";
 import { AIAssistantDashboard } from "@/components/ai/ai-dashboard";
+import { AIInputBar } from "@/components/ai/ai-input-bar";
 import { AISidebar } from "@/components/ai/ai-sidebar";
 import {
   db,
@@ -76,6 +77,8 @@ export default function AIAssistantPage() {
     props?: any;
   } | null>(null);
   const [voiceTranscript, setVoiceTranscript] = useState<string | null>(null);
+  const [listenStartedAt, setListenStartedAt] = useState<number | null>(null);
+  const [listenElapsedMs, setListenElapsedMs] = useState<number>(0);
 
   // New TRPC hooks for AI context/memories
   const recordMessage = trpc.ai.recordMessage.useMutation();
@@ -172,6 +175,15 @@ export default function AIAssistantPage() {
   const scrollToBottom = () =>
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   useEffect(scrollToBottom, [messages, inlineTool]);
+
+  // ticking timer for mic UI
+  useEffect(() => {
+    if (!isListening || !listenStartedAt) return;
+    const id = setInterval(() => {
+      setListenElapsedMs(Date.now() - listenStartedAt);
+    }, 200);
+    return () => clearInterval(id);
+  }, [isListening, listenStartedAt]);
 
   const handleSend = async (overrideText?: string) => {
     const textToSend = (overrideText ?? input).trim();
@@ -393,16 +405,28 @@ export default function AIAssistantPage() {
     if (isListening) {
       recognition.stop();
       setIsListening(false);
+      setListenStartedAt(null);
       return;
     }
-    recognition.onstart = () => setIsListening(true);
+    recognition.onstart = () => {
+      setIsListening(true);
+      setListenStartedAt(Date.now());
+      setListenElapsedMs(0);
+    };
     recognition.onresult = (event: any) => {
       const transcript = event.results[0][0].transcript as string;
       setIsListening(false);
-      setVoiceTranscript(transcript);
+      setListenStartedAt(null);
+      handleSend(transcript);
     };
-    recognition.onerror = () => setIsListening(false);
-    recognition.onend = () => setIsListening(false);
+    recognition.onerror = () => {
+      setIsListening(false);
+      setListenStartedAt(null);
+    };
+    recognition.onend = () => {
+      setIsListening(false);
+      setListenStartedAt(null);
+    };
     recognition.start();
   };
 
@@ -588,121 +612,29 @@ export default function AIAssistantPage() {
                     debugText={`localModelAvailable: ${String(
                       localModelAvailable
                     )}, cloudAvailable: ${String(cloudAvailable)}`}
+                    isListening={isListening}
+                    listenElapsedMs={listenElapsedMs}
                   />
                 </div>
               </div>
             )}
           </div>
-
-          {/* Unified input bar shown always */}
-          <div className="bg-white border-t border-ranch-200 p-4">
+          {/* Bottom input with same design as hero */}
+          <div className="bg-white border-t border-neutral-200 p-4">
             <div className="max-w-4xl mx-auto">
-              <div className="flex items-end space-x-2">
-                {/* Recording state UI */}
-                {isListening || voiceTranscript !== null ? (
-                  <div className="flex-1">
-                    <div className="w-full h-12 rounded-full bg-neutral-900 text-white px-4 flex items-center justify-between">
-                      <div className="flex-1 flex items-center gap-3">
-                        <span className="text-xl">+</span>
-                        <div className="flex-1">
-                          {voiceTranscript ? (
-                            <span className="text-neutral-200">
-                              {voiceTranscript}
-                            </span>
-                          ) : (
-                            <WaveIndicator />
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Button
-                          variant="light"
-                          isIconOnly
-                          onPress={() => {
-                            setIsListening(false);
-                            setVoiceTranscript(null);
-                          }}
-                          aria-label="Cancelar"
-                        >
-                          <X className="h-5 w-5" />
-                        </Button>
-                        <Button
-                          color="primary"
-                          isIconOnly
-                          onPress={() => {
-                            if (voiceTranscript) {
-                              handleSend(voiceTranscript);
-                              setVoiceTranscript(null);
-                            }
-                          }}
-                          aria-label="Enviar"
-                        >
-                          <Check className="h-5 w-5" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex-1">
-                      <div className="w-full h-12 rounded-full bg-neutral-900 text-white px-4 flex items-center gap-3">
-                        <span className="text-xl">+</span>
-                        <input
-                          value={input}
-                          onChange={(e) => setInput(e.target.value)}
-                          onKeyDown={(e) =>
-                            e.key === "Enter" && !e.shiftKey
-                              ? (e.preventDefault(), handleSend())
-                              : null
-                          }
-                          placeholder="Pregunta lo que quieras"
-                          className="flex-1 bg-transparent outline-none placeholder:text-neutral-400"
-                        />
-                      </div>
-                    </div>
-                    <Button
-                      onPress={handleVoiceInput}
-                      variant="bordered"
-                      isIconOnly
-                      className={cn(isListening && "bg-red-100 border-red-300")}
-                      aria-label="Voz"
-                    >
-                      {isListening ? (
-                        <MicOff className="h-5 w-5 text-red-600" />
-                      ) : (
-                        <Mic className="h-5 w-5" />
-                      )}
-                    </Button>
-                    <Button
-                      onPress={handleSend}
-                      isDisabled={!input.trim() || isLoading}
-                      color="primary"
-                      isIconOnly
-                      className="bg-pasture-500 hover:bg-pasture-600 text-white"
-                      aria-label="Enviar"
-                    >
-                      {isLoading ? (
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                      ) : (
-                        <ArrowUp className="h-5 w-5" />
-                      )}
-                    </Button>
-                  </>
-                )}
-              </div>
+              <AIInputBar
+                value={input}
+                onChange={(v) => setInput(v)}
+                onSend={() => handleSend()}
+                onMic={handleVoiceInput}
+                isListening={isListening}
+                elapsedMs={listenElapsedMs}
+                disabled={isLoading}
+              />
             </div>
           </div>
         </div>
       </DashboardLayout>
     </TRPCProvider>
-  );
-}
-
-function WaveIndicator() {
-  return (
-    <div className="relative w-40 h-4">
-      <div className="absolute inset-0 border-t border-dotted border-neutral-500/60" />
-      <div className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-16 bg-white/70 rounded-sm animate-pulse" />
-    </div>
   );
 }

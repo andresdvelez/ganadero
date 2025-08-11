@@ -2,9 +2,7 @@
 
 import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
-  Mic,
   Image as ImageIcon,
   MessageSquare,
   Settings,
@@ -15,6 +13,7 @@ import {
   Paperclip,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AIInputBar } from "./ai-input-bar";
 
 export function AIAssistantDashboard({
   value,
@@ -25,6 +24,8 @@ export function AIAssistantDashboard({
   userName,
   modelOverlay,
   debugText,
+  isListening,
+  listenElapsedMs,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -38,6 +39,8 @@ export function AIAssistantDashboard({
     isLoading?: boolean;
   };
   debugText?: string;
+  isListening?: boolean;
+  listenElapsedMs?: number;
 }) {
   const categories = useMemo(
     () => [
@@ -54,58 +57,27 @@ export function AIAssistantDashboard({
 
   return (
     <div
-      className={cn(
-        "w-full flex flex-col items-center",
-        "min-h-[calc(100vh-4rem)]"
-      )}
+      className={cn("w-full flex flex-col items-center", "min-h-[calc(100vh-4rem)]")}
     >
       <div className="text-center mt-8 sm:mt-12 mb-5 sm:mb-7">
         <h1 className="text-5xl sm:text-6xl font-extrabold text-neutral-900 tracking-tight">
           Hola
         </h1>
-        <p className="mt-2 text-2xl text-neutral-700">
-          ¿Qué puedo hacer por ti?
-        </p>
+        <p className="mt-2 text-2xl text-neutral-700">¿Qué puedo hacer por ti?</p>
       </div>
 
       {/* Big input bar with inner light field */}
-      <div
-        className={cn(
-          "relative w-full max-w-4xl",
-          overlayActive && "opacity-60"
-        )}
-      >
-        <Input
-          aria-label="Campo de solicitud a la IA"
+      <div className={cn("relative w-full max-w-4xl", overlayActive && "opacity-60")}>
+        <AIInputBar
           value={value}
-          onChange={(e: any) => onChange(e.target.value)}
-          placeholder="Escribe una tarea o pregúntame lo que quieras…"
-          variant="flat"
-          onKeyDown={(e: any) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              onSend();
-            }
-          }}
+          onChange={onChange}
+          onSend={onSend}
+          onMic={onMic}
+          isListening={isListening}
+          elapsedMs={listenElapsedMs}
           disabled={overlayActive}
-          classNames={
-            {
-              inputWrapper:
-                "h-16 rounded-[28px] bg-white border border-neutral-200 shadow-sm pr-16 pl-2",
-              input: "h-12 rounded-[20px] bg-neutral-100 text-[16px] px-4",
-            } as any
-          }
         />
-        {/* Mic button inside input on right */}
-        <Button
-          isIconOnly
-          aria-label="Hablar"
-          onPress={onMic}
-          disabled={overlayActive}
-          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-white text-neutral-700 shadow-sm border border-neutral-200 h-10 w-10"
-        >
-          <Mic className="h-5 w-5" />
-        </Button>
+
         {/* Action chips under the left edge */}
         <div className="absolute left-3 -bottom-8 flex items-center gap-3 pointer-events-none">
           <Button
@@ -179,9 +151,7 @@ export function AIAssistantDashboard({
         ))}
       </div>
 
-      <div className="mt-12 text-neutral-600 text-sm">
-        Explora preguntas y usos frecuentes ↑
-      </div>
+      <div className="mt-12 text-neutral-600 text-sm">Explora preguntas y usos frecuentes ↑</div>
     </div>
   );
 }
