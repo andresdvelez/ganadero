@@ -27,6 +27,7 @@ import { moduleRegistry } from "@/modules";
 import { trpc } from "@/lib/trpc/client";
 import { AnimalNewEmbedded } from "@/components/embedded/animal-new-embedded";
 import { AIAssistantDashboard } from "@/components/ai/ai-dashboard";
+import { AISidebar } from "@/components/ai/ai-sidebar";
 import {
   db,
   generateUUID,
@@ -508,6 +509,22 @@ export default function AIAssistantPage() {
             {/* Conversation content only; sidebar handled in layout */}
             {messages.length > 0 ? (
               <div className="flex h-full">
+                <AISidebar
+                  chats={chatList.map((c) => ({
+                    uuid: c.uuid,
+                    title: c.title,
+                    updatedAt: c.updatedAt,
+                  }))}
+                  activeChatUuid={chatUuid}
+                  onNewChat={() =>
+                    window.dispatchEvent(new Event("ai-new-chat"))
+                  }
+                  onSelectChat={(uuid) =>
+                    window.dispatchEvent(
+                      new CustomEvent("ai-open-chat", { detail: { uuid } })
+                    )
+                  }
+                />
                 <div className="flex-1 overflow-y-auto p-6">
                   {/* Inline tool remains */}
                   {inlineTool?.type === "animals.create" && (

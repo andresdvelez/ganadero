@@ -2,6 +2,7 @@
 
 import { ReactNode } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { UserButton } from "@clerk/nextjs";
 
 interface DashboardLayoutProps {
@@ -14,7 +15,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <div className="min-h-screen grid grid-rows-[auto,1fr]">
       <header className="flex items-center justify-between px-4 h-14 border-b bg-white">
-        <div className="font-semibold">Ganado AI</div>
+        <div className="flex items-center gap-2">
+          <Image src="/logo.png" alt="Ganado AI" width={28} height={28} />
+          <div className="font-semibold">Ganado AI</div>
+        </div>
         <nav className="flex items-center gap-3">
           <Link
             href="/_/offline-setup"
