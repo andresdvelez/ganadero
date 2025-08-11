@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Mic, ArrowUp } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Switch } from "@heroui/react";
 
 export function AIInputBar({
@@ -20,6 +20,7 @@ export function AIInputBar({
   levels,
   webSearch,
   onToggleWebSearch,
+  analyser,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -33,6 +34,7 @@ export function AIInputBar({
   levels?: number[];
   webSearch?: boolean;
   onToggleWebSearch?: (v: boolean) => void;
+  analyser?: AnalyserNode | null;
 }) {
   const hasText = (value || "").trim().length > 0;
   const timeLabel = useMemo(() => {
@@ -45,15 +47,87 @@ export function AIInputBar({
     return `${m}:${s}`;
   }, [elapsedMs]);
 
+  // Oscilloscope canvas refs
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const rafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!isListening || !analyser || !canvasRef.current) {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+      return;
+    }
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    analyser.fftSize = 2048;
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+
+    function resize() {
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      const logicalW = canvas.clientWidth || 100;
+      const logicalH = canvas.clientHeight || 20;
+      canvas.width = Math.floor(logicalW * dpr);
+      canvas.height = Math.floor(logicalH * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    resize();
+    const onResize = () => resize();
+    window.addEventListener("resize", onResize);
+
+    const draw = () => {
+      analyser.getByteTimeDomainData(dataArray);
+      const WIDTH = canvas.clientWidth;
+      const HEIGHT = canvas.clientHeight;
+      // clear
+      ctx.clearRect(0, 0, WIDTH, HEIGHT);
+      // baseline
+      ctx.strokeStyle = "#d1d5db"; // neutral-300 baseline dots
+      ctx.setLineDash([3, 4]);
+      ctx.beginPath();
+      ctx.moveTo(0, HEIGHT / 2);
+      ctx.lineTo(WIDTH, HEIGHT / 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // waveform
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "#9ca3af"; // neutral-400 line
+      ctx.beginPath();
+      const sliceWidth = WIDTH / bufferLength;
+      let x = 0;
+      for (let i = 0; i < bufferLength; i++) {
+        const v = dataArray[i] / 128.0;
+        const y = (v * HEIGHT) / 2;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+        x += sliceWidth;
+      }
+      ctx.lineTo(WIDTH, HEIGHT / 2);
+      ctx.stroke();
+
+      rafRef.current = requestAnimationFrame(draw);
+    };
+    rafRef.current = requestAnimationFrame(draw);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      window.removeEventListener("resize", onResize);
+      rafRef.current = null;
+    };
+  }, [isListening, analyser]);
+
   return (
     <div className={cn("relative w-full", className)}>
       {isListening ? (
-        <div className="h-16 rounded-[28px] bg-neutral-900 text-white border border-neutral-800 shadow-sm pr-44 pl-4 flex items-center">
+        <div className="h-16 rounded-[28px] bg-white text-neutral-700 border border-neutral-200 shadow-sm pr-44 pl-4 flex items-center">
           <div className="w-full flex items-center gap-4">
-            <div className="flex-1">
-              <WaveBars levels={levels} />
+            <div className="flex-1 h-6">
+              <canvas ref={canvasRef} className="w-full h-full" />
             </div>
-            <span className="text-sm tabular-nums opacity-80">{timeLabel}</span>
+            <span className="text-sm tabular-nums text-neutral-600">
+              {timeLabel}
+            </span>
           </div>
         </div>
       ) : (
@@ -137,7 +211,7 @@ function WaveBars({ levels }: { levels?: number[] }) {
         {bars.map((v, i) => (
           <span
             key={i}
-            className="bg-white/80 rounded-sm inline-block"
+            className="bg-neutral-400 rounded-sm inline-block"
             style={{ width: 2, height: Math.max(3, Math.min(20, 3 + v * 18)) }}
           />
         ))}
@@ -149,7 +223,7 @@ function WaveBars({ levels }: { levels?: number[] }) {
       {Array.from({ length: 64 }).map((_, i) => (
         <span
           key={i}
-          className="bg-white/70 rounded-sm inline-block animate-pulse"
+          className="bg-neutral-400/80 rounded-sm inline-block animate-pulse"
           style={{
             width: 2,
             height: 6 + ((i * 7) % 12),
