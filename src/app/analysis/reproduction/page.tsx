@@ -261,6 +261,26 @@ export default function AnalysisReproductionPage() {
             >
               Abrir en chat
             </Button>
+            <Button
+              size="sm"
+              variant="flat"
+              onPress={() => {
+                router.push(`/breeding`);
+                setTimeout(() => {
+                  window.dispatchEvent(
+                    new CustomEvent("ai-seed-report", {
+                      detail: {
+                        module: "breeding",
+                        from: period.from || null,
+                        to: period.to || null,
+                      },
+                    })
+                  );
+                }, 350);
+              }}
+            >
+              Abrir en módulo
+            </Button>
           </div>
         </div>
 
