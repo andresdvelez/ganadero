@@ -191,6 +191,20 @@ function SemenTab() {
               </option>
             ))}
           </select>
+          <Button
+            size="sm"
+            variant="light"
+            onPress={() => {
+              const name = tanks.data?.find((t) => t.id === tankFilter)?.name;
+              window.dispatchEvent(
+                new CustomEvent("ai-seed-report", {
+                  detail: { module: "ai-assets", tankName: name || null },
+                })
+              );
+            }}
+          >
+            Abrir en chat
+          </Button>
         </div>
         <div className="mb-2 flex items-center gap-2">
           <Input
@@ -404,6 +418,20 @@ function EmbryosTab() {
               </option>
             ))}
           </select>
+          <Button
+            size="sm"
+            variant="light"
+            onPress={() => {
+              const name = tanks.data?.find((t) => t.id === tankFilter)?.name;
+              window.dispatchEvent(
+                new CustomEvent("ai-seed-report", {
+                  detail: { module: "ai-assets", tankName: name || null },
+                })
+              );
+            }}
+          >
+            Abrir en chat
+          </Button>
         </div>
         <div className="mb-2 flex items-center gap-2">
           <Input

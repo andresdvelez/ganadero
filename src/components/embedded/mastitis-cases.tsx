@@ -195,6 +195,22 @@ export function MastitisCases() {
           >
             Mes
           </Button>
+          <Button
+            size="sm"
+            onPress={() => {
+              window.dispatchEvent(
+                new CustomEvent("ai-seed-report", {
+                  detail: {
+                    module: "mastitis",
+                    from: period.from || null,
+                    to: period.to || null,
+                  },
+                })
+              );
+            }}
+          >
+            Abrir en chat
+          </Button>
         </div>
         <Button
           variant="secondary"
