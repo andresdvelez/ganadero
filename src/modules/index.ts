@@ -39,19 +39,19 @@ export const moduleRegistry: Record<string, RanchModule> = {
     id: "health",
     name: "Salud",
     category: "Salud y Reproducción",
-    path: "/_/health",
+    path: "/health",
     tags: ["vacunación", "tratamientos", "desparasitación"],
     actions: {
       list: {
         label: "Ver salud",
         async run() {
-          return { navigateTo: "/_/health" };
+          return { navigateTo: "/health" };
         },
       },
       create: {
         label: "Agregar registro de salud",
         async run() {
-          return { navigateTo: "/_/health/new" };
+          return { navigateTo: "/health/new" };
         },
       },
     },
@@ -60,19 +60,19 @@ export const moduleRegistry: Record<string, RanchModule> = {
     id: "breeding",
     name: "Reproducción",
     category: "Salud y Reproducción",
-    path: "/_/breeding",
+    path: "/breeding",
     tags: ["partos", "montas", "inseminación"],
     actions: {
       list: {
         label: "Ver reproducción",
         async run() {
-          return { navigateTo: "/_/breeding" };
+          return { navigateTo: "/breeding" };
         },
       },
       create: {
         label: "Nuevo evento",
         async run() {
-          return { navigateTo: "/_/breeding/new" };
+          return { navigateTo: "/breeding/new" };
         },
       },
     },
@@ -81,19 +81,19 @@ export const moduleRegistry: Record<string, RanchModule> = {
     id: "inventory",
     name: "Inventario",
     category: "Administración",
-    path: "/_/inventory",
+    path: "/inventory",
     tags: ["productos", "bodega", "stock"],
     actions: {
       list: {
         label: "Ver inventario",
         async run() {
-          return { navigateTo: "/_/inventory" };
+          return { navigateTo: "/inventory" };
         },
       },
       create: {
         label: "Nuevo producto",
         async run() {
-          return { navigateTo: "/_/inventory/new" };
+          return { navigateTo: "/inventory/new" };
         },
       },
     },
@@ -138,19 +138,19 @@ export const moduleRegistry: Record<string, RanchModule> = {
     id: "pastures",
     name: "Potreros",
     category: "Productividad",
-    path: "/_/pastures",
+    path: "/pastures",
     tags: ["rotación", "forraje", "mapa"],
     actions: {
       list: {
         label: "Ver potreros",
         async run() {
-          return { navigateTo: "/_/pastures" };
+          return { navigateTo: "/pastures" };
         },
       },
       create: {
         label: "Nuevo potrero",
         async run() {
-          return { navigateTo: "/_/pastures/new" };
+          return { navigateTo: "/pastures/new" };
         },
       },
     },
@@ -195,19 +195,19 @@ export const moduleRegistry: Record<string, RanchModule> = {
     id: "milk",
     name: "Lechería",
     category: "Productividad",
-    path: "/_/milk",
+    path: "/milk",
     tags: ["producción", "control lechero"],
     actions: {
       list: {
         label: "Control lechero",
         async run() {
-          return { navigateTo: "/_/milk" };
+          return { navigateTo: "/milk" };
         },
       },
       create: {
         label: "Nuevo registro",
         async run() {
-          return { navigateTo: "/_/milk/new" };
+          return { navigateTo: "/milk/new" };
         },
       },
     },
@@ -216,19 +216,19 @@ export const moduleRegistry: Record<string, RanchModule> = {
     id: "lab",
     name: "Laboratorio",
     category: "Integración",
-    path: "/_/lab",
+    path: "/lab",
     tags: ["exámenes", "muestreo"],
     actions: {
       list: {
         label: "Ver exámenes",
         async run() {
-          return { navigateTo: "/_/lab" };
+          return { navigateTo: "/lab" };
         },
       },
       create: {
         label: "Nuevo examen",
         async run() {
-          return { navigateTo: "/_/lab/new" };
+          return { navigateTo: "/lab/new" };
         },
       },
     },

@@ -451,7 +451,7 @@ export default function AIAssistantPage() {
             action: intent.action,
           };
           setMessages((prev) => [...prev, assistantMessage]);
-          router.push("/_/pastures/new");
+          router.push("/pastures/new");
           setIsLoading(false);
           return;
         }
@@ -617,7 +617,7 @@ export default function AIAssistantPage() {
         return;
       }
       if (response.module === "pastures" && response.action === "create") {
-        router.push("/_/pastures/new");
+        router.push("/pastures/new");
         return;
       }
       if (response.module === "animals" && response.action === "create") {
@@ -1497,7 +1497,7 @@ export default function AIAssistantPage() {
                                         } else if (
                                           forced?.action === "create"
                                         ) {
-                                          router.push("/_/pastures/new");
+                                          router.push("/pastures/new");
                                           return;
                                         }
                                       }
@@ -1543,9 +1543,9 @@ export default function AIAssistantPage() {
                                       }
                                       if (c.id === "finance") {
                                         try {
-                                    router.push("/finance");
-                                  } catch {}
-                                  return;
+                                          router.push("/finance");
+                                        } catch {}
+                                        return;
                                       }
                                     }}
                                   >

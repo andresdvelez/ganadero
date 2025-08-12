@@ -27,7 +27,7 @@ export function DashboardLayout({
         </div>
         <nav className="flex items-center gap-3">
           <Link
-            href="/_/offline-setup"
+            href="/offline-setup"
             className="text-sm text-neutral-600 hover:text-neutral-900"
           >
             Offline

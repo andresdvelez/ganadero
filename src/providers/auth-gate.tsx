@@ -17,9 +17,7 @@ export function AuthGate() {
       if (
         pathname?.startsWith("/sign-in") ||
         pathname?.startsWith("/sign-up") ||
-        pathname?.startsWith("/_/device-unlock") ||
         pathname?.startsWith("/device-unlock") ||
-        pathname?.startsWith("/_/offline") ||
         pathname?.startsWith("/offline")
       ) {
         return;

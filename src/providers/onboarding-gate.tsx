@@ -10,9 +10,6 @@ const ALLOW_ROUTES = [
   "/sign-in",
   "/sign-up",
   // Note: do not skip onboarding here so we can redirect away when complete
-  "/_/device-unlock",
-  "/_/offline",
-  "/_/download",
   "/device-unlock",
   "/offline",
   "/download",
