@@ -78,7 +78,15 @@ function downloadCsv(rows: Array<Record<string, any>>, filename: string) {
 }
 
 export default function AnalysisReproductionPage() {
-  const [period, setPeriod] = useState<{ from?: string; to?: string }>({});
+  const [period, setPeriod] = useState<{ from?: string; to?: string }>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("analysisPeriod:breeding");
+        if (raw) return JSON.parse(raw);
+      } catch {}
+    }
+    return {};
+  });
   const router = useRouter();
   const query = trpc.breedingAdv.kpis.useQuery({
     from: period.from,
@@ -112,16 +120,32 @@ export default function AnalysisReproductionPage() {
               type="date"
               className="border rounded-md px-2 py-1 text-sm"
               value={period.from || ""}
-              onChange={(e) =>
-                setPeriod((p) => ({ ...p, from: e.target.value }))
-              }
+              onChange={(e) => {
+                const np = { ...period, from: e.target.value };
+                setPeriod(np);
+                try {
+                  localStorage.setItem(
+                    "analysisPeriod:breeding",
+                    JSON.stringify(np)
+                  );
+                } catch {}
+              }}
             />
             <input
               aria-label="Hasta"
               type="date"
               className="border rounded-md px-2 py-1 text-sm"
               value={period.to || ""}
-              onChange={(e) => setPeriod((p) => ({ ...p, to: e.target.value }))}
+              onChange={(e) => {
+                const np = { ...period, to: e.target.value };
+                setPeriod(np);
+                try {
+                  localStorage.setItem(
+                    "analysisPeriod:breeding",
+                    JSON.stringify(np)
+                  );
+                } catch {}
+              }}
             />
             <Button size="sm" variant="flat" onPress={() => query.refetch()}>
               Actualizar
@@ -137,10 +161,17 @@ export default function AnalysisReproductionPage() {
                     now.getMonth(),
                     now.getDate()
                   );
-                  setPeriod({
+                  const np = {
                     from: d.toISOString().slice(0, 10),
                     to: d.toISOString().slice(0, 10),
-                  });
+                  };
+                  setPeriod(np);
+                  try {
+                    localStorage.setItem(
+                      "analysisPeriod:breeding",
+                      JSON.stringify(np)
+                    );
+                  } catch {}
                 }}
               >
                 Hoy
@@ -151,10 +182,17 @@ export default function AnalysisReproductionPage() {
                 onPress={() => {
                   const now = new Date();
                   const from = new Date(now.getTime() - 7 * 86400000);
-                  setPeriod({
+                  const np = {
                     from: from.toISOString().slice(0, 10),
                     to: new Date().toISOString().slice(0, 10),
-                  });
+                  };
+                  setPeriod(np);
+                  try {
+                    localStorage.setItem(
+                      "analysisPeriod:breeding",
+                      JSON.stringify(np)
+                    );
+                  } catch {}
                 }}
               >
                 7 días
@@ -165,10 +203,17 @@ export default function AnalysisReproductionPage() {
                 onPress={() => {
                   const now = new Date();
                   const from = new Date(now.getTime() - 30 * 86400000);
-                  setPeriod({
+                  const np = {
                     from: from.toISOString().slice(0, 10),
                     to: new Date().toISOString().slice(0, 10),
-                  });
+                  };
+                  setPeriod(np);
+                  try {
+                    localStorage.setItem(
+                      "analysisPeriod:breeding",
+                      JSON.stringify(np)
+                    );
+                  } catch {}
                 }}
               >
                 30 días
@@ -180,10 +225,17 @@ export default function AnalysisReproductionPage() {
                   const now = new Date();
                   const from = new Date(now.getFullYear(), now.getMonth(), 1);
                   const to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-                  setPeriod({
+                  const np = {
                     from: from.toISOString().slice(0, 10),
                     to: to.toISOString().slice(0, 10),
-                  });
+                  };
+                  setPeriod(np);
+                  try {
+                    localStorage.setItem(
+                      "analysisPeriod:breeding",
+                      JSON.stringify(np)
+                    );
+                  } catch {}
                 }}
               >
                 Este mes

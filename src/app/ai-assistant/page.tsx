@@ -2103,6 +2103,30 @@ export default function AIAssistantPage() {
     })();
   }, [pendingCandidates]);
 
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await checkLocal.mutateAsync();
+        setLocalModelAvailable((prev) =>
+          prev === true ? true : !!res.available
+        );
+      } catch {
+        setLocalModelAvailable((prev) => (prev === true ? true : false));
+      }
+    })();
+    // Listen seeded report from analysis pages
+    const onSeed = (e: any) => {
+      const d = e?.detail || {};
+      const title = `Abrí el reporte de ${d.module} para el periodo ${d.from || "(desde)"} → ${d.to || "(hasta)"}.`;
+      const msg: Message = { id: Date.now().toString(), role: "assistant", content: title, timestamp: new Date(), module: d.module };
+      setMessages((prev) => [...prev, msg]);
+      setRunningTools((prev) => [...prev, { id: `seed-${Date.now()}`, label: `Generando reporte de ${d.module}…` }]);
+      // Optionally trigger intent-based loads already implemented (milk/breeding/health/inventory charts)
+    };
+    window.addEventListener("ai-seed-report", onSeed as any);
+    return () => { window.removeEventListener("ai-seed-report", onSeed as any); };
+  }, []);
+
   return (
     <TRPCProvider>
       <DashboardLayout
