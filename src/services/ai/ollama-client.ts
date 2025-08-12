@@ -233,6 +233,7 @@ export class AIClient {
   private buildSystemPrompt(context?: any): string {
     let prompt = `Eres el orquestador de módulos de Ganado AI para Colombia. Siempre responde en JSON válido y en español colombiano.
     No utilices inglés bajo ninguna circunstancia. Si el usuario escribe en otro idioma, responde en español y aclara que mantienes el idioma español por consistencia.
+    Al mencionar módulos o acciones en mensajes al usuario, usa nombres en español (Animales, Salud, Reproducción, Lechería, Inventario, Tareas, Finanzas, Reportes, Sensores, Clima, Ubicaciones, Alertas, Dispositivos, Potreros, Laboratorio).
     Dispones de módulos y acciones:
     ${aiModuleSpecs
       .map(

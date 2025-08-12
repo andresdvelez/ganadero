@@ -25,6 +25,15 @@ export function ModuleLauncher({
     return ["Todos", ...Array.from(set)];
   }, [modules]);
 
+  const countsByCategory = useMemo(() => {
+    const map = new Map<string, number>();
+    modules.forEach((m) => {
+      const key = m.category || "Otros";
+      map.set(key, (map.get(key) || 0) + 1);
+    });
+    return map;
+  }, [modules]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return modules.filter((m) => {
@@ -57,7 +66,12 @@ export function ModuleLauncher({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="w-full max-w-6xl rounded-2xl bg-white shadow-xl p-4">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-semibold">Explorar módulos</h3>
+          <h3 className="text-lg font-semibold">
+            Explorar módulos
+            <span className="ml-2 text-sm text-neutral-500">
+              (Total: {modules.length})
+            </span>
+          </h3>
           <Button
             isIconOnly
             variant="light"
@@ -67,7 +81,7 @@ export function ModuleLauncher({
             <X className="h-5 w-5" />
           </Button>
         </div>
-        <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        <div className="flex flex-col sm:flex-row gap-3 mb-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
             <Input
@@ -95,21 +109,32 @@ export function ModuleLauncher({
                 onPress={() => setActiveCategory(c === "Todos" ? null : c)}
               >
                 {c}
+                {c !== "Todos" && (
+                  <span className="ml-2 inline-flex items-center justify-center h-5 min-w-[20px] px-1 rounded-full text-[11px] bg-white/90 text-violet-700">
+                    {countsByCategory.get(c) || 0}
+                  </span>
+                )}
               </Button>
             ))}
           </div>
+        </div>
+        <div className="text-xs text-neutral-500 mb-3">
+          {filtered.length} resultados
         </div>
         <div className="max-h-[60vh] overflow-auto space-y-6">
           {grouped.map(([cat, items]) => (
             <div key={cat}>
               <h4 className="text-sm font-semibold text-neutral-500 mb-2">
-                {cat}
+                {cat}{" "}
+                <span className="ml-1 text-[11px] text-neutral-400">
+                  ({items.length})
+                </span>
               </h4>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                 {items.map((m) => (
                   <Link
                     key={m.id}
-                    href={`/${m.id}`}
+                    href={m.path || `/${m.id}`}
                     onClick={onClose}
                     className={cn(
                       "rounded-2xl border border-neutral-200 bg-white hover:shadow-md transition-shadow p-4",
@@ -119,7 +144,9 @@ export function ModuleLauncher({
                     <div className="text-sm font-medium text-neutral-800 line-clamp-2">
                       {m.name}
                     </div>
-                    <div className="text-xs text-neutral-500">/{m.id}</div>
+                    <div className="text-xs text-neutral-500">
+                      {m.path || `/${m.id}`}
+                    </div>
                     {m.tags && (
                       <div className="flex items-center gap-1 flex-wrap mt-1">
                         {m.tags.slice(0, 3).map((t) => (

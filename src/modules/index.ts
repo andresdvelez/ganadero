@@ -3,6 +3,7 @@ export interface RanchModule {
   name: string;
   category?: string; // e.g., "Productividad", "Salud", "Administración", "Integración"
   tags?: string[]; // keywords to enhance search in launcher
+  path?: string; // route path to list view
   actions: Record<
     string,
     {
@@ -17,18 +18,19 @@ export const moduleRegistry: Record<string, RanchModule> = {
     id: "animals",
     name: "Animales",
     category: "Productividad",
+    path: "/animals",
     tags: ["inventario vivo", "ganado", "registro"],
     actions: {
       list: {
         label: "Ver animales",
         async run() {
-          return { navigateTo: "/_" };
+          return { navigateTo: "/animals" };
         },
       },
       create: {
         label: "Agregar animal",
         async run() {
-          return { navigateTo: "/_/new" };
+          return { navigateTo: "/animals/new" };
         },
       },
     },
@@ -37,6 +39,7 @@ export const moduleRegistry: Record<string, RanchModule> = {
     id: "health",
     name: "Salud",
     category: "Salud y Reproducción",
+    path: "/_/health",
     tags: ["vacunación", "tratamientos", "desparasitación"],
     actions: {
       list: {
@@ -57,6 +60,7 @@ export const moduleRegistry: Record<string, RanchModule> = {
     id: "breeding",
     name: "Reproducción",
     category: "Salud y Reproducción",
+    path: "/_/breeding",
     tags: ["partos", "montas", "inseminación"],
     actions: {
       list: {
@@ -77,6 +81,7 @@ export const moduleRegistry: Record<string, RanchModule> = {
     id: "inventory",
     name: "Inventario",
     category: "Administración",
+    path: "/_/inventory",
     tags: ["productos", "bodega", "stock"],
     actions: {
       list: {
@@ -97,20 +102,43 @@ export const moduleRegistry: Record<string, RanchModule> = {
     id: "finance",
     name: "Finanzas",
     category: "Administración",
+    path: "/finance",
     tags: ["costos", "ingresos", "egresos"],
-    actions: {},
+    actions: {
+      list: {
+        label: "Ver finanzas",
+        async run() {
+          return { navigateTo: "/finance" };
+        },
+      },
+      create: {
+        label: "Registrar transacción",
+        async run() {
+          return { navigateTo: "/finance/new" };
+        },
+      },
+    },
   },
   reports: {
     id: "reports",
     name: "Reportes",
     category: "Administración",
+    path: "/reports",
     tags: ["informes", "exportar"],
-    actions: {},
+    actions: {
+      list: {
+        label: "Ver reportes",
+        async run() {
+          return { navigateTo: "/reports" };
+        },
+      },
+    },
   },
   pastures: {
     id: "pastures",
     name: "Potreros",
     category: "Productividad",
+    path: "/_/pastures",
     tags: ["rotación", "forraje", "mapa"],
     actions: {
       list: {
@@ -131,20 +159,43 @@ export const moduleRegistry: Record<string, RanchModule> = {
     id: "weather",
     name: "Clima",
     category: "Integración",
+    path: "/weather",
     tags: ["pronóstico", "estación"],
-    actions: {},
+    actions: {
+      list: {
+        label: "Ver clima",
+        async run() {
+          return { navigateTo: "/weather" };
+        },
+      },
+    },
   },
   tasks: {
     id: "tasks",
     name: "Tareas",
     category: "Productividad",
+    path: "/tasks",
     tags: ["pendientes", "gestión"],
-    actions: {},
+    actions: {
+      list: {
+        label: "Ver tareas",
+        async run() {
+          return { navigateTo: "/tasks" };
+        },
+      },
+      create: {
+        label: "Crear tarea",
+        async run() {
+          return { navigateTo: "/tasks/new" };
+        },
+      },
+    },
   },
   milk: {
     id: "milk",
     name: "Lechería",
     category: "Productividad",
+    path: "/_/milk",
     tags: ["producción", "control lechero"],
     actions: {
       list: {
@@ -165,6 +216,7 @@ export const moduleRegistry: Record<string, RanchModule> = {
     id: "lab",
     name: "Laboratorio",
     category: "Integración",
+    path: "/_/lab",
     tags: ["exámenes", "muestreo"],
     actions: {
       list: {
@@ -185,14 +237,30 @@ export const moduleRegistry: Record<string, RanchModule> = {
     id: "sensors",
     name: "Sensores",
     category: "Integración",
+    path: "/sensors",
     tags: ["iot", "telemetría"],
-    actions: {},
+    actions: {
+      list: {
+        label: "Ver sensores",
+        async run() {
+          return { navigateTo: "/sensors" };
+        },
+      },
+    },
   },
   locations: {
     id: "locations",
     name: "Ubicaciones",
     category: "Administración",
+    path: "/locations",
     tags: ["georreferenciación", "mapas"],
-    actions: {},
+    actions: {
+      list: {
+        label: "Ver ubicaciones",
+        async run() {
+          return { navigateTo: "/locations" };
+        },
+      },
+    },
   },
 };

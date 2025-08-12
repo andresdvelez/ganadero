@@ -128,12 +128,17 @@ export default function AIAssistantPage() {
     messageId: string | null;
   }>({ open: false, x: 0, y: 0, messageId: null });
   const [checkpointsOpen, setCheckpointsOpen] = useState(false);
+  const [pendingCandidates, setPendingCandidates] = useState<{
+    modules: Array<{ id: string; score: number }>;
+    originalText: string;
+  } | null>(null);
 
   // New TRPC hooks for AI context/memories
   const recordMessage = trpc.ai.recordMessage.useMutation();
   const utils = trpc.useUtils();
   const confirmMemories = trpc.ai.confirmMemories.useMutation();
   const summarizeSession = trpc.ai.summarizeSession.useMutation();
+  const recordChoice = trpc.ai.recordChoice.useMutation();
 
   const MODEL_URL =
     process.env.NEXT_PUBLIC_MODEL_DOWNLOAD_URL ||
@@ -364,6 +369,34 @@ export default function AIAssistantPage() {
       const intent = await routeIntent.mutateAsync({
         query: userMessage.content,
       });
+      if (intent?.module === "unknown" && intent?.data?.candidates?.length) {
+        setPendingCandidates({
+          modules: intent.data.candidates,
+          originalText: userMessage.content,
+        });
+        setIsLoading(false);
+        return;
+      }
+      if (intent?.module === "finance") {
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content:
+            intent?.action === "create"
+              ? "Abrí el módulo de Finanzas para registrar una transacción."
+              : "Abrí el módulo de Finanzas.",
+          timestamp: new Date(),
+          module: intent.module,
+          action: intent.action,
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+        // open launcher or navigate
+        setModulesOpen(true);
+        // You can also push to a dedicated finance page if present
+        // router.push("/_/finance");
+        setIsLoading(false);
+        return;
+      }
       // Inline handling for pastures
       if (intent?.module === "pastures") {
         if (intent?.action === "list") {
@@ -1256,6 +1289,86 @@ export default function AIAssistantPage() {
                         </div>
                       </>
                     )}
+
+                    {/* Disambiguation candidates prompt */}
+                    {pendingCandidates && (
+                      <div className="mx-auto max-w-3xl mt-2">
+                        <div className="rounded-2xl bg-white border border-neutral-200 p-3 shadow-sm">
+                          <div className="text-sm text-neutral-700 mb-2">
+                            ¿Te refieres a alguno de estos módulos?
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {pendingCandidates.modules.map((c) => (
+                              <Button
+                                key={c.id}
+                                size="sm"
+                                variant="flat"
+                                onPress={async () => {
+                                  const choice = {
+                                    sessionId: chatUuid || "",
+                                    messageId:
+                                      messages[messages.length - 1]?.id ||
+                                      undefined,
+                                    chosenModule: c.id,
+                                    chosenAction: undefined,
+                                    keywords: pendingCandidates.originalText
+                                      .split(/\s+/)
+                                      .slice(0, 6),
+                                    tone: undefined,
+                                    candidates: pendingCandidates.modules,
+                                  } as any;
+                                  // local record
+                                  await db.aiChoices.add({
+                                    uuid: generateUUID(),
+                                    userId: "dev-user",
+                                    sessionId: choice.sessionId,
+                                    messageId: choice.messageId,
+                                    chosenModule: choice.chosenModule,
+                                    chosenAction: choice.chosenAction,
+                                    keywords: JSON.stringify(choice.keywords),
+                                    tone: choice.tone || null,
+                                    candidates: JSON.stringify(
+                                      choice.candidates
+                                    ),
+                                    synced: false,
+                                    createdAt: new Date(),
+                                    updatedAt: new Date(),
+                                  });
+                                  // queue to sync
+                                  await addToSyncQueue(
+                                    "create",
+                                    "ai_choice",
+                                    `${chatUuid || ""}-choice-${Date.now()}`,
+                                    choice,
+                                    "dev-user"
+                                  );
+                                  // try server record (best effort)
+                                  try {
+                                    await recordChoice.mutateAsync(choice);
+                                  } catch {}
+                                  setPendingCandidates(null);
+                                  // proceed by routing to chosen module
+                                  setMessages((prev) => [
+                                    ...prev,
+                                    {
+                                      id: (Date.now() + 1).toString(),
+                                      role: "assistant",
+                                      content: `Entendido. Abrí el módulo ${c.id}.`,
+                                      timestamp: new Date(),
+                                      module: c.id,
+                                    },
+                                  ]);
+                                  setModulesOpen(true);
+                                }}
+                              >
+                                {c.id}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {isLoading && (
                       <div className="mx-auto max-w-3xl">
                         <div className="inline-flex items-center gap-2 rounded-2xl bg-white border border-neutral-200 px-4 py-2 shadow-sm">

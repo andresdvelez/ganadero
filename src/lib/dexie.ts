@@ -149,6 +149,68 @@ export interface OfflineLabExam {
   updatedAt: Date;
 }
 
+// Nuevos modelos offline base para módulos administrativos/productividad
+export interface OfflineTask {
+  id?: number;
+  uuid: string;
+  userId: string;
+  title: string;
+  description?: string;
+  status: "open" | "in_progress" | "done";
+  priority?: "low" | "medium" | "high";
+  dueDate?: Date;
+  assignedTo?: string;
+  synced: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface OfflineFinanceTransaction {
+  id?: number;
+  uuid: string;
+  userId: string;
+  type: "income" | "expense";
+  category?: string;
+  amount: number;
+  currency?: string; // COP por defecto
+  date: Date;
+  counterparty?: string; // cliente/proveedor
+  notes?: string;
+  synced: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface OfflineSensor {
+  id?: number;
+  uuid: string;
+  userId: string;
+  name: string;
+  type?: string; // clima, rumia, geolocalización, etc.
+  status?: "active" | "inactive";
+  lastReadingAt?: Date;
+  locationName?: string;
+  notes?: string;
+  synced: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface OfflineLocation {
+  id?: number;
+  uuid: string;
+  userId: string;
+  name: string;
+  type?: string; // potrero, sala de ordeño, bodega, etc.
+  lat?: number;
+  lng?: number;
+  areaHa?: number;
+  notes?: string;
+  synced: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface SyncQueueItem {
   id?: number;
   uuid: string;
@@ -180,6 +242,22 @@ export interface OfflineChatMessage {
   role: "user" | "assistant";
   content: string;
   createdAt: Date;
+}
+
+export interface OfflineAIChoice {
+  id?: number;
+  uuid: string; // local uuid
+  userId: string;
+  sessionId: string;
+  messageId?: string;
+  chosenModule: string;
+  chosenAction?: string;
+  keywords?: string; // JSON
+  tone?: string;
+  candidates?: string; // JSON
+  synced: boolean;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface OfflineIdentity {
@@ -221,9 +299,14 @@ export class GanadoDB extends Dexie {
   milkRecords!: Table<OfflineMilkRecord>;
   pastures!: Table<OfflinePasture>;
   labExams!: Table<OfflineLabExam>;
+  tasks!: Table<OfflineTask>;
+  financeTransactions!: Table<OfflineFinanceTransaction>;
+  sensors!: Table<OfflineSensor>;
+  locations!: Table<OfflineLocation>;
   syncQueue!: Table<SyncQueueItem>;
   chats!: Table<OfflineChat>;
   chatMessages!: Table<OfflineChatMessage>;
+  aiChoices!: Table<OfflineAIChoice>;
   identities!: Table<OfflineIdentity>;
   deviceInfo!: Table<DeviceInfo>;
   syncState!: Table<SyncState>;
@@ -287,6 +370,26 @@ export class GanadoDB extends Dexie {
     this.version(6)
       .stores({
         syncState: "++id",
+      })
+      .upgrade(() => {});
+
+    // Version 7: AI choices (HITL)
+    this.version(7)
+      .stores({
+        aiChoices:
+          "++id, uuid, userId, sessionId, chosenModule, synced, createdAt",
+      })
+      .upgrade(() => {});
+
+    // Version 8: tareas, finanzas, sensores, ubicaciones
+    this.version(8)
+      .stores({
+        tasks:
+          "++id, uuid, userId, status, priority, dueDate, synced, createdAt",
+        financeTransactions:
+          "++id, uuid, userId, type, category, date, synced, createdAt",
+        sensors: "++id, uuid, userId, status, type, synced, createdAt",
+        locations: "++id, uuid, userId, name, type, synced, createdAt",
       })
       .upgrade(() => {});
   }

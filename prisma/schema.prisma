@@ -44,6 +44,7 @@ model User {
   deletionLogs      DeletionLog[]
   aiUserProfile     AIUserProfile?
   aiMemories        AIMemory[]
+  aiChoices         AIChoice[]
   
   @@index([clerkId])
   @@index([email])
@@ -416,6 +417,27 @@ model AIMemory {
 
   @@index([userId, importance])
   @@index([createdAt])
+}
+
+// Human-in-the-loop disambiguation choice captured from users (aggregable)
+model AIChoice {
+  id           String   @id @default(cuid())
+  userId       String
+  sessionId    String
+  messageId    String?
+  chosenModule String
+  chosenAction String?
+  keywords     String?  // JSON array of keywords tokenized from query
+  tone         String?  // informal|formal|direct|amistoso
+  candidates   String?  // JSON candidate list returned by classifier
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([sessionId])
+  @@index([chosenModule])
 }
 
 model DeletionLog {

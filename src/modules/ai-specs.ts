@@ -228,7 +228,19 @@ export const aiModuleSpecs: AIModuleSpec[] = [
     name: "Finanzas",
     category: "Administración",
     description: "Costos, ingresos y egresos.",
-    tags: ["costos", "ingresos", "egresos", "flujo"],
+    tags: [
+      "costos",
+      "ingresos",
+      "egresos",
+      "flujo",
+      "venta",
+      "venta de ganado",
+      "compra",
+      "factura",
+      "contabilidad",
+      "pago",
+      "cobro",
+    ],
     actions: [
       { id: "list", label: "Ver finanzas", patterns: ACTION_PATTERNS.list },
       {

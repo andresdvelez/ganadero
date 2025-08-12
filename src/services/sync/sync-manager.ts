@@ -184,6 +184,9 @@ export class SyncManager {
           data,
         });
         break;
+      case "ai_choice":
+        await trpcClient.ai.recordChoice.mutate(data);
+        break;
       default:
         throw new Error(`Tipo de entidad no soportado: ${item.entityType}`);
     }

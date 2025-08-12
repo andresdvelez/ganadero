@@ -395,6 +395,39 @@ export const aiRouter = createTRPCRouter({
       return { ok: true };
     }),
 
+  // Store human disambiguation choice (HITL)
+  recordChoice: protectedProcedure
+    .input(
+      z.object({
+        sessionId: z.string(),
+        messageId: z.string().nullable().optional(),
+        chosenModule: z.string(),
+        chosenAction: z.string().nullable().optional(),
+        keywords: z.any().nullable().optional(), // array
+        tone: z.string().nullable().optional(),
+        candidates: z.any().nullable().optional(), // array or object
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const { userId } = ctx;
+      if (!userId) throw new Error("UNAUTHORIZED");
+      const saved = await prisma.aIChoice.create({
+        data: {
+          userId,
+          sessionId: input.sessionId,
+          messageId: input.messageId ?? null,
+          chosenModule: input.chosenModule,
+          chosenAction: input.chosenAction ?? null,
+          keywords: input.keywords ? JSON.stringify(input.keywords) : null,
+          tone: input.tone ?? null,
+          candidates: input.candidates
+            ? JSON.stringify(input.candidates)
+            : null,
+        },
+      });
+      return { ok: true, id: saved.id };
+    }),
+
   searchMemories: protectedProcedure
     .input(
       z.object({
@@ -505,6 +538,7 @@ export const aiRouter = createTRPCRouter({
       // Find best matching module by tags/id/name tokens
       const modules = aiModuleSpecs;
       let bestModule: { id: string; score: number } | null = null;
+      let secondBest: { id: string; score: number } | null = null;
       for (const m of modules) {
         const haystack = [m.id, m.name, ...(m.tags || [])]
           .join(" ")
@@ -513,11 +547,16 @@ export const aiRouter = createTRPCRouter({
           .replace(/\p{Diacritic}/gu, "");
         const hit = buildTfIdfCosine(q, [haystack])[0];
         const score = hit?.score ?? 0;
-        if (!bestModule || score > bestModule.score)
+        if (!bestModule || score > bestModule.score) {
+          secondBest = bestModule;
           bestModule = { id: m.id, score };
+        } else if (!secondBest || score > secondBest.score) {
+          secondBest = { id: m.id, score };
+        }
       }
 
       let chosenModule = bestModule?.id || "dashboard";
+      const confidence = bestModule?.score ?? 0;
 
       // Choose action from module action patterns
       let chosenAction: string | undefined = undefined;
@@ -542,12 +581,20 @@ export const aiRouter = createTRPCRouter({
         /pastura(s)?|potrero(s)?|pastoreo|pradera(s)?|forraje|rotacion|rotación|nutricion|nutrición/.test(
           q
         );
+      const isFinance =
+        /(ingreso|egreso|venta\s+de\s+ganado|venta|compra|factura|contabilidad|flujo|costo|pago|cobro)/.test(
+          q
+        );
 
       if (!current || (bestModule && bestModule.score < 0.05)) {
-        if (isPastures) chosenModule = "pastures";
+        if (isFinance) chosenModule = "finance";
+        else if (isPastures) chosenModule = "pastures";
         else if (isAnimal) chosenModule = "animals";
         else if (isHealth) chosenModule = "health";
       }
+
+      // If both finance and animals keywords present, prefer finance for terms like "venta de ganado", "ingreso", etc.
+      if (isFinance) chosenModule = "finance";
 
       // Default action based on verbs present
       if (!chosenAction) {
@@ -560,6 +607,31 @@ export const aiRouter = createTRPCRouter({
         chosenAction = wantsCreate ? "create" : wantsList ? "list" : "none";
       }
 
-      return { module: chosenModule, action: chosenAction, data: {} } as any;
+      const MIN_CONFIDENCE = 0.18;
+      if ((bestModule?.score ?? 0) < MIN_CONFIDENCE) {
+        // low confidence → request disambiguation, return candidates
+        const candidates = [bestModule, secondBest]
+          .filter(Boolean)
+          .map((c) => ({
+            id: (c as any).id,
+            score: (c as any).score,
+          })) as Array<{
+          id: string;
+          score: number;
+        }>;
+        return {
+          module: "unknown",
+          action: "none",
+          data: { candidates },
+          confidence,
+        } as any;
+      }
+
+      return {
+        module: chosenModule,
+        action: chosenAction,
+        data: {},
+        confidence,
+      } as any;
     }),
 });
