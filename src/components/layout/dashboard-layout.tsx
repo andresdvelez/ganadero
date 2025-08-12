@@ -76,11 +76,29 @@ export function DashboardLayout({
         </div>
         <nav className="flex items-center gap-3">
           {hasConflicts && (
-            <div
-              className="text-xs px-2 py-1 rounded-full bg-red-50 text-red-700 border border-red-200"
-              title="Existen conflictos pendientes por resolver"
-            >
-              Conflictos
+            <div className="flex items-center gap-2">
+              <div
+                className="text-xs px-2 py-1 rounded-full bg-red-50 text-red-700 border border-red-200"
+                title="Existen conflictos pendientes por resolver"
+              >
+                Conflictos
+              </div>
+              <Button
+                size="sm"
+                variant="light"
+                onPress={async () => {
+                  const rows = await db.syncQueue
+                    .where("status")
+                    .anyOf(["conflict", "failed", "synced"])
+                    .reverse()
+                    .limit(20)
+                    .toArray();
+                  setConflicts(rows);
+                  setConflictsOpen(true);
+                }}
+              >
+                Ver conflictos
+              </Button>
             </div>
           )}
           <div
