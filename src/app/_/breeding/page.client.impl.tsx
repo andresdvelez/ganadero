@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BreedingSync } from "@/components/embedded/breeding-sync";
 import { BreedingPalpation } from "@/components/embedded/breeding-palpation";
 import { BreedingAbortions } from "@/components/embedded/breeding-abortions";
+import { BreedingKPIs } from "@/components/embedded/breeding-kpis";
 
 export default function BreedingClient() {
   const [tab, setTab] = useState("sync");
@@ -19,6 +20,7 @@ export default function BreedingClient() {
             <TabsTrigger value="sync">Sincronización</TabsTrigger>
             <TabsTrigger value="palp">Palpaciones</TabsTrigger>
             <TabsTrigger value="abort">Abortos</TabsTrigger>
+            <TabsTrigger value="kpi">KPIs</TabsTrigger>
           </TabsList>
           <TabsContent value="sync">
             <BreedingSync />
@@ -28,6 +30,9 @@ export default function BreedingClient() {
           </TabsContent>
           <TabsContent value="abort">
             <BreedingAbortions />
+          </TabsContent>
+          <TabsContent value="kpi">
+            <BreedingKPIs />
           </TabsContent>
         </Tabs>
       </div>
