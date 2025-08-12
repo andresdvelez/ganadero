@@ -179,6 +179,30 @@ export class SyncManager {
           data,
         });
         break;
+      case "task":
+        await trpcClient.sync.upsertTask.mutate({
+          externalId: item.entityId,
+          data,
+        });
+        break;
+      case "finance_transaction":
+        await trpcClient.sync.upsertFinance.mutate({
+          externalId: item.entityId,
+          data,
+        });
+        break;
+      case "sensor":
+        await trpcClient.sync.upsertSensor.mutate({
+          externalId: item.entityId,
+          data,
+        });
+        break;
+      case "location":
+        await trpcClient.sync.upsertLocation.mutate({
+          externalId: item.entityId,
+          data,
+        });
+        break;
       case "ai_conversation":
         await trpcClient.sync.upsertAIConversation.mutate({
           data,

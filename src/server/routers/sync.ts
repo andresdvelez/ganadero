@@ -45,6 +45,10 @@ export const syncRouter = createTRPCRouter({
         milk,
         pastures,
         labs,
+        tasks,
+        finances,
+        sensors,
+        locations,
         tombs,
       ] = await Promise.all([
         ctx.prisma.animal.findMany({
@@ -71,6 +75,18 @@ export const syncRouter = createTRPCRouter({
         ctx.prisma.labExam.findMany({
           where: { userId: user.id, updatedAt: { gt: since } },
         }),
+        ctx.prisma.task.findMany({
+          where: { userId: user.id, updatedAt: { gt: since } },
+        }),
+        ctx.prisma.financeTransaction.findMany({
+          where: { userId: user.id, updatedAt: { gt: since } },
+        }),
+        ctx.prisma.sensor.findMany({
+          where: { userId: user.id, updatedAt: { gt: since } },
+        }),
+        ctx.prisma.location.findMany({
+          where: { userId: user.id, updatedAt: { gt: since } },
+        }),
         ctx.prisma.deletionLog.findMany({
           where: { userId: user.id, deletedAt: { gt: since } },
         }),
@@ -88,6 +104,10 @@ export const syncRouter = createTRPCRouter({
           milk,
           pastures,
           labs,
+          tasks,
+          finances,
+          sensors,
+          locations,
         },
         tombstones: tombs.map((t) => ({
           entityType: t.entityType,
@@ -432,8 +452,6 @@ export const syncRouter = createTRPCRouter({
         ? await ctx.prisma.animal.findFirst({
             where: { externalId: data.animalExternalId },
           })
-        : data.animalId
-        ? await ctx.prisma.animal.findUnique({ where: { id: data.animalId } })
         : null;
       const existing = await ctx.prisma.labExam.findFirst({
         where: { externalId },
@@ -441,7 +459,7 @@ export const syncRouter = createTRPCRouter({
       const payload = {
         externalId,
         userId: user.id,
-        animalId: animal?.id ?? null,
+        animalId: animal?.id ?? data.animalId,
         examType: data.examType,
         sampleType: data.sampleType ?? null,
         labName: data.labName ?? null,
@@ -464,6 +482,130 @@ export const syncRouter = createTRPCRouter({
             data: payload,
           })
         : await ctx.prisma.labExam.create({ data: payload });
+      return saved;
+    }),
+
+  upsertTask: protectedProcedure
+    .input(z.object({ externalId: z.string(), data: z.any() }))
+    .mutation(async ({ ctx, input }) => {
+      const user = await ctx.prisma.user.findUnique({
+        where: { clerkId: ctx.userId },
+      });
+      if (!user) throw new Error("User not found");
+      const { externalId, data } = input;
+      const existing = await ctx.prisma.task.findFirst({
+        where: { id: externalId },
+      });
+      const payload = {
+        userId: user.id,
+        title: data.title,
+        description: data.description ?? null,
+        status: data.status ?? "open",
+        priority: data.priority ?? null,
+        dueDate: data.dueDate ? new Date(data.dueDate) : null,
+      } as any;
+      const saved = existing
+        ? await ctx.prisma.task.update({
+            where: { id: existing.id },
+            data: payload,
+          })
+        : await ctx.prisma.task.create({
+            data: { ...payload, id: externalId },
+          });
+      return saved;
+    }),
+
+  upsertFinance: protectedProcedure
+    .input(z.object({ externalId: z.string(), data: z.any() }))
+    .mutation(async ({ ctx, input }) => {
+      const user = await ctx.prisma.user.findUnique({
+        where: { clerkId: ctx.userId },
+      });
+      if (!user) throw new Error("User not found");
+      const { externalId, data } = input;
+      const existing = await ctx.prisma.financeTransaction.findFirst({
+        where: { id: externalId },
+      });
+      const payload = {
+        userId: user.id,
+        type: data.type,
+        category: data.category ?? null,
+        amount: data.amount,
+        currency: data.currency ?? "COP",
+        date: new Date(data.date),
+        counterparty: data.counterparty ?? null,
+        notes: data.notes ?? null,
+      } as any;
+      const saved = existing
+        ? await ctx.prisma.financeTransaction.update({
+            where: { id: existing.id },
+            data: payload,
+          })
+        : await ctx.prisma.financeTransaction.create({
+            data: { ...payload, id: externalId },
+          });
+      return saved;
+    }),
+
+  upsertSensor: protectedProcedure
+    .input(z.object({ externalId: z.string(), data: z.any() }))
+    .mutation(async ({ ctx, input }) => {
+      const user = await ctx.prisma.user.findUnique({
+        where: { clerkId: ctx.userId },
+      });
+      if (!user) throw new Error("User not found");
+      const { externalId, data } = input;
+      const existing = await ctx.prisma.sensor.findFirst({
+        where: { id: externalId },
+      });
+      const payload = {
+        userId: user.id,
+        name: data.name,
+        type: data.type ?? null,
+        status: data.status ?? "inactive",
+        lastReadingAt: data.lastReadingAt ? new Date(data.lastReadingAt) : null,
+        locationName: data.locationName ?? null,
+        notes: data.notes ?? null,
+      } as any;
+      const saved = existing
+        ? await ctx.prisma.sensor.update({
+            where: { id: existing.id },
+            data: payload,
+          })
+        : await ctx.prisma.sensor.create({
+            data: { ...payload, id: externalId },
+          });
+      return saved;
+    }),
+
+  upsertLocation: protectedProcedure
+    .input(z.object({ externalId: z.string(), data: z.any() }))
+    .mutation(async ({ ctx, input }) => {
+      const user = await ctx.prisma.user.findUnique({
+        where: { clerkId: ctx.userId },
+      });
+      if (!user) throw new Error("User not found");
+      const { externalId, data } = input;
+      const existing = await ctx.prisma.location.findFirst({
+        where: { id: externalId },
+      });
+      const payload = {
+        userId: user.id,
+        name: data.name,
+        type: data.type ?? null,
+        lat: data.lat ?? null,
+        lng: data.lng ?? null,
+        areaHa: data.areaHa ?? null,
+        notes: data.notes ?? null,
+      } as any;
+      const saved = existing
+        ? await ctx.prisma.location.update({
+            where: { id: existing.id },
+            data: payload,
+          })
+        : await ctx.prisma.location.create({
+            data: { ...payload, id: externalId },
+          });
       return saved;
     }),
 

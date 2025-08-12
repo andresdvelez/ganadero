@@ -45,6 +45,10 @@ model User {
   aiUserProfile     AIUserProfile?
   aiMemories        AIMemory[]
   aiChoices         AIChoice[]
+  tasks             Task[]
+  financeTransactions FinanceTransaction[]
+  sensors           Sensor[]
+  locations         Location[]
   
   @@index([clerkId])
   @@index([email])
@@ -345,6 +349,83 @@ model LabExam {
   @@index([userId])
   @@index([animalId])
   @@index([examType])
+}
+
+// Tareas
+model Task {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  description String?
+  status      String   // open | in_progress | done
+  priority    String?
+  dueDate     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+// Finanzas
+model FinanceTransaction {
+  id          String   @id @default(cuid())
+  userId      String
+  type        String   // income | expense
+  category    String?
+  amount      Float
+  currency    String?
+  date        DateTime
+  counterparty String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+  @@index([date])
+}
+
+// Sensores
+model Sensor {
+  id            String   @id @default(cuid())
+  userId        String
+  name          String
+  type          String?
+  status        String?  // active | inactive
+  lastReadingAt DateTime?
+  locationName  String?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+// Ubicaciones
+model Location {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  type      String?
+  lat       Float?
+  lng       Float?
+  areaHa    Float?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([name])
 }
 
 // Sync Queue - tracks pending sync operations
