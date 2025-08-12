@@ -65,6 +65,23 @@ interface Message {
   module?: string;
   action?: string;
   data?: any;
+  widget?:
+    | {
+        type: "chart";
+        title: string;
+        chart:
+          | {
+              kind: "pie";
+              data: Array<{ label: string; value: number; color?: string }>;
+            }
+          | {
+              kind: "bar";
+              data: Array<{ label: string; value: number }>;
+              max?: number;
+            }
+          | { kind: "line"; data: Array<{ x: string; y: number }> };
+      }
+    | undefined;
 }
 
 export default function AIAssistantPage() {
@@ -288,6 +305,194 @@ export default function AIAssistantPage() {
     };
   }, [isListening]);
 
+  // Utilities: chart render + download
+  const downloadSvg = (node: SVGSVGElement | null, filename: string) => {
+    if (!node) return;
+    const serializer = new XMLSerializer();
+    const source = serializer.serializeToString(node);
+    const blob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename.endsWith(".svg") ? filename : `${filename}.svg`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const ChartWidget: React.FC<{ message: Message }> = ({ message }) => {
+    const ref = useRef<SVGSVGElement | null>(null);
+    if (!message.widget || message.widget.type !== "chart") return null;
+    const w = 520;
+    const h = 240;
+    const padding = 28;
+    const { chart, title } = message.widget;
+    return (
+      <Card className="mt-2 p-3">
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-sm font-medium">{title}</div>
+          <Button
+            size="sm"
+            variant="flat"
+            onPress={() => downloadSvg(ref.current, title)}
+          >
+            Descargar SVG
+          </Button>
+        </div>
+        {chart.kind === "pie" && (
+          <svg ref={ref} width={w} height={h} role="img">
+            <g transform={`translate(${w / 2}, ${h / 2})`}>
+              {(() => {
+                const total =
+                  chart.data.reduce((s, d) => s + Math.max(0, d.value), 0) || 1;
+                let start = -Math.PI / 2;
+                const radius = Math.min(w, h) / 2 - 10;
+                return chart.data.map((d, i) => {
+                  const angle = (Math.max(0, d.value) / total) * Math.PI * 2;
+                  const end = start + angle;
+                  const x1 = Math.cos(start) * radius;
+                  const y1 = Math.sin(start) * radius;
+                  const x2 = Math.cos(end) * radius;
+                  const y2 = Math.sin(end) * radius;
+                  const large = angle > Math.PI ? 1 : 0;
+                  const color =
+                    d.color ||
+                    ["#6D28D9", "#F59E0B", "#10B981", "#EF4444", "#3B82F6"][
+                      i % 5
+                    ];
+                  const path = `M 0 0 L ${x1} ${y1} A ${radius} ${radius} 0 ${large} 1 ${x2} ${y2} Z`;
+                  const mid = start + angle / 2;
+                  const lx = Math.cos(mid) * (radius + 14);
+                  const ly = Math.sin(mid) * (radius + 14);
+                  start = end;
+                  return (
+                    <g key={i}>
+                      <path d={path} fill={color} opacity={0.9} />
+                      <text
+                        x={lx}
+                        y={ly}
+                        fontSize={11}
+                        textAnchor="middle"
+                        fill="#111"
+                      >
+                        {d.label} (
+                        {Math.round((Math.max(0, d.value) / total) * 100)}%)
+                      </text>
+                    </g>
+                  );
+                });
+              })()}
+            </g>
+          </svg>
+        )}
+        {chart.kind === "bar" && (
+          <svg ref={ref} width={w} height={h} role="img">
+            <g transform={`translate(${padding}, ${padding})`}>
+              {(() => {
+                const innerW = w - padding * 2;
+                const innerH = h - padding * 2;
+                const max =
+                  chart.max || Math.max(1, ...chart.data.map((d) => d.value));
+                const bw = innerW / chart.data.length;
+                return (
+                  <>
+                    <line
+                      x1={0}
+                      y1={innerH}
+                      x2={innerW}
+                      y2={innerH}
+                      stroke="#ddd"
+                    />
+                    {chart.data.map((d, i) => {
+                      const bh = (d.value / max) * (innerH - 12);
+                      const x = i * bw + 6;
+                      const y = innerH - bh;
+                      return (
+                        <g key={i}>
+                          <rect
+                            x={x}
+                            y={y}
+                            width={bw - 12}
+                            height={bh}
+                            fill="#6D28D9"
+                            opacity={0.9}
+                            rx={4}
+                          />
+                          <text
+                            x={x + (bw - 12) / 2}
+                            y={innerH + 12}
+                            fontSize={11}
+                            textAnchor="middle"
+                            fill="#444"
+                          >
+                            {d.label}
+                          </text>
+                        </g>
+                      );
+                    })}
+                  </>
+                );
+              })()}
+            </g>
+          </svg>
+        )}
+        {chart.kind === "line" && (
+          <svg ref={ref} width={w} height={h} role="img">
+            <g transform={`translate(${padding}, ${padding})`}>
+              {(() => {
+                const innerW = w - padding * 2;
+                const innerH = h - padding * 2;
+                const max = Math.max(1, ...chart.data.map((d) => d.y));
+                const step = innerW / Math.max(1, chart.data.length - 1);
+                const points = chart.data.map(
+                  (d, i) =>
+                    [i * step, innerH - (d.y / max) * (innerH - 8)] as const
+                );
+                const dAttr = points
+                  .map((p, i) =>
+                    i === 0 ? `M ${p[0]} ${p[1]}` : `L ${p[0]} ${p[1]}`
+                  )
+                  .join(" ");
+                return (
+                  <>
+                    <path
+                      d={dAttr}
+                      fill="none"
+                      stroke="#6D28D9"
+                      strokeWidth={2}
+                    />
+                    {points.map((p, i) => (
+                      <circle
+                        key={i}
+                        cx={p[0]}
+                        cy={p[1]}
+                        r={3}
+                        fill="#6D28D9"
+                      />
+                    ))}
+                    {chart.data.map((d, i) => (
+                      <text
+                        key={i}
+                        x={i * step}
+                        y={innerH + 12}
+                        fontSize={11}
+                        textAnchor="middle"
+                        fill="#444"
+                      >
+                        {d.x}
+                      </text>
+                    ))}
+                  </>
+                );
+              })()}
+            </g>
+          </svg>
+        )}
+      </Card>
+    );
+  };
+
   const handleSend = async (overrideText?: string) => {
     if (isPaused) {
       addToast({
@@ -376,6 +581,72 @@ export default function AIAssistantPage() {
           // Optionally we could render a UI accept button; here we auto-confirm important ones later
         }
       } catch {}
+
+      // Heuristic: if user asked explicitly for a chart of tasks, generate pie by status
+      const chartRequested =
+        /\b(graf(ica|ico|íca|íco)|chart|gráfica|gráfico)\b/i.test(
+          userMessage.content
+        );
+      if (chartRequested && /tareas?/i.test(userMessage.content)) {
+        const toolId = `tool-${Date.now()}`;
+        setRunningTools((prev) => [
+          ...prev,
+          { id: toolId, label: "Generando gráfica de tareas…" },
+        ]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: "Preparando una gráfica de tareas por estado…",
+            timestamp: new Date(),
+          },
+        ]);
+        (async () => {
+          try {
+            const tasks = await utils.tasks.getAll.fetch();
+            const counts: Record<string, number> = {
+              open: 0,
+              in_progress: 0,
+              done: 0,
+            };
+            tasks.forEach((t: any) => {
+              counts[t.status] = (counts[t.status] || 0) + 1;
+            });
+            const chartMsg: Message = {
+              id: (Date.now() + 2).toString(),
+              role: "assistant",
+              content: "Aquí está la distribución de tareas por estado.",
+              timestamp: new Date(),
+              widget: {
+                type: "chart",
+                title: "Tareas por estado",
+                chart: {
+                  kind: "pie",
+                  data: [
+                    { label: "Abiertas", value: counts.open || 0 },
+                    { label: "En progreso", value: counts.in_progress || 0 },
+                    { label: "Completadas", value: counts.done || 0 },
+                  ],
+                },
+              },
+            };
+            setMessages((prev) => [...prev, chartMsg]);
+          } catch {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "No pude construir la gráfica ahora mismo.",
+                timestamp: new Date(),
+              },
+            ]);
+          } finally {
+            setRunningTools((prev) => prev.filter((t) => t.id !== toolId));
+          }
+        })();
+      }
 
       // Intent quick path
       const intent = await routeIntent.mutateAsync({
@@ -524,71 +795,72 @@ export default function AIAssistantPage() {
         setDrawerTool({ type: "inventory.movement" });
         return;
       }
-      if (intent?.module === "breeding" && intent?.action === "list") {
-        // Example: query heats today in background and show a spinner tool
-        const toolId = `tool-${Date.now()}`;
-        setRunningTools((prev) => [
-          ...prev,
-          { id: toolId, label: "Consultando reproducción de hoy…" },
-        ]);
-        // Inform user immediately
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: (Date.now() + 1).toString(),
-            role: "assistant",
-            content:
-              "Voy a listar los eventos de celo registrados hoy en la finca para verificarlo…",
-            timestamp: new Date(),
-          },
-        ]);
-        // Background fetch
-        (async () => {
-          try {
-            const heats = await utils.breedingAdv.kpis
-              .fetch()
-              .catch(() => null);
-            const todayHeats = await utils.breedingAdv.listHeats
-              .fetch()
-              .catch(() => []);
-            const items = (todayHeats || [])
-              .map(
-                (h: any) =>
-                  `- ${h.animal?.name || "(sin nombre)"} #${
-                    h.animal?.tagNumber || h.animalId
-                  } a las ${new Date(h.eventDate).toLocaleTimeString()}`
-              )
-              .join("\n");
-            const content =
-              items && items.length > 0
-                ? `Eventos de celo hoy:\n${items}`
-                : "No encontré eventos de celo registrados hoy. ¿Deseas crear un evento de celo?";
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: (Date.now() + 2).toString(),
-                role: "assistant",
-                content,
-                timestamp: new Date(),
-              },
-            ]);
-          } catch {
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: (Date.now() + 2).toString(),
-                role: "assistant",
-                content:
-                  "No pude consultar reproducción ahora mismo. Intenta nuevamente más tarde.",
-                timestamp: new Date(),
-              },
-            ]);
-          } finally {
-            setRunningTools((prev) => prev.filter((t) => t.id !== toolId));
-          }
-        })();
-        setIsLoading(false);
-        return;
+      if (intent?.module === "tasks") {
+        if (intent?.action === "list") {
+          const toolId = `tool-${Date.now()}`;
+          setRunningTools((prev) => [
+            ...prev,
+            { id: toolId, label: "Consultando tareas…" },
+          ]);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: (Date.now() + 1).toString(),
+              role: "assistant",
+              content:
+                "Voy a listar todas las tareas registradas en el sistema…",
+              timestamp: new Date(),
+              module: "tasks",
+              action: "list",
+            },
+          ]);
+          (async () => {
+            try {
+              const list = await utils.tasks.getAll.fetch();
+              const items = list
+                .map(
+                  (t: any) =>
+                    `- ${t.title} [${t.status}]${
+                      t.dueDate
+                        ? ` (vence ${new Date(t.dueDate).toLocaleDateString()})`
+                        : ""
+                    }`
+                )
+                .join("\n");
+              const content =
+                items.length > 0
+                  ? `Estas son tus tareas:\n${items}`
+                  : "No encontré tareas. Puedes crearlas desde el módulo de tareas.";
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: (Date.now() + 2).toString(),
+                  role: "assistant",
+                  content,
+                  timestamp: new Date(),
+                  module: "tasks",
+                  action: "list",
+                },
+              ]);
+            } catch {
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: (Date.now() + 2).toString(),
+                  role: "assistant",
+                  content: "No pude consultar tareas ahora mismo.",
+                  timestamp: new Date(),
+                  module: "tasks",
+                  action: "list",
+                },
+              ]);
+            } finally {
+              setRunningTools((prev) => prev.filter((t) => t.id !== toolId));
+            }
+          })();
+          setIsLoading(false);
+          return;
+        }
       }
 
       // Build richer context from server
@@ -1232,6 +1504,9 @@ export default function AIAssistantPage() {
                             <p className="whitespace-pre-wrap leading-relaxed">
                               {message.content}
                             </p>
+                            {message.widget?.type === "chart" && (
+                              <ChartWidget message={message} />
+                            )}
                             {message.module && (
                               <p className="text-[11px] mt-2 opacity-70">
                                 Módulo sugerido: {message.module}
