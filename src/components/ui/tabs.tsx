@@ -1,7 +1,6 @@
 "use client";
 
-import { useId } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export function Tabs({
   value,
@@ -12,6 +11,15 @@ export function Tabs({
   onValueChange: (v: string) => void;
   children: React.ReactNode;
 }) {
+  // Listen to custom events and notify parent onValueChange
+  useEffect(() => {
+    const handler = (e: any) => {
+      const v = e.detail?.value;
+      if (v) onValueChange(v);
+    };
+    window.addEventListener("tabs:change", handler as any);
+    return () => window.removeEventListener("tabs:change", handler as any);
+  }, [onValueChange]);
   return <div data-tabs>{children}</div>;
 }
 
@@ -35,8 +43,7 @@ export function TabsTrigger({
       type="button"
       className="px-3 py-1.5 rounded-md text-sm hover:bg-neutral-50 data-[active=true]:bg-neutral-200"
       data-value={value}
-      onClick={(e: any) => {
-        // find parent Tabs via React event traversal is non-trivial; rely on custom event
+      onClick={() => {
         const ev = new CustomEvent("tabs:change", { detail: { value } });
         window.dispatchEvent(ev);
       }}
@@ -54,10 +61,10 @@ export function TabsContent({
   children: React.ReactNode;
 }) {
   const [active, setActive] = useState<string | null>(null);
-  useState(() => {
+  useEffect(() => {
     const handler = (e: any) => setActive(e.detail?.value || null);
     window.addEventListener("tabs:change", handler as any);
     return () => window.removeEventListener("tabs:change", handler as any);
-  });
+  }, []);
   return <div hidden={active !== null && active !== value}>{children}</div>;
 }
