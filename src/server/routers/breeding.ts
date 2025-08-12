@@ -322,4 +322,230 @@ export const breedingAdvRouter = createTRPCRouter({
 
       return { kpis, trend };
     }),
+
+  // Crear eventos rápidos: celo, servicio IA/MN/TE, parto
+  createHeat: protectedProcedure
+    .input(
+      z.object({
+        animalId: z.string(),
+        date: z.string(),
+        notes: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const animal = await ctx.prisma.animal.findFirst({
+        where: { id: input.animalId, user: { clerkId: ctx.userId! } },
+        select: { id: true },
+      });
+      if (!animal) throw new Error("Animal no encontrado o sin permisos");
+      return ctx.prisma.breedingRecord.create({
+        data: {
+          userId: ctx.userId!,
+          animalId: input.animalId,
+          eventType: "heat",
+          eventDate: new Date(input.date),
+          notes: input.notes || null,
+        },
+      });
+    }),
+  createService: protectedProcedure
+    .input(
+      z.object({
+        animalId: z.string(),
+        date: z.string(),
+        type: z.enum(["IA", "MN", "TE"]).default("IA"),
+        sireId: z.string().optional(),
+        notes: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const animal = await ctx.prisma.animal.findFirst({
+        where: { id: input.animalId, user: { clerkId: ctx.userId! } },
+        select: { id: true },
+      });
+      if (!animal) throw new Error("Animal no encontrado o sin permisos");
+      const eventType =
+        input.type === "TE" ? "embryo_transfer" : "insemination";
+      const inseminationType =
+        input.type === "IA"
+          ? "artificial"
+          : input.type === "MN"
+          ? "natural"
+          : undefined;
+      return ctx.prisma.breedingRecord.create({
+        data: {
+          userId: ctx.userId!,
+          animalId: input.animalId,
+          eventType,
+          eventDate: new Date(input.date),
+          sireId: input.sireId || null,
+          inseminationType: inseminationType || null,
+          notes: input.notes || null,
+        },
+      });
+    }),
+  createBirth: protectedProcedure
+    .input(
+      z.object({
+        animalId: z.string(),
+        date: z.string(),
+        offspringCount: z.number().int().optional(),
+        notes: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const animal = await ctx.prisma.animal.findFirst({
+        where: { id: input.animalId, user: { clerkId: ctx.userId! } },
+        select: { id: true },
+      });
+      if (!animal) throw new Error("Animal no encontrado o sin permisos");
+      return ctx.prisma.breedingRecord.create({
+        data: {
+          userId: ctx.userId!,
+          animalId: input.animalId,
+          eventType: "birth",
+          eventDate: new Date(input.date),
+          offspringCount: input.offspringCount || null,
+          notes: input.notes || null,
+        },
+      });
+    }),
+
+  // Listas de acción de reproducción
+  actionLists: protectedProcedure
+    .input(z.object({ refDate: z.string().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const ref = input?.refDate ? new Date(input.refDate) : new Date();
+      const records = await ctx.prisma.breedingRecord.findMany({
+        where: { userId: ctx.userId! },
+        orderBy: { eventDate: "asc" },
+        select: {
+          animalId: true,
+          eventType: true,
+          eventDate: true,
+          expectedDueDate: true,
+        },
+      });
+      const palpations = await ctx.prisma.palpationRecord.findMany({
+        where: { userId: ctx.userId! },
+        select: { animalId: true, palpationDate: true, result: true },
+      });
+
+      const byAnimal = new Map<
+        string,
+        { type: string; date: Date; due?: Date }[]
+      >();
+      for (const r of records) {
+        const arr = byAnimal.get(r.animalId) || [];
+        arr.push({
+          type: r.eventType,
+          date: r.eventDate,
+          due: r.expectedDueDate || undefined,
+        });
+        byAnimal.set(r.animalId, arr);
+      }
+      const palpsByAnimal = new Map<string, { date: Date; result: string }[]>();
+      for (const p of palpations) {
+        const arr = palpsByAnimal.get(p.animalId) || [];
+        arr.push({ date: p.palpationDate, result: p.result });
+        palpsByAnimal.set(p.animalId, arr);
+      }
+
+      const toPalpate: { animalId: string; lastService: Date }[] = [];
+      const scheduled: { animalId: string; scheduledAt: Date }[] = [];
+      const unscheduled: { animalId: string; lastHeat: Date }[] = [];
+      const dueProjection: { animalId: string; dueDate: Date }[] = [];
+
+      const GESTATION_DAYS = 283;
+
+      byAnimal.forEach((events, animalId) => {
+        events.sort((a, b) => a.date.getTime() - b.date.getTime());
+        const lastService = [...events]
+          .reverse()
+          .find(
+            (e) => e.type === "insemination" || e.type === "embryo_transfer"
+          );
+        const lastHeat = [...events].reverse().find((e) => e.type === "heat");
+        const anyScheduled = false; // placeholder if we add explicit schedules beyond sync batches UI
+
+        // to palpate: 30-45 días después de servicio y sin palpación confirmada
+        if (lastService) {
+          const days = (ref.getTime() - lastService.date.getTime()) / 86400000;
+          if (days >= 30 && days <= 60) {
+            const palps = (palpsByAnimal.get(animalId) || []).filter(
+              (p) => p.date > lastService.date
+            );
+            const hasConfirmed = palps.some(
+              (p) =>
+                (p.result || "").toLowerCase() === "pregnant" ||
+                (p.result || "").toLowerCase() === "pregnant"
+            );
+            if (!hasConfirmed)
+              toPalpate.push({ animalId, lastService: lastService.date });
+          }
+        }
+        // scheduled females: currently we infer from recent service
+        if (
+          lastService &&
+          (ref.getTime() - lastService.date.getTime()) / 86400000 <= 7
+        ) {
+          scheduled.push({ animalId, scheduledAt: lastService.date });
+        }
+        // unscheduled: celo reciente y sin servicio posterior
+        if (lastHeat) {
+          const afterHeatService = events.find(
+            (e) =>
+              e.date > lastHeat.date &&
+              (e.type === "insemination" || e.type === "embryo_transfer")
+          );
+          if (
+            !afterHeatService &&
+            (ref.getTime() - lastHeat.date.getTime()) / 86400000 <= 21
+          ) {
+            unscheduled.push({ animalId, lastHeat: lastHeat.date });
+          }
+        }
+        // projection of due date
+        if (lastService) {
+          const due = new Date(
+            lastService.date.getTime() + GESTATION_DAYS * 86400000
+          );
+          if (due > ref && (due.getTime() - ref.getTime()) / 86400000 <= 300)
+            dueProjection.push({ animalId, dueDate: due });
+        }
+      });
+
+      // hydrate animal tag/name
+      const animalIds = Array.from(
+        new Set(
+          [...toPalpate, ...scheduled, ...unscheduled, ...dueProjection].map(
+            (i) => i.animalId
+          )
+        )
+      );
+      const animals = await ctx.prisma.animal.findMany({
+        where: { id: { in: animalIds } },
+        select: { id: true, name: true, tagNumber: true },
+      });
+      const map = new Map(animals.map((a) => [a.id, a] as const));
+
+      return {
+        toPalpate: toPalpate.map((x) => ({
+          ...x,
+          animal: map.get(x.animalId),
+        })),
+        scheduled: scheduled.map((x) => ({
+          ...x,
+          animal: map.get(x.animalId),
+        })),
+        unscheduled: unscheduled.map((x) => ({
+          ...x,
+          animal: map.get(x.animalId),
+        })),
+        dueProjection: dueProjection.map((x) => ({
+          ...x,
+          animal: map.get(x.animalId),
+        })),
+      };
+    }),
 });

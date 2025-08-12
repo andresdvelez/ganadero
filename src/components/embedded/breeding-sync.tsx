@@ -309,6 +309,85 @@ export function BreedingSync() {
           <div className="text-neutral-600">Sin lotes aún.</div>
         )}
       </div>
+
+      {/* Action lists */}
+      <ActionLists />
+    </div>
+  );
+}
+
+function ActionLists() {
+  const q = trpc.breedingAdv.actionLists.useQuery({});
+  const data = q.data;
+  if (!data) return null;
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Hembras para palpación</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {(data.toPalpate || []).map((i: any) => (
+            <div key={i.animalId} className="text-sm">
+              {i.animal?.name || "(sin nombre)"} #{i.animal?.tagNumber} —
+              Servicio: {new Date(i.lastService).toLocaleDateString()}
+            </div>
+          ))}
+          {(!data.toPalpate || data.toPalpate.length === 0) && (
+            <div className="text-sm text-neutral-600">Sin pendientes.</div>
+          )}
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Hembras sin programar</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {(data.unscheduled || []).map((i: any) => (
+            <div key={i.animalId} className="text-sm">
+              {i.animal?.name || "(sin nombre)"} #{i.animal?.tagNumber} — Último
+              celo: {new Date(i.lastHeat).toLocaleDateString()}
+            </div>
+          ))}
+          {(!data.unscheduled || data.unscheduled.length === 0) && (
+            <div className="text-sm text-neutral-600">Sin pendientes.</div>
+          )}
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Hembras programadas (reciente)</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {(data.scheduled || []).map((i: any) => (
+            <div key={i.animalId} className="text-sm">
+              {i.animal?.name || "(sin nombre)"} #{i.animal?.tagNumber} —
+              Programada: {new Date(i.scheduledAt).toLocaleDateString()}
+            </div>
+          ))}
+          {(!data.scheduled || data.scheduled.length === 0) && (
+            <div className="text-sm text-neutral-600">Sin pendientes.</div>
+          )}
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Proyección de partos</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {(data.dueProjection || []).map((i: any) => (
+            <div key={i.animalId} className="text-sm">
+              {i.animal?.name || "(sin nombre)"} #{i.animal?.tagNumber} —
+              Probable: {new Date(i.dueDate).toLocaleDateString()}
+            </div>
+          ))}
+          {(!data.dueProjection || data.dueProjection.length === 0) && (
+            <div className="text-sm text-neutral-600">
+              Sin próximos partos estimados.
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
