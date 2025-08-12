@@ -4,11 +4,16 @@ import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { db } from "@/lib/dexie";
 import { useSearchParams } from "next/navigation";
+import { trpc } from "@/lib/trpc/client";
 
 export default function PasturesClient() {
   const [pastures, setPastures] = useState<any[]>([]);
   const [q, setQ] = useState("");
   const params = useSearchParams();
+  const events = trpc.pasturesAdv.listEvents.useQuery({ limit: 20 });
+  const measurements = trpc.pasturesAdv.listMeasurements.useQuery({
+    limit: 20,
+  });
 
   useEffect(() => {
     (async () => {
@@ -61,6 +66,43 @@ export default function PasturesClient() {
             ))}
           </div>
         )}
+
+        <div className="mt-6 grid md:grid-cols-2 gap-4">
+          <div className="island p-4">
+            <div className="font-semibold mb-2">Eventos recientes (PRV)</div>
+            {events.data?.length ? (
+              <div className="text-sm divide-y">
+                {events.data.map((e) => (
+                  <div
+                    key={`${e.pastureId}_${e.date}_${e.type}`}
+                    className="py-1"
+                  >
+                    {e.type} · {new Date(e.date).toLocaleString()}
+                    {e.groupName ? ` · ${e.groupName}` : ""}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-sm text-neutral-500">Sin eventos</div>
+            )}
+          </div>
+          <div className="island p-4">
+            <div className="font-semibold mb-2">Mediciones recientes</div>
+            {measurements.data?.length ? (
+              <div className="text-sm divide-y">
+                {measurements.data.map((m) => (
+                  <div key={`${m.pastureId}_${m.date}`} className="py-1">
+                    {new Date(m.date).toLocaleDateString()} · Forraje:{" "}
+                    {m.forageKgDMHa ?? "-"} kg MS/ha · Descanso:{" "}
+                    {m.restDays ?? "-"} d
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-sm text-neutral-500">Sin mediciones</div>
+            )}
+          </div>
+        </div>
       </div>
     </DashboardLayout>
   );

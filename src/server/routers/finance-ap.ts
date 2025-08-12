@@ -117,6 +117,69 @@ export const financeApRouter = createTRPCRouter({
         include: { items: true, payments: true, supplier: true },
       });
     }),
+
+  updateInvoiceStatus: protectedProcedure
+    .input(
+      z.object({
+        invoiceId: z.string(),
+        status: z.enum(["open", "paid", "cancelled"]),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const inv = await ctx.prisma.purchaseInvoice.findFirst({
+        where: { id: input.invoiceId, userId: ctx.userId! },
+        select: { id: true },
+      });
+      if (!inv) throw new Error("Factura no encontrada");
+      return ctx.prisma.purchaseInvoice.update({
+        where: { id: inv.id },
+        data: { status: input.status },
+      });
+    }),
+
+  createDebitCreditNote: protectedProcedure
+    .input(
+      z.object({
+        invoiceId: z.string(),
+        type: z.enum(["debit", "credit"]),
+        reason: z.string().optional(),
+        amount: z.number().positive(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const inv = await ctx.prisma.purchaseInvoice.findFirst({
+        where: { id: input.invoiceId, userId: ctx.userId! },
+      });
+      if (!inv) throw new Error("Factura no encontrada");
+      const sign = input.type === "credit" ? -1 : 1;
+      const delta = sign * input.amount;
+      // Represent as an extra item adjustment
+      await ctx.prisma.purchaseInvoice.update({
+        where: { id: inv.id },
+        data: {
+          subtotal: inv.subtotal + delta,
+          total: inv.total + delta,
+          notes:
+            (inv.notes ? inv.notes + "\n" : "") +
+            `${input.type.toUpperCase()}::${Date.now()}::${input.amount}::${
+              input.reason || ""
+            }`,
+          items: {
+            create: [
+              {
+                description:
+                  input.type === "credit" ? "Nota crédito" : "Nota débito",
+                quantity: 1,
+                unit: "ajuste",
+                unitCost: delta,
+                total: delta,
+              },
+            ],
+          },
+        },
+      });
+      return { ok: true };
+    }),
   payInvoice: protectedProcedure
     .input(
       z.object({
