@@ -102,6 +102,7 @@ export const aiAssetsRouter = createTRPCRouter({
         .object({
           q: z.string().optional(),
           limit: z.number().min(1).max(200).default(100),
+          tankId: z.string().optional(),
         })
         .optional()
     )
@@ -112,11 +113,34 @@ export const aiAssetsRouter = createTRPCRouter({
           { code: { contains: input.q, mode: "insensitive" } },
           { breed: { contains: input.q, mode: "insensitive" } },
         ];
+      if (input?.tankId) where.tankId = input.tankId;
       return ctx.prisma.semenBatch.findMany({
         where,
         orderBy: { code: "asc" },
         take: input?.limit ?? 100,
         include: { tank: true, movements: true, sire: true },
+      });
+    }),
+  updateSemenBatchLocation: protectedProcedure
+    .input(
+      z.object({
+        batchId: z.string(),
+        tankId: z.string().optional(),
+        canister: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const exists = await ctx.prisma.semenBatch.findFirst({
+        where: { id: input.batchId, userId: ctx.userId! },
+        select: { id: true },
+      });
+      if (!exists) throw new Error("Lote no encontrado");
+      return ctx.prisma.semenBatch.update({
+        where: { id: input.batchId },
+        data: {
+          tankId: input.tankId || null,
+          canister: input.canister || null,
+        },
       });
     }),
 
@@ -185,6 +209,7 @@ export const aiAssetsRouter = createTRPCRouter({
         .object({
           q: z.string().optional(),
           limit: z.number().min(1).max(200).default(100),
+          tankId: z.string().optional(),
         })
         .optional()
     )
@@ -195,11 +220,34 @@ export const aiAssetsRouter = createTRPCRouter({
           { code: { contains: input.q, mode: "insensitive" } },
           { stage: { contains: input.q, mode: "insensitive" } },
         ];
+      if (input?.tankId) where.tankId = input.tankId;
       return ctx.prisma.embryoBatch.findMany({
         where,
         orderBy: { code: "asc" },
         take: input?.limit ?? 100,
         include: { tank: true, movements: true, donor: true, sire: true },
+      });
+    }),
+  updateEmbryoBatchLocation: protectedProcedure
+    .input(
+      z.object({
+        batchId: z.string(),
+        tankId: z.string().optional(),
+        canister: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const exists = await ctx.prisma.embryoBatch.findFirst({
+        where: { id: input.batchId, userId: ctx.userId! },
+        select: { id: true },
+      });
+      if (!exists) throw new Error("Lote no encontrado");
+      return ctx.prisma.embryoBatch.update({
+        where: { id: input.batchId },
+        data: {
+          tankId: input.tankId || null,
+          canister: input.canister || null,
+        },
       });
     }),
 });

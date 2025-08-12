@@ -90,20 +90,32 @@ function TanksTab() {
 }
 
 function SemenTab() {
-  const list = trpc.aiAssets.listSemenBatches.useQuery({});
+  const tanks = trpc.aiAssets.listTanks.useQuery();
+  const [tankFilter, setTankFilter] = useState<string>("");
+  const list = trpc.aiAssets.listSemenBatches.useQuery({
+    tankId: tankFilter || undefined,
+  });
   const create = trpc.aiAssets.createSemenBatch.useMutation({
     onSuccess: () => list.refetch(),
   });
   const move = trpc.aiAssets.moveSemen.useMutation({
     onSuccess: () => list.refetch(),
   });
-  const [form, setForm] = useState({ code: "", straws: "" });
+  const updateLoc = trpc.aiAssets.updateSemenBatchLocation.useMutation({
+    onSuccess: () => list.refetch(),
+  });
+  const [form, setForm] = useState({
+    code: "",
+    straws: "",
+    tankId: "",
+    canister: "",
+  });
   const [moveQty, setMoveQty] = useState(1);
   return (
     <div className="grid md:grid-cols-2 gap-4">
       <div className="island p-4">
         <div className="font-semibold mb-2">Crear lote de semen</div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
           <Input
             placeholder="Código"
             value={form.code}
@@ -115,12 +127,32 @@ function SemenTab() {
             value={form.straws}
             onChange={(e) => setForm({ ...form, straws: e.target.value })}
           />
+          <select
+            aria-label="Termo"
+            className="border rounded-md px-2 py-2 text-sm"
+            value={form.tankId}
+            onChange={(e) => setForm({ ...form, tankId: e.target.value })}
+          >
+            <option value="">Sin termo</option>
+            {tanks.data?.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+          <Input
+            placeholder="Canister"
+            value={form.canister}
+            onChange={(e) => setForm({ ...form, canister: e.target.value })}
+          />
           <Button
             size="sm"
             onPress={() =>
               create.mutate({
                 code: form.code,
                 strawCount: form.straws ? Number(form.straws) : 0,
+                tankId: form.tankId || undefined,
+                canister: form.canister || undefined,
               })
             }
             isDisabled={!form.code}
@@ -130,7 +162,22 @@ function SemenTab() {
         </div>
       </div>
       <div className="island p-4">
-        <div className="font-semibold mb-2">Lotes</div>
+        <div className="font-semibold mb-2 flex items-center gap-2">
+          Lotes
+          <select
+            aria-label="Filtrar por termo"
+            className="border rounded-md px-2 py-1 text-xs ml-auto"
+            value={tankFilter}
+            onChange={(e) => setTankFilter(e.target.value)}
+          >
+            <option value="">Todos</option>
+            {tanks.data?.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </div>
         {list.data?.length ? (
           <div className="text-sm divide-y">
             {list.data.map((b) => (
@@ -139,7 +186,9 @@ function SemenTab() {
                 className="py-2 flex items-center justify-between"
               >
                 <div>
-                  {b.code} · {b.breed || ""} · {b.strawCount} pajuelas
+                  {b.code} · {b.breed || ""} · {b.strawCount} pajuelas{" "}
+                  {b.tank ? `· ${b.tank.name}` : ""}{" "}
+                  {b.canister ? `(${b.canister})` : ""}
                 </div>
                 <div className="flex items-center gap-2">
                   <Input
@@ -179,6 +228,36 @@ function SemenTab() {
                   >
                     Agregar
                   </Button>
+                  <select
+                    aria-label="Termo"
+                    className="border rounded-md px-2 py-1 text-xs"
+                    defaultValue={b.tankId || ""}
+                    onChange={(e) =>
+                      updateLoc.mutate({
+                        batchId: b.id,
+                        tankId: e.target.value || undefined,
+                      })
+                    }
+                  >
+                    <option value="">Sin termo</option>
+                    {tanks.data?.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                  <Input
+                    className="w-28"
+                    placeholder="Canister"
+                    defaultValue={b.canister || ""}
+                    onBlur={(e) =>
+                      updateLoc.mutate({
+                        batchId: b.id,
+                        canister: e.target.value || undefined,
+                        tankId: b.tankId || undefined,
+                      })
+                    }
+                  />
                 </div>
               </div>
             ))}
@@ -192,20 +271,32 @@ function SemenTab() {
 }
 
 function EmbryosTab() {
-  const list = trpc.aiAssets.listEmbryoBatches.useQuery({});
+  const tanks = trpc.aiAssets.listTanks.useQuery();
+  const [tankFilter, setTankFilter] = useState<string>("");
+  const list = trpc.aiAssets.listEmbryoBatches.useQuery({
+    tankId: tankFilter || undefined,
+  });
   const create = trpc.aiAssets.createEmbryoBatch.useMutation({
     onSuccess: () => list.refetch(),
   });
   const move = trpc.aiAssets.moveEmbryo.useMutation({
     onSuccess: () => list.refetch(),
   });
-  const [form, setForm] = useState({ code: "", straws: "" });
+  const updateLoc = trpc.aiAssets.updateEmbryoBatchLocation.useMutation({
+    onSuccess: () => list.refetch(),
+  });
+  const [form, setForm] = useState({
+    code: "",
+    straws: "",
+    tankId: "",
+    canister: "",
+  });
   const [moveQty, setMoveQty] = useState(1);
   return (
     <div className="grid md:grid-cols-2 gap-4">
       <div className="island p-4">
         <div className="font-semibold mb-2">Crear lote de embriones</div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
           <Input
             placeholder="Código"
             value={form.code}
@@ -217,12 +308,32 @@ function EmbryosTab() {
             value={form.straws}
             onChange={(e) => setForm({ ...form, straws: e.target.value })}
           />
+          <select
+            aria-label="Termo"
+            className="border rounded-md px-2 py-2 text-sm"
+            value={form.tankId}
+            onChange={(e) => setForm({ ...form, tankId: e.target.value })}
+          >
+            <option value="">Sin termo</option>
+            {tanks.data?.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+          <Input
+            placeholder="Canister"
+            value={form.canister}
+            onChange={(e) => setForm({ ...form, canister: e.target.value })}
+          />
           <Button
             size="sm"
             onPress={() =>
               create.mutate({
                 code: form.code,
                 strawCount: form.straws ? Number(form.straws) : 0,
+                tankId: form.tankId || undefined,
+                canister: form.canister || undefined,
               })
             }
             isDisabled={!form.code}
@@ -232,7 +343,22 @@ function EmbryosTab() {
         </div>
       </div>
       <div className="island p-4">
-        <div className="font-semibold mb-2">Lotes</div>
+        <div className="font-semibold mb-2 flex items-center gap-2">
+          Lotes
+          <select
+            aria-label="Filtrar por termo"
+            className="border rounded-md px-2 py-1 text-xs ml-auto"
+            value={tankFilter}
+            onChange={(e) => setTankFilter(e.target.value)}
+          >
+            <option value="">Todos</option>
+            {tanks.data?.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </div>
         {list.data?.length ? (
           <div className="text-sm divide-y">
             {list.data.map((b) => (
@@ -241,7 +367,9 @@ function EmbryosTab() {
                 className="py-2 flex items-center justify-between"
               >
                 <div>
-                  {b.code} · {b.stage || ""} · {b.strawCount} pajuelas
+                  {b.code} · {b.stage || ""} · {b.strawCount} pajuelas{" "}
+                  {b.tank ? `· ${b.tank.name}` : ""}{" "}
+                  {b.canister ? `(${b.canister})` : ""}
                 </div>
                 <div className="flex items-center gap-2">
                   <Input
@@ -281,6 +409,36 @@ function EmbryosTab() {
                   >
                     Agregar
                   </Button>
+                  <select
+                    aria-label="Termo"
+                    className="border rounded-md px-2 py-1 text-xs"
+                    defaultValue={b.tankId || ""}
+                    onChange={(e) =>
+                      updateLoc.mutate({
+                        batchId: b.id,
+                        tankId: e.target.value || undefined,
+                      })
+                    }
+                  >
+                    <option value="">Sin termo</option>
+                    {tanks.data?.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                  <Input
+                    className="w-28"
+                    placeholder="Canister"
+                    defaultValue={b.canister || ""}
+                    onBlur={(e) =>
+                      updateLoc.mutate({
+                        batchId: b.id,
+                        canister: e.target.value || undefined,
+                        tankId: b.tankId || undefined,
+                      })
+                    }
+                  />
                 </div>
               </div>
             ))}

@@ -123,6 +123,64 @@ export function MastitisCases() {
             setPeriod((p) => ({ ...p, to: e.target.value || undefined }))
           }
         />
+        <div className="flex items-center gap-1">
+          <Button
+            size="sm"
+            variant="light"
+            onPress={() => {
+              const d = new Date();
+              const from = d.toISOString().slice(0, 10);
+              setPeriod({ from, to: from });
+            }}
+          >
+            Hoy
+          </Button>
+          <Button
+            size="sm"
+            variant="light"
+            onPress={() => {
+              const to = new Date();
+              const from = new Date();
+              from.setDate(to.getDate() - 7);
+              setPeriod({
+                from: from.toISOString().slice(0, 10),
+                to: to.toISOString().slice(0, 10),
+              });
+            }}
+          >
+            7d
+          </Button>
+          <Button
+            size="sm"
+            variant="light"
+            onPress={() => {
+              const to = new Date();
+              const from = new Date();
+              from.setDate(to.getDate() - 30);
+              setPeriod({
+                from: from.toISOString().slice(0, 10),
+                to: to.toISOString().slice(0, 10),
+              });
+            }}
+          >
+            30d
+          </Button>
+          <Button
+            size="sm"
+            variant="light"
+            onPress={() => {
+              const d = new Date();
+              const from = new Date(d.getFullYear(), d.getMonth(), 1);
+              const to = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+              setPeriod({
+                from: from.toISOString().slice(0, 10),
+                to: to.toISOString().slice(0, 10),
+              });
+            }}
+          >
+            Mes
+          </Button>
+        </div>
         <Button
           variant="secondary"
           onPress={() => {
