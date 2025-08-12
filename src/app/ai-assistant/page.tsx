@@ -192,6 +192,8 @@ export default function AIAssistantPage() {
   const recordChoice = trpc.ai.recordChoice.useMutation();
   const createApInvoice = trpc.financeAp.createInvoice.useMutation();
   const updateProductCost = trpc.inventory.updateProductCost.useMutation();
+  const alertsCountQuery = trpc.alerts.listInstances.useQuery({ status: "open", limit: 10 }, { refetchInterval: 30000 });
+  const alertsEvaluate = trpc.alerts.evaluateAll.useMutation();
 
   const MODEL_URL =
     process.env.NEXT_PUBLIC_MODEL_DOWNLOAD_URL ||
@@ -2122,6 +2124,13 @@ export default function AIAssistantPage() {
         }
       >
         <div className="flex flex-col h-[calc(100vh-4rem)]">
+          <div className="p-2 border-b border-neutral-200 flex items-center justify-between gap-3">
+            <div className="text-sm text-neutral-600">Periodo seleccionado: {period.from || "(desde)"} → {period.to || "(hasta)"}</div>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="flat" onPress={() => alertsEvaluate.mutate()}>Evaluar alertas</Button>
+              <div className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700">Alertas abiertas: {alertsCountQuery.data?.length ?? 0}</div>
+            </div>
+          </div>
           {/* hidden input for invoice attachment */}
           <input
             aria-label="Adjuntar factura"
