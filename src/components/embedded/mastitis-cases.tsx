@@ -73,6 +73,26 @@ export function MastitisCases() {
     if (period.to && d > new Date(period.to)) return false;
     return true;
   });
+  const summary = (() => {
+    const s = new Map<string, number>();
+    for (const c of filteredByDate) {
+      const k = (c.status || "desconocido").toLowerCase();
+      s.set(k, (s.get(k) || 0) + 1);
+    }
+    return Array.from(s.entries()).map(([label, value]) => ({ label, value }));
+  })();
+  const downloadCsvFiltered = () => {
+    const csv = toCSV(filteredByDate);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "mastitis.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
   const perAnimal = (() => {
     const map = new Map<string, Record<string, number>>();
     for (const c of filteredByDate) {
@@ -242,6 +262,9 @@ export function MastitisCases() {
           >
             Abrir en chat
           </Button>
+          <Button size="sm" variant="flat" onPress={downloadCsvFiltered}>
+            CSV
+          </Button>
         </div>
         <Button
           variant="secondary"
@@ -260,6 +283,19 @@ export function MastitisCases() {
           Exportar CSV
         </Button>
       </div>
+
+      {summary.length > 0 && (
+        <div className="island p-3">
+          <div className="text-sm font-semibold mb-2">Resumen por estado</div>
+          <div className="flex flex-wrap gap-2 text-xs">
+            {summary.map((s) => (
+              <div key={s.label} className="px-2 py-1 rounded-full border">
+                {s.label}: {s.value}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Mini chart */}
       <Card>

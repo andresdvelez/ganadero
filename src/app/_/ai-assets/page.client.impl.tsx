@@ -226,6 +226,39 @@ function SemenTab() {
           <Button size="sm" variant="light" onPress={() => list.refetch()}>
             Buscar
           </Button>
+          <Button
+            size="sm"
+            variant="flat"
+            onPress={() => {
+              const rows = list.data || [];
+              const headers = ["code", "breed", "straws", "tank", "canister"];
+              const csv = [
+                headers.join(","),
+                ...rows.map((b: any) =>
+                  [
+                    b.code || "",
+                    b.breed || "",
+                    b.strawCount || 0,
+                    b.tank?.name || "",
+                    b.canister || "",
+                  ]
+                    .map((v) => JSON.stringify(v))
+                    .join(",")
+                ),
+              ].join("\n");
+              const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = "semen.csv";
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+              URL.revokeObjectURL(url);
+            }}
+          >
+            CSV
+          </Button>
         </div>
         {list.data?.length ? (
           <div className="text-sm divide-y">
@@ -461,6 +494,39 @@ function EmbryosTab() {
           />
           <Button size="sm" variant="light" onPress={() => list.refetch()}>
             Buscar
+          </Button>
+          <Button
+            size="sm"
+            variant="flat"
+            onPress={() => {
+              const rows = list.data || [];
+              const headers = ["code", "stage", "straws", "tank", "canister"];
+              const csv = [
+                headers.join(","),
+                ...rows.map((b: any) =>
+                  [
+                    b.code || "",
+                    b.stage || "",
+                    b.strawCount || 0,
+                    b.tank?.name || "",
+                    b.canister || "",
+                  ]
+                    .map((v) => JSON.stringify(v))
+                    .join(",")
+                ),
+              ].join("\n");
+              const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = "embriones.csv";
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+              URL.revokeObjectURL(url);
+            }}
+          >
+            CSV
           </Button>
         </div>
         {list.data?.length ? (

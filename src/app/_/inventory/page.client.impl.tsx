@@ -13,6 +13,63 @@ export default function InventoryClient() {
   const params = useSearchParams();
   const movements = trpc.inventory.listMovements.useQuery({ limit: 20 });
   const reverse = trpc.inventory.reverseMovement.useMutation();
+  const downloadProductsCsv = () => {
+    const header = ["code", "name", "unit", "min", "current"].join(",");
+    const body = filtered
+      .map((p: any) =>
+        [
+          p.code || "",
+          p.name || "",
+          p.unit || "",
+          p.minStock ?? "",
+          p.currentStock ?? 0,
+        ].join(",")
+      )
+      .join("\n");
+    const csv = [header, body].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "productos.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+  const downloadMovementsCsv = () => {
+    const rows = movements.data || [];
+    const header = [
+      "date",
+      "type",
+      "productId",
+      "qty",
+      "unitCost",
+      "reason",
+    ].join(",");
+    const body = rows
+      .map((m: any) =>
+        [
+          new Date(m.occurredAt).toISOString(),
+          m.type,
+          m.productId || "",
+          m.quantity,
+          m.unitCost ?? "",
+          (m.reason || "").replace(/,/g, " "),
+        ].join(",")
+      )
+      .join("\n");
+    const csv = [header, body].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "movimientos.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
 
   useEffect(() => {
     (async () => {
@@ -41,12 +98,17 @@ export default function InventoryClient() {
       <div className="p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">Inventario</h1>
-          <input
-            className="px-3 py-2 border rounded-lg"
-            placeholder="Buscar producto..."
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
+          <div className="flex items-center gap-2">
+            <input
+              className="px-3 py-2 border rounded-lg"
+              placeholder="Buscar producto..."
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+            <Button size="sm" variant="flat" onPress={downloadProductsCsv}>
+              CSV
+            </Button>
+          </div>
         </div>
         {filtered.length === 0 ? (
           <p className="text-neutral-600">Sin productos.</p>
@@ -71,6 +133,11 @@ export default function InventoryClient() {
 
         <div className="mt-6">
           <h2 className="text-lg font-semibold mb-2">Movimientos recientes</h2>
+          <div className="mb-2">
+            <Button size="sm" variant="flat" onPress={downloadMovementsCsv}>
+              CSV
+            </Button>
+          </div>
           {movements.data?.length ? (
             <div className="divide-y">
               {movements.data.map((m) => (

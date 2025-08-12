@@ -103,6 +103,41 @@ export default function PasturesClient() {
             )}
           </div>
         </div>
+
+        <div className="mt-6 island p-4">
+          <div className="font-semibold mb-2">Calendario PRV (14 días)</div>
+          <div className="grid grid-cols-7 gap-2 text-xs">
+            {Array.from({ length: 14 }).map((_, i) => {
+              const d = new Date();
+              d.setDate(d.getDate() + i);
+              const dayStr = d.toISOString().slice(0, 10);
+              const occ = (events.data || []).find(
+                (e: any) =>
+                  new Date(e.date).toISOString().slice(0, 10) === dayStr
+              );
+              return (
+                <div
+                  key={i}
+                  className={`border rounded-md p-2 ${
+                    occ ? "bg-amber-50 border-amber-200" : "bg-white"
+                  }`}
+                >
+                  <div className="font-medium">{d.toLocaleDateString()}</div>
+                  <div className="mt-1 min-h-[24px]">
+                    {occ
+                      ? `${occ.type} ${
+                          occ.groupName ? "· " + occ.groupName : ""
+                        }`
+                      : "Libre"}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-2 text-xs text-neutral-500">
+            Amarillo: día con evento de ocupación/movimiento.
+          </div>
+        </div>
       </div>
     </DashboardLayout>
   );
