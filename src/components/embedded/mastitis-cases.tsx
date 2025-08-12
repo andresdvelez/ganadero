@@ -52,6 +52,21 @@ export function MastitisCases() {
     if (period.to && d > new Date(period.to)) return false;
     return true;
   });
+  const perAnimal = (() => {
+    const map = new Map<string, Record<string, number>>();
+    for (const c of filteredByDate) {
+      const id = c.animalId;
+      if (!id) continue;
+      const rec =
+        map.get(id) || ({ LF: 0, LR: 0, RF: 0, RR: 0, OTROS: 0 } as any);
+      const q = String(c.quarter || "").toUpperCase();
+      if (q === "LF" || q === "LR" || q === "RF" || q === "RR")
+        rec[q] = (rec[q] || 0) + 1;
+      else rec.OTROS = (rec.OTROS || 0) + 1;
+      map.set(id, rec);
+    }
+    return map;
+  })();
 
   function toCSV(items: any[]) {
     const header = [
@@ -254,6 +269,16 @@ export function MastitisCases() {
                 onChange={setSelectedAnimalForCCS}
               />
             </div>
+            {selectedAnimalForCCS && perAnimal.get(selectedAnimalForCCS) && (
+              <div className="text-xs self-end">
+                {(() => {
+                  const r = perAnimal.get(selectedAnimalForCCS)!;
+                  return `LF:${r.LF || 0} · LR:${r.LR || 0} · RF:${
+                    r.RF || 0
+                  } · RR:${r.RR || 0} · Otros:${r.OTROS || 0}`;
+                })()}
+              </div>
+            )}
           </div>
           <div className="w-full h-24">
             <svg width="100%" height="100%" viewBox="0 0 200 80">

@@ -92,8 +92,12 @@ function TanksTab() {
 function SemenTab() {
   const tanks = trpc.aiAssets.listTanks.useQuery();
   const [tankFilter, setTankFilter] = useState<string>("");
+  const [q, setQ] = useState("");
+  const [limit, setLimit] = useState(50);
   const list = trpc.aiAssets.listSemenBatches.useQuery({
     tankId: tankFilter || undefined,
+    q: q || undefined,
+    limit,
   });
   const create = trpc.aiAssets.createSemenBatch.useMutation({
     onSuccess: () => list.refetch(),
@@ -178,6 +182,17 @@ function SemenTab() {
             ))}
           </select>
         </div>
+        <div className="mb-2 flex items-center gap-2">
+          <Input
+            className="w-48"
+            placeholder="Buscar código/raza"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+          <Button size="sm" variant="light" onPress={() => list.refetch()}>
+            Buscar
+          </Button>
+        </div>
         {list.data?.length ? (
           <div className="text-sm divide-y">
             {list.data.map((b) => (
@@ -261,6 +276,15 @@ function SemenTab() {
                 </div>
               </div>
             ))}
+            <div className="pt-2">
+              <Button
+                size="sm"
+                variant="light"
+                onPress={() => setLimit((x) => x + 50)}
+              >
+                Cargar más
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="text-sm text-neutral-500">Sin lotes</div>
@@ -273,8 +297,12 @@ function SemenTab() {
 function EmbryosTab() {
   const tanks = trpc.aiAssets.listTanks.useQuery();
   const [tankFilter, setTankFilter] = useState<string>("");
+  const [q, setQ] = useState("");
+  const [limit, setLimit] = useState(50);
   const list = trpc.aiAssets.listEmbryoBatches.useQuery({
     tankId: tankFilter || undefined,
+    q: q || undefined,
+    limit,
   });
   const create = trpc.aiAssets.createEmbryoBatch.useMutation({
     onSuccess: () => list.refetch(),
@@ -359,6 +387,17 @@ function EmbryosTab() {
             ))}
           </select>
         </div>
+        <div className="mb-2 flex items-center gap-2">
+          <Input
+            className="w-48"
+            placeholder="Buscar código/etapa"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+          <Button size="sm" variant="light" onPress={() => list.refetch()}>
+            Buscar
+          </Button>
+        </div>
         {list.data?.length ? (
           <div className="text-sm divide-y">
             {list.data.map((b) => (
@@ -442,6 +481,15 @@ function EmbryosTab() {
                 </div>
               </div>
             ))}
+            <div className="pt-2">
+              <Button
+                size="sm"
+                variant="light"
+                onPress={() => setLimit((x) => x + 50)}
+              >
+                Cargar más
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="text-sm text-neutral-500">Sin lotes</div>
