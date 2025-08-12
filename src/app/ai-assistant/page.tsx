@@ -933,69 +933,35 @@ export default function AIAssistantPage() {
         /finanzas?|ingresos|egresos/i.test(userMessage.content)
       ) {
         const toolId = `tool-${Date.now()}`;
-        const range =
-          period.from || period.to
-            ? {
-                from: period.from ? new Date(period.from) : undefined,
-                to: period.to ? new Date(period.to) : undefined,
-              }
-            : inferDateRange(userMessage.content);
-        setRunningTools((prev) => [
-          ...prev,
-          { id: toolId, label: "Generando gráfica de finanzas…" },
-        ]);
+        const range = period.from || period.to ? { from: period.from ? new Date(period.from) : undefined, to: period.to ? new Date(period.to) : undefined } : inferDateRange(userMessage.content);
+        setRunningTools((prev) => [...prev, { id: toolId, label: "Generando gráfica de finanzas…" }]);
         setMessages((prev) => [
           ...prev,
-          {
-            id: (Date.now() + 1).toString(),
-            role: "assistant",
-            content: "Preparando resumen de ingresos vs egresos…",
-            timestamp: new Date(),
-          },
+          { id: (Date.now() + 1).toString(), role: "assistant", content: "Preparando resumen de ingresos vs egresos…", timestamp: new Date() },
         ]);
         (async () => {
           try {
-            const txs = await utils.finance.getAll.fetch();
-            const filtered = txs.filter((t: any) => {
-              const d = new Date(t.date);
-              return (
-                (range.from ? d >= range.from : true) &&
-                (range.to ? d <= range.to : true)
-              );
-            });
-            const sumIn = filtered
-              .filter((t: any) => t.type === "income")
-              .reduce((s: number, t: any) => s + (t.amount || 0), 0);
-            const sumOut = filtered
-              .filter((t: any) => t.type === "expense")
-              .reduce((s: number, t: any) => s + (t.amount || 0), 0);
-            const chartMsg: Message = {
+            const k = await utils.finance.kpis.fetch({ from: range.from?.toISOString(), to: range.to?.toISOString() });
+            const pieMsg: Message = {
               id: (Date.now() + 2).toString(),
               role: "assistant",
               content: "Totales de ingresos vs egresos en el periodo.",
               timestamp: new Date(),
-              widget: {
-                type: "chart",
-                title: "Finanzas: Ingresos vs Egresos",
-                chart: {
-                  kind: "pie",
-                  data: [
-                    { label: "Ingresos", value: sumIn },
-                    { label: "Egresos", value: sumOut },
-                  ],
-                },
-              },
+              widget: { type: "chart", title: "Finanzas: Ingresos vs Egresos", chart: { kind: "pie", data: [ { label: "Ingresos", value: k.income }, { label: "Egresos", value: k.expense } ] } },
             };
-            setMessages((prev) => [...prev, chartMsg]);
+            setMessages((prev) => [...prev, pieMsg]);
+            const barMsg: Message = {
+              id: (Date.now() + 3).toString(),
+              role: "assistant",
+              content: "Margen por categoría.",
+              timestamp: new Date(),
+              widget: { type: "chart", title: "Finanzas: Margen por categoría", chart: { kind: "bar", data: (k.byCategory || []).map((c: any) => ({ label: c.label, value: c.margin })) } },
+            };
+            setMessages((prev) => [...prev, barMsg]);
           } catch {
             setMessages((prev) => [
               ...prev,
-              {
-                id: (Date.now() + 2).toString(),
-                role: "assistant",
-                content: "No pude construir la gráfica de finanzas.",
-                timestamp: new Date(),
-              },
+              { id: (Date.now() + 2).toString(), role: "assistant", content: "No pude construir la gráfica de finanzas.", timestamp: new Date() },
             ]);
           } finally {
             setRunningTools((prev) => prev.filter((t) => t.id !== toolId));
@@ -1915,9 +1881,7 @@ export default function AIAssistantPage() {
               type="date"
               className="border rounded-md px-2 py-1 text-sm"
               value={period.from || ""}
-              onChange={(e) =>
-                setPeriod((p) => ({ ...p, from: e.target.value }))
-              }
+              onChange={(e) => setPeriod((p) => ({ ...p, from: e.target.value }))}
             />
             <input
               aria-label="Hasta"
@@ -1926,9 +1890,30 @@ export default function AIAssistantPage() {
               value={period.to || ""}
               onChange={(e) => setPeriod((p) => ({ ...p, to: e.target.value }))}
             />
-            <div className="text-xs text-neutral-500">
-              Usado por gráficas y listados cuando aplica.
+            <div className="flex items-center gap-1">
+              <Button size="sm" variant="flat" onPress={() => {
+                const now = new Date();
+                const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                setPeriod({ from: d.toISOString().slice(0,10), to: d.toISOString().slice(0,10) });
+              }}>Hoy</Button>
+              <Button size="sm" variant="flat" onPress={() => {
+                const now = new Date();
+                const from = new Date(now.getTime() - 7*24*60*60*1000);
+                setPeriod({ from: from.toISOString().slice(0,10), to: new Date().toISOString().slice(0,10) });
+              }}>Últimos 7 días</Button>
+              <Button size="sm" variant="flat" onPress={() => {
+                const now = new Date();
+                const from = new Date(now.getTime() - 30*24*60*60*1000);
+                setPeriod({ from: from.toISOString().slice(0,10), to: new Date().toISOString().slice(0,10) });
+              }}>Últimos 30 días</Button>
+              <Button size="sm" variant="flat" onPress={() => {
+                const now = new Date();
+                const from = new Date(now.getFullYear(), now.getMonth(), 1);
+                const to = new Date(now.getFullYear(), now.getMonth()+1, 0);
+                setPeriod({ from: from.toISOString().slice(0,10), to: to.toISOString().slice(0,10) });
+              }}>Este mes</Button>
             </div>
+            <div className="text-xs text-neutral-500">Usado por gráficas y listados cuando aplica.</div>
           </div>
           <div className="flex-1 overflow-y-auto p-0">
             {messages.length > 0 ? (

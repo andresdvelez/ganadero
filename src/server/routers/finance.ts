@@ -12,6 +12,49 @@ export const financeRouter = createTRPCRouter({
       orderBy: { date: "desc" },
     });
   }),
+
+  kpis: protectedProcedure
+    .input(
+      z
+        .object({ from: z.string().optional(), to: z.string().optional() })
+        .optional()
+    )
+    .query(async ({ ctx, input }) => {
+      const user = await ctx.prisma.user.findUnique({
+        where: { clerkId: ctx.userId },
+      });
+      if (!user) throw new Error("User not found");
+      const where: any = { userId: user.id };
+      if (input?.from || input?.to) {
+        where.date = {};
+        if (input.from) (where.date as any).gte = new Date(input.from);
+        if (input.to) (where.date as any).lte = new Date(input.to);
+      }
+      const txs = await ctx.prisma.financeTransaction.findMany({
+        where,
+        select: { type: true, category: true, amount: true },
+      });
+      let income = 0;
+      let expense = 0;
+      const byCat = new Map<string, { income: number; expense: number }>();
+      txs.forEach((t) => {
+        if (t.type === "income") income += t.amount || 0;
+        else expense += t.amount || 0;
+        const key = t.category || "Sin categoría";
+        const agg = byCat.get(key) || { income: 0, expense: 0 };
+        if (t.type === "income") agg.income += t.amount || 0;
+        else agg.expense += t.amount || 0;
+        byCat.set(key, agg);
+      });
+      const byCategory = Array.from(byCat.entries()).map(([label, v]) => ({
+        label,
+        income: v.income,
+        expense: v.expense,
+        margin: v.income - v.expense,
+      }));
+      return { income, expense, margin: income - expense, byCategory };
+    }),
+
   create: protectedProcedure
     .input(
       z.object({
@@ -72,7 +115,9 @@ export const financeRouter = createTRPCRouter({
             ? { currency: input.data.currency }
             : {}),
           ...(input.data.date !== undefined
-            ? (input.data.date ? { date: new Date(input.data.date) } : {})
+            ? input.data.date
+              ? { date: new Date(input.data.date) }
+              : {}
             : {}),
           ...(input.data.counterparty !== undefined
             ? { counterparty: input.data.counterparty }
