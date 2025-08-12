@@ -132,6 +132,11 @@ export default function AIAssistantPage() {
     modules: Array<{ id: string; score: number }>;
     originalText: string;
   } | null>(null);
+  const [pendingAction, setPendingAction] = useState<null | {
+    kind: "navigate" | "open-inline" | "open-drawer";
+    summary: string;
+    payload: any;
+  }>(null);
 
   // New TRPC hooks for AI context/memories
   const recordMessage = trpc.ai.recordMessage.useMutation();
@@ -854,6 +859,52 @@ export default function AIAssistantPage() {
     typeof navigator === "undefined" ? true : navigator.onLine !== false;
   const overlayVisible = !isOnline && localModelAvailable === false;
 
+  const confirmAndExecute = async () => {
+    if (!pendingAction) return;
+    const act = pendingAction;
+    setPendingAction(null);
+    if (act.kind === "navigate") {
+      router.push(act.payload.href);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: (Date.now() + 9).toString(),
+          role: "assistant",
+          content: `Navegué a ${act.payload.href}.`,
+          timestamp: new Date(),
+        },
+      ]);
+    } else if (act.kind === "open-inline") {
+      setInlineTool(act.payload);
+    } else if (act.kind === "open-drawer") {
+      setDrawerTool(act.payload);
+    }
+    // registrar elección HITL
+    try {
+      if (chatUuid) {
+        const choice = {
+          sessionId: chatUuid,
+          messageId: null,
+          chosenModule: act.payload?.moduleId || "ui",
+          chosenAction: act.kind,
+          keywords: ["confirm"],
+          tone: "direct",
+          candidates: [],
+        } as any;
+        await recordChoice.mutateAsync(choice);
+        await addToSyncQueue(
+          "create",
+          "ai_choice",
+          generateUUID(),
+          { ...choice, createdAt: new Date().toISOString() },
+          "dev-user"
+        );
+      }
+    } catch {}
+  };
+
+  const cancelPending = () => setPendingAction(null);
+
   return (
     <TRPCProvider>
       <DashboardLayout
@@ -1366,6 +1417,36 @@ export default function AIAssistantPage() {
                             ))}
                           </div>
                         </div>
+                      </div>
+                    )}
+
+                    {pendingAction && (
+                      <div className="mx-auto max-w-3xl">
+                        {pendingCandidates && (
+                          <div className="mb-3 p-3 border rounded-lg bg-yellow-50 text-yellow-800 text-sm">
+                            ¿Te refieres a{" "}
+                            {pendingCandidates.modules
+                              .map((m) =>
+                                m.id === "finance" ? "Finanzas" : m.id
+                              )
+                              .join(" o ")}
+                            ?
+                          </div>
+                        )}
+                        {pendingAction && (
+                          <div className="mb-3 p-3 border rounded-lg bg-blue-50 text-blue-800 text-sm flex items-center justify-between gap-2">
+                            <span>{pendingAction.summary}</span>
+                            <div className="flex gap-2">
+                              <Button onPress={confirmAndExecute}>Sí</Button>
+                              <Button
+                                variant="bordered"
+                                onPress={cancelPending}
+                              >
+                                No
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
 

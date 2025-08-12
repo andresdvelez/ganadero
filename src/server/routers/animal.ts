@@ -47,6 +47,43 @@ export const animalRouter = createTRPCRouter({
       return animal;
     }),
 
+  getTree: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const base = await ctx.prisma.animal.findFirst({
+        where: { id: input.id, user: { clerkId: ctx.userId } },
+        include: {
+          mother: true,
+          father: true,
+          motherChildren: { take: 10, orderBy: { createdAt: "desc" } },
+          fatherChildren: { take: 10, orderBy: { createdAt: "desc" } },
+        },
+      });
+      if (!base) throw new TRPCError({ code: "NOT_FOUND" });
+      return base;
+    }),
+
+  getSireInseminations: protectedProcedure
+    .input(
+      z.object({
+        bullId: z.string(),
+        limit: z.number().min(1).max(200).default(50),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const bull = await ctx.prisma.animal.findFirst({
+        where: { id: input.bullId, user: { clerkId: ctx.userId } },
+      });
+      if (!bull) throw new TRPCError({ code: "NOT_FOUND" });
+      const services = await ctx.prisma.breedingRecord.findMany({
+        where: { sireId: input.bullId, user: { clerkId: ctx.userId } as any },
+        orderBy: { eventDate: "desc" },
+        take: input.limit,
+        include: { animal: true },
+      });
+      return { bull, services };
+    }),
+
   create: protectedProcedure
     .input(
       z.object({

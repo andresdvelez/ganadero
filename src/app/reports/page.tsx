@@ -2,10 +2,19 @@
 
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { trpc } from "@/lib/trpc/client";
 
 export const dynamic = "force-dynamic";
 
 export default function ReportsPage() {
+  const { data: milk = [] } = trpc.milk.list.useQuery({ limit: 30 });
+  const { data: health = [] } = trpc.health.list.useQuery({ limit: 30 });
+  // breeding not exposed yet via router; placeholder counts via health/milk proxies
+  const milkTotal = milk.reduce(
+    (acc: number, r: any) => acc + (r.liters || 0),
+    0
+  );
+
   return (
     <DashboardLayout>
       <div className="p-6 space-y-6">
@@ -23,11 +32,14 @@ export default function ReportsPage() {
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Producción de leche</CardTitle>
+              <CardTitle>Producción de leche (últimos 30)</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-sm text-neutral-500">
-                Próximamente: series de tiempo por ordeño.
+              <div className="text-sm">
+                Total litros: {milkTotal.toLocaleString("es-CO")}
+              </div>
+              <div className="text-xs text-neutral-500">
+                Registros: {milk.length}
               </div>
             </CardContent>
           </Card>
@@ -36,8 +48,11 @@ export default function ReportsPage() {
               <CardTitle>Salud y tratamientos</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-sm text-neutral-500">
-                Próximamente: eventos, próximos vencimientos.
+              <div className="text-sm">
+                Registros recientes: {health.length}
+              </div>
+              <div className="text-xs text-neutral-500">
+                Próximamente: próximos vencimientos, costos.
               </div>
             </CardContent>
           </Card>
@@ -48,6 +63,16 @@ export default function ReportsPage() {
             <CardContent>
               <div className="text-sm text-neutral-500">
                 Próximamente: servicios, preñeces, partos.
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Potreros</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-sm text-neutral-500">
+                Próximamente: ocupación, rotaciones, aforos.
               </div>
             </CardContent>
           </Card>
