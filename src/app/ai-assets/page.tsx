@@ -1,7 +1,10 @@
-"use client";
-
+import { Suspense } from "react";
 import Client from "../_/ai-assets/page.client.impl";
 
 export default function Page() {
-  return <Client />;
+  return (
+    <Suspense fallback={<div className="p-4">Cargando…</div>}>
+      <Client />
+    </Suspense>
+  );
 }
