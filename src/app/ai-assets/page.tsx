@@ -1,8 +1,6 @@
-import dynamic from "next/dynamic";
+"use client";
 
-const Client = dynamic(() => import("../_/ai-assets/page.client.impl"), {
-  ssr: false,
-});
+import Client from "../_/ai-assets/page.client.impl";
 
 export default function Page() {
   return <Client />;
