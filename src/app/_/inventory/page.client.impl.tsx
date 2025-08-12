@@ -25,6 +25,31 @@ export default function InventoryClient() {
     { id: auditId || "" },
     { enabled: !!auditId }
   );
+  const historyWithBalanceAsc = useMemo(() => {
+    const rows = ((history.data as any[]) || [])
+      .slice()
+      .sort(
+        (a, b) =>
+          new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime()
+      );
+    let balance = 0;
+    return rows.map((m) => {
+      const delta =
+        m.type === "in" ? m.quantity : m.type === "out" ? -m.quantity : 0;
+      balance += delta;
+      return { ...m, _balance: balance } as any;
+    });
+  }, [history.data]);
+  const historyWithBalanceDesc = useMemo(
+    () =>
+      historyWithBalanceAsc
+        .slice()
+        .sort(
+          (a: any, b: any) =>
+            new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()
+        ),
+    [historyWithBalanceAsc]
+  );
   const downloadProductsCsv = () => {
     const header = ["code", "name", "unit", "min", "current"].join(",");
     const body = filtered
@@ -83,8 +108,15 @@ export default function InventoryClient() {
     URL.revokeObjectURL(url);
   };
   const downloadHistoryCsv = () => {
-    const rows = history.data || [];
-    const header = ["date", "type", "qty", "unitCost", "reason"].join(",");
+    const rows = historyWithBalanceAsc;
+    const header = [
+      "date",
+      "type",
+      "qty",
+      "unitCost",
+      "reason",
+      "balance",
+    ].join(",");
     const body = rows
       .map((m: any) =>
         [
@@ -93,6 +125,7 @@ export default function InventoryClient() {
           m.quantity,
           m.unitCost ?? "",
           (m.reason || "").replace(/,/g, " "),
+          m._balance,
         ].join(",")
       )
       .join("\n");
@@ -246,16 +279,16 @@ export default function InventoryClient() {
                   </Button>
                 </div>
               </div>
-              {history.data?.length ? (
+              {historyWithBalanceDesc.length ? (
                 <div className="text-sm divide-y mt-2">
-                  {history.data.map((m: any) => (
+                  {historyWithBalanceDesc.map((m: any) => (
                     <div
                       key={m.id}
                       className="py-1 flex items-center justify-between"
                     >
                       <div>
                         {new Date(m.occurredAt).toLocaleString()} · {m.type} ·{" "}
-                        {m.quantity} · {m.unitCost ?? "-"}
+                        {m.quantity} · {m.unitCost ?? "-"} · Saldo: {m._balance}
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="text-xs text-neutral-500">
