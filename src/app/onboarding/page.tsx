@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { bindDeviceLocally } from "@/lib/auth/offline-auth";
 import { addToast } from "@/components/ui/toast";
+import { robustDeviceId } from "@/lib/utils";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -75,7 +76,7 @@ function OrgStep({ onCreated }: { onCreated: () => void }) {
               label="Nombre de la organización"
               placeholder="Mi finca"
               value={name}
-              onChange={(e: any) => setName(e.target.value)}
+              onChange={(e) => setName((e.target as HTMLInputElement).value)}
               required
             />
             <Button
@@ -107,10 +108,7 @@ function LinkDeviceStep() {
     },
   });
 
-  const deviceId = (() => {
-    const { robustDeviceId } = require("@/lib/utils");
-    return robustDeviceId();
-  })();
+  const deviceId = useMemo(() => robustDeviceId(), []);
 
   return (
     <Card>

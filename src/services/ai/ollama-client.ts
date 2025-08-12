@@ -1,5 +1,6 @@
 import { translations } from "@/lib/constants/translations";
 import { aiModuleSpecs } from "@/modules/ai-specs";
+import { z } from "zod";
 
 // AI Client configuration
 interface AIResponse {
@@ -373,8 +374,6 @@ Responde priorizando prácticas locales y terminología usada en Colombia.`;
 
   private convertToZodSchema(data: any): any {
     // Implementación básica - expandir según necesidad
-    const { z } = require("zod");
-
     const schema: any = {};
 
     if (data.fields) {

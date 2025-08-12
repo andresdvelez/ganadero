@@ -244,7 +244,7 @@ export const aiRouter = createTRPCRouter({
         },
       });
 
-      let suggested: Array<{ id: string; content: string }> = [];
+      const suggested: Array<{ id: string; content: string }> = [];
       if (input.role === "user") {
         const extracted = extractMemories(input.content);
         if (extracted.length > 0) {

@@ -14,6 +14,7 @@ import {
 } from "@/lib/auth/offline-auth";
 import { useMemo, useState } from "react";
 import { addToast } from "@/components/ui/toast";
+import { robustDeviceId } from "@/lib/utils";
 
 export default function DownloadPage() {
   const { user } = useUser();
@@ -36,7 +37,6 @@ export default function DownloadPage() {
 
   const deviceId = useMemo(() => {
     if (typeof window === "undefined") return "";
-    const { robustDeviceId } = require("@/lib/utils");
     return robustDeviceId();
   }, []);
 
@@ -162,13 +162,17 @@ export default function DownloadPage() {
                       type="password"
                       label="Passcode"
                       value={passcode}
-                      onChange={(e: any) => setPasscode(e.target.value)}
+                      onChange={(e) =>
+                        setPasscode((e.target as HTMLInputElement).value)
+                      }
                     />
                     <Input
                       type="password"
                       label="Confirmar passcode"
                       value={confirm}
-                      onChange={(e: any) => setConfirm(e.target.value)}
+                      onChange={(e) =>
+                        setConfirm((e.target as HTMLInputElement).value)
+                      }
                     />
                     {error && (
                       <div className="text-red-600 text-sm">{error}</div>
