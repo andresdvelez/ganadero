@@ -20,6 +20,10 @@ export function MastitisCases() {
     animalId: selectedAnimalForCCS || undefined,
     bucket: "week",
   });
+  const ccsQuarter = trpc.mastitis.ccsTrend.useQuery({
+    animalId: selectedAnimalForCCS || undefined,
+    bucket: "month",
+  });
   const makeLab = trpc.mastitis.createLabExam.useMutation();
   const labByCase = trpc.mastitis.labExamByCase.useQuery as any;
 
@@ -362,6 +366,33 @@ export function MastitisCases() {
                 })()}
               </div>
             )}
+            {ccsQuarter.data?.series?.length ? (
+              <div className="text-xs self-end">
+                {(() => {
+                  const rows = (ccsQuarter.data?.series || []) as any[];
+                  const byQuarter = new Map<
+                    string,
+                    { sum: number; n: number }
+                  >();
+                  rows.forEach((s) => {
+                    const [y, m] = String(s.period).split("-");
+                    const q = Math.floor((parseInt(m || "1") - 1) / 3) + 1;
+                    const key = `${y}-Q${q}`;
+                    const v = byQuarter.get(key) || { sum: 0, n: 0 };
+                    v.sum += s.value || 0;
+                    v.n += 1;
+                    byQuarter.set(key, v);
+                  });
+                  const last = Array.from(byQuarter.entries())
+                    .sort((a, b) => (a[0] > b[0] ? 1 : -1))
+                    .pop();
+                  const avg = last
+                    ? Math.round(last[1].sum / Math.max(1, last[1].n))
+                    : 0;
+                  return `CCS prom. último trimestre: ${avg.toLocaleString()}`;
+                })()}
+              </div>
+            ) : null}
           </div>
           <div className="w-full h-24">
             <svg width="100%" height="100%" viewBox="0 0 200 80">
@@ -395,6 +426,55 @@ export function MastitisCases() {
               })()}
             </svg>
           </div>
+          {ccsQuarter.data?.series?.length ? (
+            <div className="mt-3">
+              <div className="text-xs text-neutral-600 mb-1">
+                CCS por trimestre
+              </div>
+              <div className="w-full h-20">
+                <svg width="100%" height="100%" viewBox="0 0 200 80">
+                  {(() => {
+                    const rows = (ccsQuarter.data?.series || []) as any[];
+                    if (!rows.length) return null;
+                    const agg = new Map<string, number>();
+                    rows.forEach((s) => {
+                      const [y, m] = String(s.period).split("-");
+                      const q = Math.floor((parseInt(m || "1") - 1) / 3) + 1;
+                      const key = `${y}-Q${q}`;
+                      agg.set(key, (agg.get(key) || 0) + (s.value || 0));
+                    });
+                    const series = Array.from(agg.entries()).sort((a, b) =>
+                      a[0] > b[0] ? 1 : -1
+                    );
+                    const max = Math.max(...series.map(([, v]) => v));
+                    const bw = Math.max(
+                      10,
+                      Math.floor(160 / Math.max(1, series.length))
+                    );
+                    return (
+                      <>
+                        {series.map(([k, v], i) => {
+                          const x = 20 + i * (bw + 8);
+                          const h = (v / Math.max(1, max)) * 70;
+                          return (
+                            <g key={k}>
+                              <rect
+                                x={x}
+                                y={80 - h - 5}
+                                width={bw}
+                                height={h}
+                                fill="#0ea5e9"
+                              />
+                            </g>
+                          );
+                        })}
+                      </>
+                    );
+                  })()}
+                </svg>
+              </div>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -532,6 +612,11 @@ export function MastitisCases() {
                   <Button asChild size="sm" variant="light">
                     <a href={`/lab?ref=${c.labExamId}`}>Ver examen</a>
                   </Button>
+                )}
+                {!c.labExamId && (
+                  <div className="text-[10px] text-neutral-500">
+                    Sin examen asociado
+                  </div>
                 )}
               </div>
             </div>
