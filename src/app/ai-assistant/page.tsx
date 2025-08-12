@@ -1536,68 +1536,222 @@ export default function AIAssistantPage() {
       }
 
       // Quick actions: AP filters and Inventory Kardex by product
-      const apMatch = userMessage.content.match(/\b(cxp|cuentas\s*por\s*pagar|facturas)\b.*(abiertas|pagadas|anuladas)?/i);
+      const apMatch = userMessage.content.match(
+        /\b(cxp|cuentas\s*por\s*pagar|facturas)\b.*(abiertas|pagadas|anuladas)?/i
+      );
       if (apMatch) {
-        const statusMap: Record<string, string> = { abiertas: "open", pagadas: "paid", anuladas: "cancelled" };
-        const status = apMatch[2] ? statusMap[apMatch[2].toLowerCase()] : undefined;
-        const supplier = (userMessage.content.match(/proveedor\s*[:#]?\s*([A-Za-z0-9_-]+)/i)?.[1]) || undefined;
-        const href = `/finance${status || supplier ? `?${new URLSearchParams({ status: status||"", supplierId: supplier||"" }).toString()}` : ""}`;
-        setMessages((prev)=> [...prev, { id: (Date.now()+1).toString(), role: "assistant", content: "Abrir CxP con filtros.", timestamp: new Date(), action: "open-link", module: "finance", data: { href } } as any]);
+        const statusMap: Record<string, string> = {
+          abiertas: "open",
+          pagadas: "paid",
+          anuladas: "cancelled",
+        };
+        const status = apMatch[2]
+          ? statusMap[apMatch[2].toLowerCase()]
+          : undefined;
+        const supplier =
+          userMessage.content.match(
+            /proveedor\s*[:#]?\s*([A-Za-z0-9_-]+)/i
+          )?.[1] || undefined;
+        const href = `/finance${
+          status || supplier
+            ? `?${new URLSearchParams({
+                status: status || "",
+                supplierId: supplier || "",
+              }).toString()}`
+            : ""
+        }`;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            role: "assistant",
+            content: `Voy a abrir CxP${status ? ` (${status})` : ""}${
+              supplier ? ` para proveedor ${supplier}` : ""
+            }.`,
+            timestamp: new Date(),
+          } as any,
+        ]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: "Abrir CxP con filtros.",
+            timestamp: new Date(),
+            action: "open-link",
+            module: "finance",
+            data: { href },
+          } as any,
+        ]);
         setIsLoading(false);
         return;
       }
-      const kardexMatch = userMessage.content.match(/kardex\s+del\s+producto\s+([A-Za-z0-9_-]+)/i);
+      const kardexMatch = userMessage.content.match(
+        /kardex\s+del\s+producto\s+([A-Za-z0-9_-]+)/i
+      );
       if (kardexMatch) {
         const code = kardexMatch[1];
         // Pass code as search q for inventory; user can click "Ver Kardex" en tarjeta
         const href = `/inventory?q=${encodeURIComponent(code)}`;
-        setMessages((prev)=> [...prev, { id: (Date.now()+1).toString(), role: "assistant", content: `Abrir Inventario filtrado por ${code} (luego click en Ver Kardex).`, timestamp: new Date(), action: "open-link", module: "inventory", data: { href } } as any]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            role: "assistant",
+            content: `Voy a abrir Inventario filtrado por ${code}.`,
+            timestamp: new Date(),
+          } as any,
+        ]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: `Abrir Inventario filtrado por ${code} (luego click en Ver Kardex).`,
+            timestamp: new Date(),
+            action: "open-link",
+            module: "inventory",
+            data: { href },
+          } as any,
+        ]);
         setIsLoading(false);
         return;
       }
       // Mastitis quick period
-      const mastitisMatch = userMessage.content.match(/mastitis\s*(hoy|7d|30d|mes)/i);
+      const mastitisMatch = userMessage.content.match(
+        /mastitis\s*(hoy|7d|30d|mes)/i
+      );
       if (mastitisMatch) {
         const key = mastitisMatch[1].toLowerCase();
         const now = new Date();
         let from: Date | null = null;
         let to: Date | null = null;
-        if (key === "hoy") { from = new Date(now.getFullYear(), now.getMonth(), now.getDate()); to = from; }
-        else if (key === "7d") { to = now; from = new Date(now.getTime()-7*86400000); }
-        else if (key === "30d") { to = now; from = new Date(now.getTime()-30*86400000); }
-        else if (key === "mes") { from = new Date(now.getFullYear(), now.getMonth(), 1); to = new Date(now.getFullYear(), now.getMonth()+1, 0); }
-        const qs = new URLSearchParams({ from: from? from.toISOString().slice(0,10): "", to: to? to.toISOString().slice(0,10): "" }).toString();
+        if (key === "hoy") {
+          from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          to = from;
+        } else if (key === "7d") {
+          to = now;
+          from = new Date(now.getTime() - 7 * 86400000);
+        } else if (key === "30d") {
+          to = now;
+          from = new Date(now.getTime() - 30 * 86400000);
+        } else if (key === "mes") {
+          from = new Date(now.getFullYear(), now.getMonth(), 1);
+          to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        }
+        const qs = new URLSearchParams({
+          from: from ? from.toISOString().slice(0, 10) : "",
+          to: to ? to.toISOString().slice(0, 10) : "",
+        }).toString();
         const href = `/health?${qs}`;
-        setMessages((prev)=> [...prev, { id: (Date.now()+1).toString(), role: "assistant", content: `Abrir Mastitis (${key}).`, timestamp: new Date(), action: "open-link", module: "health", data: { href } } as any]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            role: "assistant",
+            content: `Voy a abrir Mastitis (${key}).`,
+            timestamp: new Date(),
+          } as any,
+        ]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: `Abrir Mastitis (${key}).`,
+            timestamp: new Date(),
+            action: "open-link",
+            module: "health",
+            data: { href },
+          } as any,
+        ]);
         setIsLoading(false);
         return;
       }
       // IA Assets quick: termo X
-      const termoMatch = userMessage.content.match(/(semen|embriones)\s+(del\s+)?termo\s+([\w\- ]+)/i);
+      const termoMatch = userMessage.content.match(
+        /(semen|embriones)\s+(del\s+)?termo\s+([\w\- ]+)/i
+      );
       if (termoMatch) {
         const tankName = termoMatch[3].trim();
         const href = `/ai-assets?tankName=${encodeURIComponent(tankName)}`;
-        setMessages((prev)=> [...prev, { id: (Date.now()+1).toString(), role: "assistant", content: `Abrir IA Assets: ${tankName}.`, timestamp: new Date(), action: "open-link", module: "ai-assets", data: { href } } as any]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            role: "assistant",
+            content: `Voy a abrir IA Assets para el termo ${tankName}.`,
+            timestamp: new Date(),
+          } as any,
+        ]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: `Abrir IA Assets: ${tankName}.`,
+            timestamp: new Date(),
+            action: "open-link",
+            module: "ai-assets",
+            data: { href },
+          } as any,
+        ]);
         setIsLoading(false);
         return;
       }
       // Pesajes animal periodo
-      const pesajeMatch = userMessage.content.match(/pesajes?\s+(de\s+)?animal\s*[:#]?\s*([A-Za-z0-9_-]+)\s*(hoy|7d|30d|mes)?/i);
+      const pesajeMatch = userMessage.content.match(
+        /pesajes?\s+(de\s+)?animal\s*[:#]?\s*([A-Za-z0-9_-]+)\s*(hoy|7d|30d|mes)?/i
+      );
       if (pesajeMatch) {
         const animalId = pesajeMatch[2];
-        const periodKey = (pesajeMatch[3]||"").toLowerCase();
+        const periodKey = (pesajeMatch[3] || "").toLowerCase();
         const now = new Date();
-        let from: Date | null = null; let to: Date | null = null;
-        if (periodKey === "hoy") { from = new Date(now.getFullYear(), now.getMonth(), now.getDate()); to = from; }
-        else if (periodKey === "7d") { to = now; from = new Date(now.getTime()-7*86400000); }
-        else if (periodKey === "30d") { to = now; from = new Date(now.getTime()-30*86400000); }
-        else if (periodKey === "mes") { from = new Date(now.getFullYear(), now.getMonth(), 1); to = new Date(now.getFullYear(), now.getMonth()+1, 0); }
+        let from: Date | null = null;
+        let to: Date | null = null;
+        if (periodKey === "hoy") {
+          from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          to = from;
+        } else if (periodKey === "7d") {
+          to = now;
+          from = new Date(now.getTime() - 7 * 86400000);
+        } else if (periodKey === "30d") {
+          to = now;
+          from = new Date(now.getTime() - 30 * 86400000);
+        } else if (periodKey === "mes") {
+          from = new Date(now.getFullYear(), now.getMonth(), 1);
+          to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        }
         const qs = new URLSearchParams();
         qs.set("animalId", animalId);
-        if (from) qs.set("from", from.toISOString().slice(0,10));
-        if (to) qs.set("to", to.toISOString().slice(0,10));
+        if (from) qs.set("from", from.toISOString().slice(0, 10));
+        if (to) qs.set("to", to.toISOString().slice(0, 10));
         const href = `/weights?${qs.toString()}`;
-        setMessages((prev)=> [...prev, { id: (Date.now()+1).toString(), role: "assistant", content: `Abrir Pesajes animal ${animalId}${periodKey?` (${periodKey})`:""}.`, timestamp: new Date(), action: "open-link", module: "weights", data: { href } } as any]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            role: "assistant",
+            content: `Voy a abrir Pesajes para el animal ${animalId}${
+              periodKey ? ` (${periodKey})` : ""
+            }.`,
+            timestamp: new Date(),
+          } as any,
+        ]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: `Abrir Pesajes animal ${animalId}${
+              periodKey ? ` (${periodKey})` : ""
+            }.`,
+            timestamp: new Date(),
+            action: "open-link",
+            module: "weights",
+            data: { href },
+          } as any,
+        ]);
         setIsLoading(false);
         return;
       }
@@ -1605,13 +1759,44 @@ export default function AIAssistantPage() {
       const iepMatch = userMessage.content.match(/iep\s+(hoy|7d|30d|mes)/i);
       if (iepMatch) {
         const key = iepMatch[1].toLowerCase();
-        const now = new Date(); let from: Date | null=null; let to: Date | null=null;
-        if (key === "hoy") { from = new Date(now.getFullYear(), now.getMonth(), now.getDate()); to = from; }
-        else if (key === "7d") { to = now; from = new Date(now.getTime()-7*86400000); }
-        else if (key === "30d") { to = now; from = new Date(now.getTime()-30*86400000); }
-        else if (key === "mes") { from = new Date(now.getFullYear(), now.getMonth(), 1); to = new Date(now.getFullYear(), now.getMonth()+1, 0); }
+        const now = new Date();
+        let from: Date | null = null;
+        let to: Date | null = null;
+        if (key === "hoy") {
+          from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          to = from;
+        } else if (key === "7d") {
+          to = now;
+          from = new Date(now.getTime() - 7 * 86400000);
+        } else if (key === "30d") {
+          to = now;
+          from = new Date(now.getTime() - 30 * 86400000);
+        } else if (key === "mes") {
+          from = new Date(now.getFullYear(), now.getMonth(), 1);
+          to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        }
         const href = `/analysis/reproduction`; // seed ya manda periodo si el usuario lo reabre con Abrir en chat desde panel
-        setMessages((prev)=> [...prev, { id: (Date.now()+1).toString(), role: "assistant", content: `Abrir análisis de Reproducción (${key}).`, timestamp: new Date(), action: "open-link", module: "breeding", data: { href } } as any]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            role: "assistant",
+            content: `Voy a abrir el Análisis de Reproducción (${key}).`,
+            timestamp: new Date(),
+          } as any,
+        ]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: `Abrir análisis de Reproducción (${key}).`,
+            timestamp: new Date(),
+            action: "open-link",
+            module: "breeding",
+            data: { href },
+          } as any,
+        ]);
         setIsLoading(false);
         return;
       }
@@ -2247,7 +2432,9 @@ export default function AIAssistantPage() {
         ]);
         (async () => {
           try {
-            const list = await utils.weights.listWeights.fetch({ limit: 300 } as any);
+            const list = await utils.weights.listWeights.fetch({
+              limit: 300,
+            } as any);
             const filtered = list.filter((r: any) => {
               const d = new Date(r.weighedAt);
               return (
@@ -2258,9 +2445,9 @@ export default function AIAssistantPage() {
             const map = new Map<string, number>();
             filtered.forEach((r: any) => {
               const d = new Date(r.weighedAt);
-              const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-                d.getDate()
-              ).padStart(2, "0")}`;
+              const key = `${d.getFullYear()}-${String(
+                d.getMonth() + 1
+              ).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
               map.set(key, (map.get(key) || 0) + 1);
             });
             const data = Array.from(map.entries())
@@ -2274,16 +2461,27 @@ export default function AIAssistantPage() {
                 content: "Conteo de pesajes por día.",
                 timestamp: new Date(),
                 module: "weights",
-                widget: { type: "chart", title: "Pesajes por día", chart: { kind: "line", data } },
+                widget: {
+                  type: "chart",
+                  title: "Pesajes por día",
+                  chart: { kind: "line", data },
+                },
                 dataCsv: data,
               } as any,
             ]);
             // deep link to weights with optional animal and dates if present in text
-            const animalMatch = userMessage.content.match(/animal\s*[:#]?\s*([A-Za-z0-9_-]+)/i);
+            const animalMatch = userMessage.content.match(
+              /animal\s*[:#]?\s*([A-Za-z0-9_-]+)/i
+            );
             const params = new URLSearchParams();
             if (animalMatch) params.set("animalId", animalMatch[1]);
-            if (range.from) params.set("from", (range.from as Date).toISOString().slice(0, 10));
-            if (range.to) params.set("to", (range.to as Date).toISOString().slice(0, 10));
+            if (range.from)
+              params.set(
+                "from",
+                (range.from as Date).toISOString().slice(0, 10)
+              );
+            if (range.to)
+              params.set("to", (range.to as Date).toISOString().slice(0, 10));
             setMessages((prev) => [
               ...prev,
               {
@@ -2293,7 +2491,11 @@ export default function AIAssistantPage() {
                 timestamp: new Date(),
                 action: "open-link",
                 module: "weights",
-                data: { href: `/weights${params.toString() ? `?${params.toString()}` : ""}` },
+                data: {
+                  href: `/weights${
+                    params.toString() ? `?${params.toString()}` : ""
+                  }`,
+                },
               } as any,
             ]);
           } catch {
@@ -3437,7 +3639,10 @@ export default function AIAssistantPage() {
                                               : undefined,
                                           });
                                         }
-                                        if (message.module === "mastitis") {
+                                        if (
+                                          message.module === "mastitis" ||
+                                          message.module === "health"
+                                        ) {
                                           const from =
                                             url.searchParams.get("from");
                                           const to = url.searchParams.get("to");
@@ -3454,6 +3659,63 @@ export default function AIAssistantPage() {
                                               from || to
                                                 ? `Periodo aplicado`
                                                 : undefined,
+                                          });
+                                        }
+                                        if (message.module === "finance") {
+                                          const status =
+                                            url.searchParams.get("status");
+                                          const supplierId =
+                                            url.searchParams.get("supplierId");
+                                          addToast({
+                                            variant: "success",
+                                            title: "Abrí CxP",
+                                            description:
+                                              [
+                                                status
+                                                  ? `Estado: ${status}`
+                                                  : null,
+                                                supplierId
+                                                  ? `Proveedor: ${supplierId}`
+                                                  : null,
+                                              ]
+                                                .filter(Boolean)
+                                                .join(" · ") || undefined,
+                                          });
+                                        }
+                                        if (message.module === "inventory") {
+                                          const q = url.searchParams.get("q");
+                                          addToast({
+                                            variant: "success",
+                                            title: "Abrí Inventario",
+                                            description: q
+                                              ? `Filtro: ${q}`
+                                              : undefined,
+                                          });
+                                        }
+                                        if (message.module === "weights") {
+                                          const animalId =
+                                            url.searchParams.get("animalId");
+                                          const from =
+                                            url.searchParams.get("from");
+                                          const to = url.searchParams.get("to");
+                                          addToast({
+                                            variant: "success",
+                                            title: "Abrí Pesajes",
+                                            description:
+                                              [
+                                                animalId
+                                                  ? `Animal: ${animalId}`
+                                                  : null,
+                                                from || to ? `Periodo` : null,
+                                              ]
+                                                .filter(Boolean)
+                                                .join(" · ") || undefined,
+                                          });
+                                        }
+                                        if (message.module === "breeding") {
+                                          addToast({
+                                            variant: "success",
+                                            title: "Abrí Reproducción",
                                           });
                                         }
                                       } catch {}
