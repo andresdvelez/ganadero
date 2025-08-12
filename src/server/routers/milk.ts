@@ -40,7 +40,7 @@ export const milkRouter = createTRPCRouter({
       }
       const rows = await ctx.prisma.milkRecord.findMany({
         where,
-        select: { animalId: true, ccs: true },
+        select: { animalId: true, ccs: true, liters: true },
       });
       const map = new Map<string, { sum: number; count: number }>();
       rows.forEach((r) => {
@@ -61,7 +61,40 @@ export const milkRouter = createTRPCRouter({
         select: { id: true, name: true, tagNumber: true },
       });
       const amap = new Map(animals.map((a) => [a.id, a] as const));
-      return top.map((t) => ({ ...t, animal: amap.get(t.animalId) }));
+      // Herd average CCS
+      const herd = Array.from(map.values());
+      const herdAvgCCS = herd.length
+        ? herd.reduce((s, v) => s + v.sum / Math.max(1, v.count), 0) /
+          herd.length
+        : 0;
+
+      // Top animals by liters
+      const litersByAnimal = new Map<string, number>();
+      rows.forEach((r) => {
+        if (!r.animalId) return;
+        litersByAnimal.set(
+          r.animalId,
+          (litersByAnimal.get(r.animalId) || 0) + (r.liters || 0)
+        );
+      });
+      const litersTop = Array.from(litersByAnimal.entries())
+        .map(([animalId, liters]) => ({ animalId, liters }))
+        .sort((a, b) => b.liters - a.liters)
+        .slice(0, input?.top ?? 10);
+      const animals2 = await ctx.prisma.animal.findMany({
+        where: { id: { in: litersTop.map((t) => t.animalId) } },
+        select: { id: true, name: true, tagNumber: true },
+      });
+      const amap2 = new Map(animals2.map((a) => [a.id, a] as const));
+
+      return {
+        topCCS: top.map((t) => ({ ...t, animal: amap.get(t.animalId) })),
+        herdAvgCCS,
+        topLiters: litersTop.map((t) => ({
+          ...t,
+          animal: amap2.get(t.animalId),
+        })),
+      };
     }),
 
   create: protectedProcedure

@@ -9,6 +9,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Save } from "lucide-react";
 import { addToast } from "@/components/ui/toast";
+import React from "react";
 
 const schema = z.object({
   productId: z.string().min(1, "Producto requerido"),
@@ -23,9 +24,11 @@ export type MovementFormData = z.infer<typeof schema>;
 export function InventoryMovementNew({
   onCompleted,
   onClose,
+  defaults,
 }: {
   onCompleted?: () => void;
   onClose?: () => void;
+  defaults?: Partial<MovementFormData>;
 }) {
   const [isLoading, setIsLoading] = useState(false);
   const create = trpc.inventory.createMovement.useMutation();
@@ -44,6 +47,21 @@ export function InventoryMovementNew({
       occurredAt: new Date().toISOString().slice(0, 10),
     },
   });
+
+  // Apply defaults from props
+  React.useEffect(() => {
+    if (!defaults) return;
+    if (defaults.productId) setValue("productId", defaults.productId);
+    if (defaults.type) setValue("type", defaults.type);
+    if (typeof defaults.quantity === "number")
+      setValue("quantity", defaults.quantity);
+    if (typeof defaults.unitCost === "number")
+      setValue("unitCost", defaults.unitCost);
+    if (typeof defaults.reason === "string")
+      setValue("reason", defaults.reason);
+    if (typeof defaults.occurredAt === "string")
+      setValue("occurredAt", defaults.occurredAt);
+  }, [defaults, setValue]);
 
   const onSubmit = async (data: MovementFormData) => {
     setIsLoading(true);
