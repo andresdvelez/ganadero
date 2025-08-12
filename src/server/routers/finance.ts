@@ -72,7 +72,7 @@ export const financeRouter = createTRPCRouter({
             ? { currency: input.data.currency }
             : {}),
           ...(input.data.date !== undefined
-            ? { date: input.data.date ? new Date(input.data.date) : null }
+            ? (input.data.date ? { date: new Date(input.data.date) } : {})
             : {}),
           ...(input.data.counterparty !== undefined
             ? { counterparty: input.data.counterparty }
