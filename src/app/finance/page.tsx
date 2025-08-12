@@ -19,6 +19,43 @@ export default function FinancePage() {
   const addNote = trpc.financeAp.createDebitCreditNote.useMutation({
     onSuccess: () => invoices.refetch(),
   });
+  const downloadInvoicesCsv = () => {
+    const rows = invoices.data || [];
+    const headers = [
+      "id",
+      "supplier",
+      "date",
+      "status",
+      "subtotal",
+      "tax",
+      "total",
+    ];
+    const csv = [
+      headers.join(","),
+      ...rows.map((r: any) =>
+        [
+          r.id,
+          r.supplier?.name || "",
+          new Date(r.date).toISOString().slice(0, 10),
+          r.status,
+          r.subtotal,
+          r.tax,
+          r.total,
+        ]
+          .map((v) => JSON.stringify(v ?? ""))
+          .join(",")
+      ),
+    ].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "facturas_compra.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
 
   useEffect(() => {
     db.financeTransactions
@@ -73,7 +110,12 @@ export default function FinancePage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Facturas de compra (borradores recientes)</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>Facturas de compra (borradores recientes)</CardTitle>
+              <Button size="sm" variant="flat" onPress={downloadInvoicesCsv}>
+                CSV
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {invoices.data?.length ? (
@@ -96,6 +138,17 @@ export default function FinancePage() {
                         reason,
                       });
                     }}
+                    onPaid={async (amount, date, method, notes) => {
+                      await trpc.financeAp.payInvoice
+                        .useMutation({ onSuccess: () => invoices.refetch() })
+                        .mutateAsync({
+                          invoiceId: inv.id,
+                          amount,
+                          date,
+                          method: method || undefined,
+                          notes: notes || undefined,
+                        } as any);
+                    }}
                   />
                 ))}
               </div>
@@ -115,6 +168,7 @@ function InvoiceRow({
   inv,
   onChangeStatus,
   onAddNote,
+  onPaid,
 }: {
   inv: any;
   onChangeStatus: (status: "open" | "paid" | "cancelled") => Promise<void>;
@@ -123,6 +177,12 @@ function InvoiceRow({
     amount: number,
     reason?: string
   ) => Promise<void>;
+  onPaid: (
+    amount: number,
+    date: string,
+    method?: string,
+    notes?: string
+  ) => Promise<void>;
 }) {
   const [status, setStatus] = useState(
     inv.status as "open" | "paid" | "cancelled"
@@ -130,6 +190,13 @@ function InvoiceRow({
   const [noteAmount, setNoteAmount] = useState(0);
   const [noteReason, setNoteReason] = useState("");
   const [busy, setBusy] = useState(false);
+  const [payAmount, setPayAmount] = useState(0);
+  const [payDate, setPayDate] = useState(new Date().toISOString().slice(0, 10));
+  const [payMethod, setPayMethod] = useState("");
+  const [payNotes, setPayNotes] = useState("");
+  const attachments = trpc.financeAp.listInvoiceAttachments.useQuery({
+    invoiceId: inv.id,
+  });
 
   return (
     <div className="border rounded-md p-3">
@@ -144,9 +211,25 @@ function InvoiceRow({
         </div>
       </div>
       <div className="mt-2 text-xs text-neutral-600">
-        Adjuntos: (se agregan desde el chat y se listarán aquí cuando se
-        sincronicen)
+        Adjuntos: {attachments.data?.length || 0}
+        <Button
+          size="sm"
+          variant="light"
+          className="ml-2"
+          onPress={() => attachments.refetch()}
+        >
+          Refrescar
+        </Button>
       </div>
+      {attachments.data?.length ? (
+        <div className="mt-1 text-xs flex flex-wrap gap-2">
+          {attachments.data.map((a: any) => (
+            <span key={a.id} className="px-2 py-1 rounded-full border">
+              {a.fileName}
+            </span>
+          ))}
+        </div>
+      ) : null}
       <div className="mt-3 grid md:grid-cols-3 gap-3 items-end">
         <div>
           <label className="block text-xs text-neutral-600 mb-1">
@@ -243,6 +326,69 @@ function InvoiceRow({
             }}
           >
             Nota crédito
+          </Button>
+        </div>
+      </div>
+      <div className="mt-4 grid md:grid-cols-4 gap-3 items-end">
+        <div>
+          <label className="block text-xs text-neutral-600 mb-1">
+            Pago (monto)
+          </label>
+          <input
+            aria-label="Monto pago"
+            className="w-full border rounded-md px-2 py-2 text-sm"
+            type="number"
+            step="0.01"
+            placeholder="0.00"
+            value={payAmount}
+            onChange={(e) => setPayAmount(parseFloat(e.target.value || "0"))}
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-neutral-600 mb-1">Fecha</label>
+          <input
+            aria-label="Fecha pago"
+            type="date"
+            className="w-full border rounded-md px-2 py-2 text-sm"
+            value={payDate}
+            onChange={(e) => setPayDate(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-neutral-600 mb-1">
+            Método (opcional)
+          </label>
+          <input
+            aria-label="Método de pago"
+            className="w-full border rounded-md px-2 py-2 text-sm"
+            placeholder="Transferencia/Efectivo"
+            value={payMethod}
+            onChange={(e) => setPayMethod(e.target.value)}
+          />
+        </div>
+        <div className="flex items-end gap-2">
+          <Button
+            size="sm"
+            variant="flat"
+            isDisabled={busy || payAmount <= 0}
+            onPress={async () => {
+              setBusy(true);
+              try {
+                await onPaid(
+                  payAmount,
+                  payDate,
+                  payMethod || undefined,
+                  payNotes || undefined
+                );
+                setPayAmount(0);
+                setPayMethod("");
+                setPayNotes("");
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Registrar pago
           </Button>
         </div>
       </div>
