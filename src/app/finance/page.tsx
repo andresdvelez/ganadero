@@ -1,14 +1,7 @@
 import { Suspense } from "react";
-import NextDynamic from "next/dynamic";
+import FinancePageClient from "@/app/_/finance/page.client.impl";
 
-export const dynamic = "force-dynamic" as const;
-
-const FinancePageClient = NextDynamic(
-  () => import("@/app/_/finance/page.client.impl"),
-  {
-    ssr: false,
-  }
-);
+export const dynamic = "force-dynamic";
 
 export default function FinancePage() {
   return (
