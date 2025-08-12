@@ -2669,6 +2669,121 @@ export default function AIAssistantPage() {
                 lowStock: lowArr,
               },
             ]);
+          } else if (d.module === "mastitis") {
+            const list = await utils.mastitis.list.fetch({ limit: 300 });
+            const f = d.from ? new Date(d.from) : null;
+            const t = d.to ? new Date(d.to) : null;
+            const rows = list.filter((c: any) => {
+              const dt = new Date(c.detectedAt);
+              return (f ? dt >= f : true) && (t ? dt <= t : true);
+            });
+            const weekly = new Map<string, number>();
+            rows.forEach((c: any) => {
+              const dt = new Date(c.detectedAt);
+              const first = new Date(dt.getFullYear(), 0, 1);
+              const week = Math.ceil(
+                ((dt.getTime() - first.getTime()) / 86400000 + first.getDay() + 1) / 7
+              );
+              const key = `${dt.getFullYear()}-W${week}`;
+              weekly.set(key, (weekly.get(key) || 0) + 1);
+            });
+            const weeklyData = Array.from(weekly.entries())
+              .sort(([a], [b]) => (a < b ? -1 : 1))
+              .map(([x, y]) => ({ x, y }));
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 1).toString(),
+                role: "assistant",
+                content: "Mastitis: casos por semana.",
+                timestamp: new Date(),
+                module: "mastitis",
+                widget: { type: "chart", title: "Mastitis: casos por semana", chart: { kind: "line", data: weeklyData } },
+                dataCsv: weeklyData,
+              } as any,
+            ]);
+            const counts: Record<string, number> = { LF: 0, LR: 0, RF: 0, RR: 0, Otros: 0 };
+            rows.forEach((c: any) => {
+              const q = String(c.quarter || "").toUpperCase();
+              if (q === "LF" || q === "LR" || q === "RF" || q === "RR") counts[q] = (counts[q] || 0) + 1; else counts.Otros = (counts.Otros || 0) + 1;
+            });
+            const quadData = [
+              { label: "LF", value: counts.LF || 0 },
+              { label: "LR", value: counts.LR || 0 },
+              { label: "RF", value: counts.RF || 0 },
+              { label: "RR", value: counts.RR || 0 },
+              { label: "Otros", value: counts.Otros || 0 },
+            ];
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "Mastitis: distribución por cuadrante.",
+                timestamp: new Date(),
+                module: "mastitis",
+                widget: { type: "chart", title: "Mastitis: por cuadrante", chart: { kind: "bar", data: quadData } },
+                dataCsv: quadData,
+              } as any,
+            ]);
+          } else if (d.module === "ai-assets") {
+            const semen = await utils.aiAssets.listSemenBatches.fetch({ limit: 500 } as any);
+            const embryos = await utils.aiAssets.listEmbryoBatches.fetch({ limit: 500 } as any);
+            const filterName = (d as any).tankName as string | null;
+            const semenRows = (semen || []).filter((b: any) => !filterName || (b.tank?.name || "").toLowerCase() === filterName.toLowerCase());
+            const embryoRows = (embryos || []).filter((b: any) => !filterName || (b.tank?.name || "").toLowerCase() === filterName.toLowerCase());
+            const semenMap = new Map<string, number>();
+            semenRows.forEach((b: any) => {
+              const key = b.tank?.name || "Sin termo";
+              semenMap.set(key, (semenMap.get(key) || 0) + (b.strawCount || 0));
+            });
+            const embMap = new Map<string, number>();
+            embryoRows.forEach((b: any) => {
+              const key = b.tank?.name || "Sin termo";
+              embMap.set(key, (embMap.get(key) || 0) + (b.strawCount || 0));
+            });
+            const semenData = Array.from(semenMap.entries()).map(([label, value]) => ({ label, value }));
+            const embData = Array.from(embMap.entries()).map(([label, value]) => ({ label, value }));
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 1).toString(),
+                role: "assistant",
+                content: filterName ? `Semen por termo: ${filterName}` : "Semen por termo.",
+                timestamp: new Date(),
+                module: "ai-assets",
+                widget: { type: "chart", title: "Semen por termo", chart: { kind: "bar", data: semenData } },
+                dataCsv: semenData,
+              } as any,
+            ]);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: filterName ? `Embriones por termo: ${filterName}` : "Embriones por termo.",
+                timestamp: new Date(),
+                module: "ai-assets",
+                widget: { type: "chart", title: "Embriones por termo", chart: { kind: "bar", data: embData } },
+                dataCsv: embData,
+              } as any,
+            ]);
+            // Breakdown CSV por lote
+            const breakdown = [
+              ...semenRows.map((b: any) => ({ tipo: "semen", codigo: b.code, termo: b.tank?.name || "Sin termo", canister: b.canister || "", pajuelas: b.strawCount || 0 })),
+              ...embryoRows.map((b: any) => ({ tipo: "embrion", codigo: b.code, termo: b.tank?.name || "Sin termo", canister: b.canister || "", pajuelas: b.strawCount || 0 })),
+            ];
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 3).toString(),
+                role: "assistant",
+                content: "Desglose por lote (CSV disponible).",
+                timestamp: new Date(),
+                module: "ai-assets",
+                dataCsv: breakdown,
+              } as any,
+            ]);
           }
         } finally {
           setRunningTools((prev) => prev.filter((t) => t.id !== toolId));
