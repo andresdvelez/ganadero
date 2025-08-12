@@ -2417,12 +2417,18 @@ export default function AIAssistantPage() {
                                         size="sm"
                                         variant="flat"
                                         onPress={() => {
+                                          const qty = Math.max(
+                                            0,
+                                            it.min - it.current
+                                          );
                                           setDrawerTool({
                                             type: "inventory.movement",
                                             props: {
                                               defaults: {
                                                 productId: it.productId,
                                                 type: "in",
+                                                quantity:
+                                                  qty > 0 ? qty : undefined,
                                                 occurredAt: new Date()
                                                   .toISOString()
                                                   .slice(0, 10),

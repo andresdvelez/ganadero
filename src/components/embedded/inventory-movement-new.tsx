@@ -17,6 +17,7 @@ const schema = z.object({
   quantity: z.number().positive("Cantidad > 0"),
   unitCost: z.number().optional(),
   reason: z.string().optional(),
+  supplierId: z.string().optional(),
   occurredAt: z.string().min(1, "Fecha requerida"),
 });
 export type MovementFormData = z.infer<typeof schema>;
@@ -33,6 +34,7 @@ export function InventoryMovementNew({
   const [isLoading, setIsLoading] = useState(false);
   const create = trpc.inventory.createMovement.useMutation();
   const products = trpc.inventory.listProducts.useQuery({ limit: 200 });
+  const suppliers = trpc.inventory.listSuppliers.useQuery({ limit: 200 });
 
   const {
     register,
@@ -72,6 +74,7 @@ export function InventoryMovementNew({
         quantity: data.quantity,
         unitCost: data.unitCost,
         reason: data.reason,
+        relatedEntity: data.supplierId,
         occurredAt: new Date(data.occurredAt),
       });
       addToast({ variant: "success", title: "Movimiento registrado" });
@@ -139,6 +142,20 @@ export function InventoryMovementNew({
                 {errors.quantity.message}
               </p>
             )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Proveedor</label>
+            <select
+              {...register("supplierId")}
+              className="w-full px-3 py-2 border rounded-lg"
+            >
+              <option value="">Seleccione…</option>
+              {(suppliers.data || []).map((s: any) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">

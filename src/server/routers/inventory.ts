@@ -105,6 +105,33 @@ export const inventoryRouter = createTRPCRouter({
       };
     }),
 
+  listSuppliers: protectedProcedure
+    .input(
+      z
+        .object({
+          q: z.string().optional(),
+          limit: z.number().min(1).max(200).default(100),
+        })
+        .optional()
+    )
+    .query(async ({ ctx, input }) => {
+      const where: any = {
+        userId: (
+          await ctx.prisma.user.findUnique({
+            where: { clerkId: ctx.userId },
+            select: { id: true },
+          })
+        )?.id,
+      };
+      if (!where.userId) throw new Error("User not found");
+      if (input?.q) where.name = { contains: input.q, mode: "insensitive" };
+      return ctx.prisma.supplier.findMany({
+        where,
+        orderBy: { name: "asc" },
+        take: input?.limit ?? 100,
+      });
+    }),
+
   createProduct: protectedProcedure
     .input(
       z.object({
