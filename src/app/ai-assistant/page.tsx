@@ -89,6 +89,12 @@ interface Message {
     current: number;
     min: number;
   }>;
+  invoiceSummary?: {
+    invoiceId: string;
+    productId: string;
+    qty: number;
+    unitCost?: number;
+  };
 }
 
 export default function AIAssistantPage() {
@@ -173,6 +179,10 @@ export default function AIAssistantPage() {
     kind: "create-invoice";
     context: { productId: string; suggestedQty?: number };
   }>(null);
+  const [attachTargetInvoiceId, setAttachTargetInvoiceId] = useState<
+    string | null
+  >(null);
+  const attachInputRef = useRef<HTMLInputElement | null>(null);
 
   // New TRPC hooks for AI context/memories
   const recordMessage = trpc.ai.recordMessage.useMutation();
@@ -2112,95 +2122,52 @@ export default function AIAssistantPage() {
         }
       >
         <div className="flex flex-col h-[calc(100vh-4rem)]">
-          <div className="p-3 border-b border-neutral-200 flex items-center gap-3">
-            <div className="text-sm text-neutral-600">Periodo:</div>
-            <input
-              aria-label="Desde"
-              type="date"
-              className="border rounded-md px-2 py-1 text-sm"
-              value={period.from || ""}
-              onChange={(e) =>
-                setPeriod((p) => ({ ...p, from: e.target.value }))
+          {/* hidden input for invoice attachment */}
+          <input
+            aria-label="Adjuntar factura"
+            ref={attachInputRef}
+            type="file"
+            accept="application/pdf,image/*"
+            className="hidden"
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              if (!f || !attachTargetInvoiceId) return;
+              try {
+                const reader = new FileReader();
+                reader.onload = async () => {
+                  try {
+                    const base64 = (reader.result as string) || "";
+                    await addToSyncQueue(
+                      "create",
+                      "invoice_attachment",
+                      generateUUID(),
+                      {
+                        invoiceId: attachTargetInvoiceId,
+                        fileName: f.name,
+                        mimeType: f.type,
+                        dataUrl: base64,
+                        createdAt: new Date().toISOString(),
+                      },
+                      "dev-user"
+                    );
+                    setMessages((prev) => [
+                      ...prev,
+                      {
+                        id: (Date.now() + 5).toString(),
+                        role: "assistant",
+                        content: "Adjunto en cola de sincronización.",
+                        timestamp: new Date(),
+                      },
+                    ]);
+                  } catch {}
+                };
+                reader.readAsDataURL(f);
+              } finally {
+                setAttachTargetInvoiceId(null);
+                if (attachInputRef.current) attachInputRef.current.value = "";
               }
-            />
-            <input
-              aria-label="Hasta"
-              type="date"
-              className="border rounded-md px-2 py-1 text-sm"
-              value={period.to || ""}
-              onChange={(e) => setPeriod((p) => ({ ...p, to: e.target.value }))}
-            />
-            <div className="flex items-center gap-1">
-              <Button
-                size="sm"
-                variant="flat"
-                onPress={() => {
-                  const now = new Date();
-                  const d = new Date(
-                    now.getFullYear(),
-                    now.getMonth(),
-                    now.getDate()
-                  );
-                  setPeriod({
-                    from: d.toISOString().slice(0, 10),
-                    to: d.toISOString().slice(0, 10),
-                  });
-                }}
-              >
-                Hoy
-              </Button>
-              <Button
-                size="sm"
-                variant="flat"
-                onPress={() => {
-                  const now = new Date();
-                  const from = new Date(
-                    now.getTime() - 7 * 24 * 60 * 60 * 1000
-                  );
-                  setPeriod({
-                    from: from.toISOString().slice(0, 10),
-                    to: new Date().toISOString().slice(0, 10),
-                  });
-                }}
-              >
-                Últimos 7 días
-              </Button>
-              <Button
-                size="sm"
-                variant="flat"
-                onPress={() => {
-                  const now = new Date();
-                  const from = new Date(
-                    now.getTime() - 30 * 24 * 60 * 60 * 1000
-                  );
-                  setPeriod({
-                    from: from.toISOString().slice(0, 10),
-                    to: new Date().toISOString().slice(0, 10),
-                  });
-                }}
-              >
-                Últimos 30 días
-              </Button>
-              <Button
-                size="sm"
-                variant="flat"
-                onPress={() => {
-                  const now = new Date();
-                  const from = new Date(now.getFullYear(), now.getMonth(), 1);
-                  const to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-                  setPeriod({
-                    from: from.toISOString().slice(0, 10),
-                    to: to.toISOString().slice(0, 10),
-                  });
-                }}
-              >
-                Este mes
-              </Button>
-            </div>
-            <div className="text-xs text-neutral-500">
-              Usado por gráficas y listados cuando aplica.
-            </div>
-          </div>
+            }}
+          />
           <div className="flex-1 overflow-y-auto p-0">
             {messages.length > 0 ? (
               <div className="flex h-full">
@@ -2306,7 +2273,7 @@ export default function AIAssistantPage() {
                     {drawerTool?.type === "inventory.movement" && (
                       <InventoryMovementNew
                         defaults={drawerTool?.props?.defaults || undefined}
-                        onCompleted={() => {
+                        onCompleted={async (payload) => {
                           setDrawerTool(null);
                           // If requested, create a draft purchase invoice after movement
                           (async () => {
@@ -2314,32 +2281,42 @@ export default function AIAssistantPage() {
                               if (
                                 postMovementCreate?.kind === "create-invoice"
                               ) {
-                                const defaults =
-                                  drawerTool?.props?.defaults || {};
                                 const supplierId =
-                                  defaults?.supplierId || undefined;
+                                  payload?.supplierId ||
+                                  drawerTool?.props?.defaults?.supplierId ||
+                                  undefined;
                                 if (supplierId) {
                                   const qty =
-                                    defaults?.quantity ||
+                                    payload?.quantity ||
+                                    drawerTool?.props?.defaults?.quantity ||
                                     postMovementCreate.context.suggestedQty ||
                                     1;
-                                  const unitCost = defaults?.unitCost || 0;
-                                  await createApInvoice.mutateAsync({
-                                    supplierId,
-                                    date: new Date().toISOString(),
-                                    items: [
-                                      {
-                                        productId:
-                                          postMovementCreate.context.productId,
-                                        quantity: qty,
-                                        unitCost,
-                                      },
-                                    ],
-                                  } as any);
+                                  const unitCost =
+                                    payload?.unitCost ||
+                                    drawerTool?.props?.defaults?.unitCost ||
+                                    0;
+                                  const created =
+                                    await createApInvoice.mutateAsync({
+                                      supplierId,
+                                      date: new Date().toISOString(),
+                                      items: [
+                                        {
+                                          productId:
+                                            postMovementCreate.context
+                                              .productId,
+                                          quantity: qty,
+                                          unitCost,
+                                        },
+                                      ],
+                                    } as any);
                                   // Update product standard cost if provided
                                   if (unitCost && utils) {
                                     try {
-                                      await updateProductCost.mutateAsync({ productId: postMovementCreate.context.productId, cost: unitCost } as any);
+                                      await updateProductCost.mutateAsync({
+                                        productId:
+                                          postMovementCreate.context.productId,
+                                        cost: unitCost,
+                                      } as any);
                                     } catch {}
                                   }
                                   setMessages((prev) => [
@@ -2347,8 +2324,16 @@ export default function AIAssistantPage() {
                                     {
                                       id: (Date.now() + 4).toString(),
                                       role: "assistant",
-                                      content: "Factura de compra (borrador) creada a partir del reorden.",
+                                      content:
+                                        "Factura de compra (borrador) creada a partir del reorden.",
                                       timestamp: new Date(),
+                                      invoiceSummary: {
+                                        invoiceId: (created as any)?.id || "",
+                                        productId:
+                                          postMovementCreate.context.productId,
+                                        qty: Number(qty) || 0,
+                                        unitCost: unitCost || undefined,
+                                      },
                                     },
                                   ]);
                                 } else {
@@ -2542,6 +2527,45 @@ export default function AIAssistantPage() {
                                   ))}
                                 </div>
                               )}
+                            {message.invoiceSummary && (
+                              <div className="mt-3 space-y-2 text-sm">
+                                <div>
+                                  Factura creada (borrador). Cantidad:{" "}
+                                  {message.invoiceSummary.qty}
+                                  {message.invoiceSummary.unitCost
+                                    ? ` @ $${message.invoiceSummary.unitCost}`
+                                    : ""}
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="flat"
+                                    onPress={() => router.push("/finance")}
+                                  >
+                                    Ver finanzas
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="flat"
+                                    onPress={() => router.push("/inventory")}
+                                  >
+                                    Ver inventario
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="solid"
+                                    onPress={() => {
+                                      setAttachTargetInvoiceId(
+                                        message.invoiceSummary!.invoiceId
+                                      );
+                                      attachInputRef.current?.click();
+                                    }}
+                                  >
+                                    Adjuntar PDF/Imagen
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
                             {message.widget?.type === "chart" && (
                               <ChartWidget message={message} />
                             )}
