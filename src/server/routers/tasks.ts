@@ -58,8 +58,10 @@ export const tasksRouter = createTRPCRouter({
           ...(input.data.title !== undefined && input.data.title !== null
             ? { title: input.data.title }
             : {}),
-          ...(input.data.description !== undefined ? { description: input.data.description ?? null } : {}),
-          ...(input.data.status !== undefined
+          ...(input.data.description !== undefined
+            ? { description: input.data.description ?? null }
+            : {}),
+          ...(input.data.status !== undefined && input.data.status !== null
             ? { status: input.data.status }
             : {}),
           ...(input.data.priority !== undefined
