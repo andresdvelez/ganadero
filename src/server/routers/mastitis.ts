@@ -92,4 +92,99 @@ export const mastitisRouter = createTRPCRouter({
         },
       });
     }),
+
+  // Crear y vincular examen de laboratorio para un caso de mastitis
+  createLabExam: protectedProcedure
+    .input(z.object({ caseId: z.string(), labName: z.string().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const mc = await ctx.prisma.mastitisCase.findFirst({
+        where: { id: input.caseId, userId: ctx.userId! },
+      });
+      if (!mc) throw new Error("Caso no encontrado o sin permisos");
+      const exam = await ctx.prisma.labExam.create({
+        data: {
+          userId: ctx.userId!,
+          animalId: mc.animalId,
+          examType: "mastitis",
+          sampleType: "milk",
+          labName: input.labName || null,
+          requestedAt: new Date(),
+          notes: `Relacionado al caso ${mc.id}`,
+        },
+      });
+      await ctx.prisma.mastitisCase.update({
+        where: { id: mc.id },
+        data: { labExamId: exam.id },
+      });
+      return exam;
+    }),
+  labExamByCase: protectedProcedure
+    .input(z.object({ caseId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const mc = await ctx.prisma.mastitisCase.findFirst({
+        where: { id: input.caseId, userId: ctx.userId! },
+      });
+      if (!mc || !mc.labExamId) return null;
+      return ctx.prisma.labExam.findFirst({
+        where: { id: mc.labExamId, userId: ctx.userId! },
+      });
+    }),
+
+  // Serie de CCS desde MilkRecord para calidad de leche
+  ccsTrend: protectedProcedure
+    .input(
+      z
+        .object({
+          animalId: z.string().optional(),
+          from: z.string().optional(),
+          to: z.string().optional(),
+          bucket: z.enum(["day", "week", "month"]).default("day"),
+        })
+        .optional()
+    )
+    .query(async ({ ctx, input }) => {
+      const where: any = { userId: ctx.userId!, ccs: { not: null } };
+      if (input?.animalId) where.animalId = input.animalId;
+      if (input?.from || input?.to) where.recordedAt = {};
+      if (input?.from) where.recordedAt.gte = new Date(input.from);
+      if (input?.to) where.recordedAt.lte = new Date(input.to);
+      const rows = await ctx.prisma.milkRecord.findMany({
+        where,
+        orderBy: { recordedAt: "asc" },
+        select: { recordedAt: true, ccs: true, animalId: true },
+      });
+
+      const bucketOf = (d: Date) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        if (input?.bucket === "month") return `${y}-${m}`;
+        if (input?.bucket === "week") {
+          const first = new Date(d.getFullYear(), 0, 1);
+          const week = Math.ceil(
+            ((d.getTime() - first.getTime()) / 86400000 + first.getDay() + 1) /
+              7
+          );
+          return `${y}-W${week}`;
+        }
+        return `${y}-${m}-${day}`;
+      };
+
+      const agg: Record<string, { sum: number; n: number }> = {};
+      for (const r of rows) {
+        if (r.ccs == null) continue;
+        const key = bucketOf(r.recordedAt);
+        const a = agg[key] || { sum: 0, n: 0 };
+        a.sum += r.ccs;
+        a.n += 1;
+        agg[key] = a;
+      }
+      const series = Object.entries(agg)
+        .map(([period, v]) => ({
+          period,
+          value: Math.round((v.sum / v.n) * 100) / 100,
+        }))
+        .sort((a, b) => (a.period > b.period ? 1 : -1));
+      return { series };
+    }),
 });

@@ -15,6 +15,13 @@ export function MastitisCases() {
   const update = trpc.mastitis.update.useMutation({
     onSuccess: () => list.refetch(),
   });
+  const [selectedAnimalForCCS, setSelectedAnimalForCCS] = useState<string>("");
+  const ccs = trpc.mastitis.ccsTrend.useQuery({
+    animalId: selectedAnimalForCCS || undefined,
+    bucket: "week",
+  });
+  const makeLab = trpc.mastitis.createLabExam.useMutation();
+  const labByCase = trpc.mastitis.labExamByCase.useQuery as any;
 
   const [form, setForm] = useState({
     animalId: "",
@@ -153,6 +160,57 @@ export function MastitisCases() {
 
       <Card>
         <CardHeader>
+          <CardTitle>Calidad: CCS por semana</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+            <div>
+              <label className="text-sm text-neutral-600">
+                Animal (opcional)
+              </label>
+              <AnimalPicker
+                value={selectedAnimalForCCS}
+                onChange={setSelectedAnimalForCCS}
+              />
+            </div>
+          </div>
+          <div className="w-full h-24">
+            <svg width="100%" height="100%" viewBox="0 0 200 80">
+              {(() => {
+                const series = ccs.data?.series || [];
+                if (!series.length) return null;
+                const max = Math.max(...series.map((s: any) => s.value));
+                const stepX = 200 / Math.max(1, series.length - 1);
+                const pts = series.map((s: any, i: number) => {
+                  const x = i * stepX;
+                  const y = 80 - (s.value / Math.max(1, max)) * 70 - 5;
+                  return `${x},${y}`;
+                });
+                return (
+                  <>
+                    <polyline
+                      fill="none"
+                      stroke="#334155"
+                      strokeWidth="2"
+                      points={pts.join(" ")}
+                    />
+                    {series.map((s: any, i: number) => {
+                      const x = i * stepX;
+                      const y = 80 - (s.value / Math.max(1, max)) * 70 - 5;
+                      return (
+                        <circle key={i} cx={x} cy={y} r="2" fill="#334155" />
+                      );
+                    })}
+                  </>
+                );
+              })()}
+            </svg>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Registrar caso de mastitis</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -220,48 +278,66 @@ export function MastitisCases() {
 
       <div className="rounded-lg border divide-y">
         {filtered.map((c: any) => (
-          <div
-            key={c.id}
-            className="p-3 text-sm flex items-center justify-between"
-          >
-            <div>
-              <div className="font-medium">
-                {new Date(c.detectedAt).toLocaleDateString()} — {c.status}
-              </div>
-              <div className="text-neutral-600">
-                Animal: {c.animal?.name || "(sin nombre)"} #
-                {c.animal?.tagNumber || c.animalId}
-              </div>
-              {c.quarter && (
-                <div className="text-neutral-600">Cuadrante: {c.quarter}</div>
-              )}
-              {c.cmtScore && (
-                <div className="text-neutral-600">CMT/CCS: {c.cmtScore}</div>
-              )}
-              {c.bacteria && (
-                <div className="text-neutral-600">Bacteria: {c.bacteria}</div>
-              )}
-              {c.treatment && (
-                <div className="text-neutral-600">
-                  Tratamiento: {c.treatment}
+          <>
+            <div
+              key={c.id}
+              className="p-3 text-sm flex items-center justify-between"
+            >
+              <div>
+                <div className="font-medium">
+                  {new Date(c.detectedAt).toLocaleDateString()} — {c.status}
                 </div>
-              )}
-              {c.notes && <div className="text-neutral-600">{c.notes}</div>}
-            </div>
-            <div className="flex gap-2">
-              {c.status !== "resolved" && (
+                <div className="text-neutral-600">
+                  Animal: {c.animal?.name || "(sin nombre)"} #
+                  {c.animal?.tagNumber || c.animalId}
+                </div>
+                {c.quarter && (
+                  <div className="text-neutral-600">Cuadrante: {c.quarter}</div>
+                )}
+                {c.cmtScore && (
+                  <div className="text-neutral-600">CMT/CCS: {c.cmtScore}</div>
+                )}
+                {c.bacteria && (
+                  <div className="text-neutral-600">Bacteria: {c.bacteria}</div>
+                )}
+                {c.treatment && (
+                  <div className="text-neutral-600">
+                    Tratamiento: {c.treatment}
+                  </div>
+                )}
+                {c.notes && <div className="text-neutral-600">{c.notes}</div>}
+              </div>
+              <div className="flex gap-2">
+                {c.status !== "resolved" && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onPress={() =>
+                      update.mutate({ id: c.id, data: { status: "resolved" } })
+                    }
+                  >
+                    Resolver
+                  </Button>
+                )}
                 <Button
                   size="sm"
-                  variant="secondary"
-                  onPress={() =>
-                    update.mutate({ id: c.id, data: { status: "resolved" } })
-                  }
+                  onPress={async () => {
+                    try {
+                      await makeLab.mutateAsync({ caseId: c.id });
+                      list.refetch();
+                    } catch {}
+                  }}
                 >
-                  Resolver
+                  Crear examen lab
                 </Button>
-              )}
+              </div>
             </div>
-          </div>
+            {c.labExamId && (
+              <div className="px-3 pb-3 text-xs text-neutral-600">
+                Examen asociado: {c.labExamId}
+              </div>
+            )}
+          </>
         ))}
         {!filtered.length && (
           <div className="p-3 text-sm text-neutral-600">Sin casos aún.</div>
