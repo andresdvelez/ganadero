@@ -2120,8 +2120,47 @@ export default function AIAssistantPage() {
       const title = `Abrí el reporte de ${d.module} para el periodo ${d.from || "(desde)"} → ${d.to || "(hasta)"}.`;
       const msg: Message = { id: Date.now().toString(), role: "assistant", content: title, timestamp: new Date(), module: d.module };
       setMessages((prev) => [...prev, msg]);
-      setRunningTools((prev) => [...prev, { id: `seed-${Date.now()}`, label: `Generando reporte de ${d.module}…` }]);
-      // Optionally trigger intent-based loads already implemented (milk/breeding/health/inventory charts)
+      const toolId = `seed-${Date.now()}`;
+      setRunningTools((prev) => [...prev, { id: toolId, label: `Generando reporte de ${d.module}…` }]);
+      (async () => {
+        try {
+          if (d.module === "breeding") {
+            const k = await utils.breedingAdv.kpis.fetch({ from: d.from, to: d.to });
+            // KPIs summary
+            setMessages((prev) => [...prev, { id: (Date.now()+1).toString(), role: "assistant", content: `KPIs — Días abiertos: ${k.kpis?.avgDaysOpen ?? 0}, Tasa preñez: ${k.kpis?.pregnancyRate ?? 0}%, IEP: ${k.kpis?.avgCalvingInterval ?? 0}`, timestamp: new Date(), module: "breeding" }]);
+            // Trend line
+            setMessages((prev) => [...prev, { id: (Date.now()+2).toString(), role: "assistant", content: "Concepciones por mes.", timestamp: new Date(), module: "breeding", widget: { type: "chart", title: "Reproducción: concepciones/mes", chart: { kind: "line", data: (k.trend || []).map((t:any)=>({ x: t.period, y: t.value })) } }, dataCsv: k.trend } as any]);
+            // IEP by category
+            setMessages((prev) => [...prev, { id: (Date.now()+3).toString(), role: "assistant", content: "IEP por raza.", timestamp: new Date(), module: "breeding", widget: { type: "chart", title: "Reproducción: IEP por raza", chart: { kind: "bar", data: (k.iepByCategory || []).map((c:any)=>({ label: c.label, value: c.avgIEP })) } }, dataCsv: k.iepByCategory } as any]);
+          } else if (d.module === "milk") {
+            // Per-day series from recent list filtered by period
+            const list = await utils.milk.list.fetch({ limit: 300 });
+            const f = d.from ? new Date(d.from) : null; const t = d.to ? new Date(d.to) : null;
+            const rows = list.filter((r:any)=>{ const dt=new Date(r.recordedAt); return (f?dt>=f:true)&&(t?dt<=t:true); });
+            const map = new Map<string, number>();
+            rows.forEach((r:any)=>{ const dt=new Date(r.recordedAt); const key=`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`; map.set(key,(map.get(key)||0)+(r.liters||0)); });
+            const perDay = Array.from(map.entries()).sort().map(([x,y])=>({ x, y }));
+            setMessages((prev)=>[...prev,{ id:(Date.now()+1).toString(), role:"assistant", content:"Litros por día.", timestamp:new Date(), module:"milk", widget:{ type:"chart", title:"Leche por día", chart:{ kind:"line", data: perDay.map(p=>({ x:p.x, y:p.y })) } }, dataCsv: perDay } as any]);
+            const k = await utils.milk.kpis.fetch({ from: d.from, to: d.to, top: 10 });
+            setMessages((prev)=>[...prev,{ id:(Date.now()+2).toString(), role:"assistant", content:`CCS promedio del rebaño: ${Math.round(k.herdAvgCCS||0)}`, timestamp:new Date(), module:"milk" }]);
+            const topCsv = (k.topLiters||[]).map((t:any)=>({ animal: `${t.animal?.name||"(sin nombre)"} #${t.animal?.tagNumber||t.animalId}`, liters: t.liters }));
+            setMessages((prev)=>[...prev,{ id:(Date.now()+3).toString(), role:"assistant", content:"Top animales por litros.", timestamp:new Date(), module:"milk", widget:{ type:"chart", title:"Leche: top litros", chart:{ kind:"bar", data:(k.topLiters||[]).map((t:any)=>({ label: t.animal?.tagNumber||t.animalId, value: t.liters })) } }, dataCsv: topCsv } as any]);
+          } else if (d.module === "health") {
+            const h = await utils.health.kpis.fetch({ from: d.from, to: d.to });
+            const sumMap = new Map<string, number>();
+            (h.series||[]).forEach((row:any)=>{ sumMap.set(row.type, (sumMap.get(row.type)||0)+(row.cost||0)); });
+            const rows = Array.from(sumMap.entries()).map(([label,value])=>({ label, value }));
+            setMessages((prev)=>[...prev,{ id:(Date.now()+1).toString(), role:"assistant", content:"Costo de salud por tipo.", timestamp:new Date(), module:"health", widget:{ type:"chart", title:"Salud: costo por tipo", chart:{ kind:"bar", data: rows } }, dataCsv: h.series } as any]);
+          } else if (d.module === "inventory") {
+            const inv = await utils.inventory.kpis.fetch({ from: d.from, to: d.to, topLow: 10 });
+            setMessages((prev)=>[...prev,{ id:(Date.now()+1).toString(), role:"assistant", content:"Costo por categoría.", timestamp:new Date(), module:"inventory", widget:{ type:"chart", title:"Inventario: costo por categoría", chart:{ kind:"bar", data:(inv.costByCategory||[]).map((c:any)=>({ label: c.label, value: c.value })) } }, dataCsv: inv.costByCategory } as any]);
+            const lowArr = (inv.lowStock||[]).map((r:any)=>({ productId: r.product.id, name: r.product.name, code: r.product.code, current: r.current, min: r.min }));
+            setMessages((prev)=>[...prev,{ id:(Date.now()+2).toString(), role:"assistant", content: lowArr.length?"Productos con stock bajo:":"Sin productos con stock bajo.", timestamp:new Date(), module:"inventory", lowStock: lowArr }]);
+          }
+        } finally {
+          setRunningTools((prev)=>prev.filter((t)=>t.id!==toolId));
+        }
+      })();
     };
     window.addEventListener("ai-seed-report", onSeed as any);
     return () => { window.removeEventListener("ai-seed-report", onSeed as any); };
