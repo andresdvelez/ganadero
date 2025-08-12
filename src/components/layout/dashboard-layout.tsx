@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { getSyncManager } from "@/services/sync/sync-manager";
 import { db } from "@/lib/dexie";
 import { Button } from "@/components/ui/button";
+import { addToast } from "@/components/ui/toast";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -28,6 +29,7 @@ export function DashboardLayout({
   }>({ online: true, syncing: false, pending: 0 });
   const [conflictsOpen, setConflictsOpen] = useState(false);
   const [conflicts, setConflicts] = useState<any[]>([]);
+  const [hasConflicts, setHasConflicts] = useState(false);
   useEffect(() => {
     const mgr = getSyncManager();
     const refresh = async () => {
@@ -36,16 +38,32 @@ export function DashboardLayout({
         .where("status")
         .anyOf(["pending", "failed"])
         .count();
+      const conflictsCount = await db.syncQueue
+        .where("status")
+        .equals("conflict")
+        .count();
+      setHasConflicts(conflictsCount > 0);
       setSyncStatus({ online: st.isOnline, syncing: st.isSyncing, pending });
     };
     const t = setInterval(refresh, 5000);
     window.addEventListener("online", refresh);
     window.addEventListener("offline", refresh);
+    const onSyncCompleted = async (e: any) => {
+      const { synced, failed, conflicts } = e.detail || {};
+      addToast({
+        variant: failed > 0 || conflicts > 0 ? "warning" : "success",
+        title: "Sincronización completada",
+        description: `Sincronizados: ${synced} · Fallidos: ${failed} · Conflictos: ${conflicts}`,
+      });
+      refresh();
+    };
+    window.addEventListener("sync:completed", onSyncCompleted as any);
     refresh();
     return () => {
       clearInterval(t);
       window.removeEventListener("online", refresh);
       window.removeEventListener("offline", refresh);
+      window.removeEventListener("sync:completed", onSyncCompleted as any);
     };
   }, []);
 
@@ -57,6 +75,14 @@ export function DashboardLayout({
           <div className="font-semibold">Ganado AI</div>
         </div>
         <nav className="flex items-center gap-3">
+          {hasConflicts && (
+            <div
+              className="text-xs px-2 py-1 rounded-full bg-red-50 text-red-700 border border-red-200"
+              title="Existen conflictos pendientes por resolver"
+            >
+              Conflictos
+            </div>
+          )}
           <div
             className="text-xs px-2 py-1 rounded-full border"
             title={

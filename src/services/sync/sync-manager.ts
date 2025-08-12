@@ -137,6 +137,13 @@ export class SyncManager {
         ok: true,
       });
       await setSyncState({ lastSyncedAt: new Date() });
+      try {
+        window.dispatchEvent(
+          new CustomEvent("sync:completed", {
+            detail: { synced, failed, conflicts, ok: true },
+          })
+        );
+      } catch {}
       return { success: true, synced, failed, conflicts };
     } finally {
       this.isSyncing = false;
