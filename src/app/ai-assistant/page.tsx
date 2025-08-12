@@ -1555,6 +1555,66 @@ export default function AIAssistantPage() {
         setIsLoading(false);
         return;
       }
+      // Mastitis quick period
+      const mastitisMatch = userMessage.content.match(/mastitis\s*(hoy|7d|30d|mes)/i);
+      if (mastitisMatch) {
+        const key = mastitisMatch[1].toLowerCase();
+        const now = new Date();
+        let from: Date | null = null;
+        let to: Date | null = null;
+        if (key === "hoy") { from = new Date(now.getFullYear(), now.getMonth(), now.getDate()); to = from; }
+        else if (key === "7d") { to = now; from = new Date(now.getTime()-7*86400000); }
+        else if (key === "30d") { to = now; from = new Date(now.getTime()-30*86400000); }
+        else if (key === "mes") { from = new Date(now.getFullYear(), now.getMonth(), 1); to = new Date(now.getFullYear(), now.getMonth()+1, 0); }
+        const qs = new URLSearchParams({ from: from? from.toISOString().slice(0,10): "", to: to? to.toISOString().slice(0,10): "" }).toString();
+        const href = `/health?${qs}`;
+        setMessages((prev)=> [...prev, { id: (Date.now()+1).toString(), role: "assistant", content: `Abrir Mastitis (${key}).`, timestamp: new Date(), action: "open-link", module: "health", data: { href } } as any]);
+        setIsLoading(false);
+        return;
+      }
+      // IA Assets quick: termo X
+      const termoMatch = userMessage.content.match(/(semen|embriones)\s+(del\s+)?termo\s+([\w\- ]+)/i);
+      if (termoMatch) {
+        const tankName = termoMatch[3].trim();
+        const href = `/ai-assets?tankName=${encodeURIComponent(tankName)}`;
+        setMessages((prev)=> [...prev, { id: (Date.now()+1).toString(), role: "assistant", content: `Abrir IA Assets: ${tankName}.`, timestamp: new Date(), action: "open-link", module: "ai-assets", data: { href } } as any]);
+        setIsLoading(false);
+        return;
+      }
+      // Pesajes animal periodo
+      const pesajeMatch = userMessage.content.match(/pesajes?\s+(de\s+)?animal\s*[:#]?\s*([A-Za-z0-9_-]+)\s*(hoy|7d|30d|mes)?/i);
+      if (pesajeMatch) {
+        const animalId = pesajeMatch[2];
+        const periodKey = (pesajeMatch[3]||"").toLowerCase();
+        const now = new Date();
+        let from: Date | null = null; let to: Date | null = null;
+        if (periodKey === "hoy") { from = new Date(now.getFullYear(), now.getMonth(), now.getDate()); to = from; }
+        else if (periodKey === "7d") { to = now; from = new Date(now.getTime()-7*86400000); }
+        else if (periodKey === "30d") { to = now; from = new Date(now.getTime()-30*86400000); }
+        else if (periodKey === "mes") { from = new Date(now.getFullYear(), now.getMonth(), 1); to = new Date(now.getFullYear(), now.getMonth()+1, 0); }
+        const qs = new URLSearchParams();
+        qs.set("animalId", animalId);
+        if (from) qs.set("from", from.toISOString().slice(0,10));
+        if (to) qs.set("to", to.toISOString().slice(0,10));
+        const href = `/weights?${qs.toString()}`;
+        setMessages((prev)=> [...prev, { id: (Date.now()+1).toString(), role: "assistant", content: `Abrir Pesajes animal ${animalId}${periodKey?` (${periodKey})`:""}.`, timestamp: new Date(), action: "open-link", module: "weights", data: { href } } as any]);
+        setIsLoading(false);
+        return;
+      }
+      // Reproducción IEP periodo
+      const iepMatch = userMessage.content.match(/iep\s+(hoy|7d|30d|mes)/i);
+      if (iepMatch) {
+        const key = iepMatch[1].toLowerCase();
+        const now = new Date(); let from: Date | null=null; let to: Date | null=null;
+        if (key === "hoy") { from = new Date(now.getFullYear(), now.getMonth(), now.getDate()); to = from; }
+        else if (key === "7d") { to = now; from = new Date(now.getTime()-7*86400000); }
+        else if (key === "30d") { to = now; from = new Date(now.getTime()-30*86400000); }
+        else if (key === "mes") { from = new Date(now.getFullYear(), now.getMonth(), 1); to = new Date(now.getFullYear(), now.getMonth()+1, 0); }
+        const href = `/analysis/reproduction`; // seed ya manda periodo si el usuario lo reabre con Abrir en chat desde panel
+        setMessages((prev)=> [...prev, { id: (Date.now()+1).toString(), role: "assistant", content: `Abrir análisis de Reproducción (${key}).`, timestamp: new Date(), action: "open-link", module: "breeding", data: { href } } as any]);
+        setIsLoading(false);
+        return;
+      }
 
       // Intent quick path
       const intent = await routeIntent.mutateAsync({
