@@ -57,12 +57,22 @@ export default function AlertsPage() {
   }, [list.data, active, q]);
 
   const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [statusFilter, setStatusFilter] = useState<
+    "open" | "acknowledged" | "resolved"
+  >("open");
   const toggleSelect = (id: string) =>
     setSelected((m) => ({ ...m, [id]: !m[id] }));
   const resolveSelected = async () => {
     const ids = Object.keys(selected).filter((k) => selected[k]);
     for (const id of ids) {
       await update.mutateAsync({ id, status: "resolved" });
+    }
+    setSelected({});
+  };
+  const acknowledgeSelected = async () => {
+    const ids = Object.keys(selected).filter((k) => selected[k]);
+    for (const id of ids) {
+      await update.mutateAsync({ id, status: "acknowledged" });
     }
     setSelected({});
   };
@@ -80,6 +90,22 @@ export default function AlertsPage() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
+            <select
+              aria-label="Estado"
+              className="border rounded-md px-2 py-1 text-sm"
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value as any);
+                list.refetch({
+                  type: "active",
+                  input: { status: e.target.value as any, limit: 200 } as any,
+                } as any);
+              }}
+            >
+              <option value="open">Abiertas</option>
+              <option value="acknowledged">Reconocidas</option>
+              <option value="resolved">Resueltas</option>
+            </select>
             <Button size="sm" variant="flat" onPress={() => evaluate.mutate()}>
               Evaluar reglas
             </Button>
@@ -96,12 +122,28 @@ export default function AlertsPage() {
                   triggeredAt: new Date(a.triggeredAt).toISOString(),
                   status: a.status,
                 }));
-                const headers = Object.keys(items[0] || { id: "", rule: "", module: "", entityType: "", entityId: "", triggeredAt: "", status: "" });
+                const headers = Object.keys(
+                  items[0] || {
+                    id: "",
+                    rule: "",
+                    module: "",
+                    entityType: "",
+                    entityId: "",
+                    triggeredAt: "",
+                    status: "",
+                  }
+                );
                 const csv = [
                   headers.join(","),
-                  ...items.map((r) => headers.map((h) => JSON.stringify((r as any)[h] ?? "")).join(",")),
+                  ...items.map((r) =>
+                    headers
+                      .map((h) => JSON.stringify((r as any)[h] ?? ""))
+                      .join(",")
+                  ),
                 ].join("\n");
-                const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+                const blob = new Blob([csv], {
+                  type: "text/csv;charset=utf-8",
+                });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement("a");
                 a.href = url;
@@ -113,6 +155,9 @@ export default function AlertsPage() {
               }}
             >
               CSV
+            </Button>
+            <Button size="sm" variant="flat" onPress={acknowledgeSelected}>
+              Reconocer seleccionadas
             </Button>
             <Button size="sm" variant="solid" onPress={resolveSelected}>
               Resolver seleccionadas
@@ -165,6 +210,27 @@ export default function AlertsPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
+                      <a
+                        href={(() => {
+                          const mod = a.rule?.module as string;
+                          if (mod === "breeding" && a.entityType === "animal")
+                            return `/breeding?animalId=${a.entityId}`;
+                          if (
+                            mod === "health" &&
+                            a.entityType === "healthRecord"
+                          )
+                            return `/health?id=${a.entityId}`;
+                          if (mod === "milk" && a.entityType === "animal")
+                            return `/milk?animalId=${a.entityId}`;
+                          if (mod === "inventory" && a.entityType === "product")
+                            return `/inventory?id=${a.entityId}`;
+                          return `/${mod}`;
+                        })()}
+                        className="text-xs underline"
+                        target="_self"
+                      >
+                        Abrir en módulo
+                      </a>
                       <Button
                         size="sm"
                         variant="flat"
@@ -199,14 +265,30 @@ export default function AlertsPage() {
             {rules.data?.length ? (
               <div className="divide-y text-sm">
                 {rules.data.map((r: any) => (
-                  <div key={r.id} className="py-2 flex items-center justify-between">
+                  <div
+                    key={r.id}
+                    className="py-2 flex items-center justify-between"
+                  >
                     <div>
                       <div className="font-medium">{r.name}</div>
-                      <div className="text-xs text-neutral-500">{r.module} · {r.condition}</div>
+                      <div className="text-xs text-neutral-500">
+                        {r.module} · {r.condition}
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs px-2 py-1 rounded-full border">{r.enabled ? "Activa" : "Pausada"}</span>
-                      <Button size="sm" variant="flat" onPress={() => updateRule.mutate({ id: r.id, data: { enabled: !r.enabled } })}>
+                      <span className="text-xs px-2 py-1 rounded-full border">
+                        {r.enabled ? "Activa" : "Pausada"}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="flat"
+                        onPress={() =>
+                          updateRule.mutate({
+                            id: r.id,
+                            data: { enabled: !r.enabled },
+                          })
+                        }
+                      >
                         {r.enabled ? "Pausar" : "Activar"}
                       </Button>
                     </div>
