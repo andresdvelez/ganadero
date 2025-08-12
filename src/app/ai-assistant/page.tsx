@@ -1575,6 +1575,11 @@ export default function AIAssistantPage() {
           const list = await utils.financeAp.listInvoices.fetch({ status, supplierId: supplier } as any);
           const count = (list || []).length;
           setMessages((prev)=>[...prev, { id: (Date.now()+0.5).toString(), role: "assistant", content: `Resumen rápido: ${count} factura(s).`, timestamp: new Date() } as any]);
+          if (count > 0) {
+            const top = (list || []).slice(0, 2);
+            const lines = top.map((inv:any)=> `- ${new Date(inv.date).toISOString().slice(0,10)} · ${inv.supplier?.name||"Proveedor"} · $${(inv.total||0).toLocaleString()} · ${inv.status}`);
+            setMessages((prev)=>[...prev, { id: (Date.now()+0.6).toString(), role: "assistant", content: `\n${lines.join("\n")}`, timestamp: new Date() } as any]);
+          }
         } catch {}
         setMessages((prev) => [
           ...prev,
@@ -1663,6 +1668,11 @@ export default function AIAssistantPage() {
           const cFrom = from; const cTo = to;
           const count = (list||[]).filter((r:any)=>{ const d = new Date(r.detectedAt); return (cFrom? d>=cFrom : true) && (cTo? d<=cTo : true); }).length;
           setMessages((prev)=>[...prev, { id: (Date.now()+0.5).toString(), role: "assistant", content: `Resumen rápido: ${count} caso(s).`, timestamp: new Date() } as any]);
+          if (count > 0) {
+            const rows = (list||[]).filter((r:any)=>{ const d = new Date(r.detectedAt); return (cFrom? d>=cFrom : true) && (cTo? d<=cTo : true); }).slice(0,2);
+            const lines = rows.map((r:any)=> `- ${new Date(r.detectedAt).toISOString().slice(0,10)} · ${(r.animal?.tagNumber||r.animalId)||"animal"} · ${r.status||""}`);
+            setMessages((prev)=>[...prev, { id: (Date.now()+0.6).toString(), role: "assistant", content: `\n${lines.join("\n")}`, timestamp: new Date() } as any]);
+          }
         } catch {}
         setMessages((prev) => [
           ...prev,
@@ -1746,6 +1756,11 @@ export default function AIAssistantPage() {
           const cFrom = from; const cTo = to;
           const count = (list||[]).filter((r:any)=> r.animalId===animalId).filter((r:any)=>{ const d=new Date(r.weighedAt); return (cFrom? d>=cFrom:true) && (cTo? d<=cTo:true);}).length;
           setMessages((prev)=>[...prev, { id: (Date.now()+0.5).toString(), role: "assistant", content: `Resumen rápido: ${count} pesaje(s).`, timestamp: new Date() } as any]);
+          if (count > 0) {
+            const rows = (list||[]).filter((r:any)=> r.animalId===animalId).filter((r:any)=>{ const d=new Date(r.weighedAt); return (cFrom? d>=cFrom:true) && (cTo? d<=cTo:true);}).slice(0,2);
+            const lines = rows.map((r:any)=> `- ${new Date(r.weighedAt).toISOString().slice(0,10)} · ${r.weightKg} kg`);
+            setMessages((prev)=>[...prev, { id: (Date.now()+0.6).toString(), role: "assistant", content: `\n${lines.join("\n")}`, timestamp: new Date() } as any]);
+          }
         } catch {}
         setMessages((prev) => [
           ...prev,
