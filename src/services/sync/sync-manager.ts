@@ -29,8 +29,14 @@ export class SyncManager {
   private startPeriodicSync() {
     this.syncInterval = setInterval(() => {
       if (navigator.onLine && !this.isSyncing) {
-        this.sync();
-        this.pullChanges();
+        // respect autoSyncEnabled if present
+        getSyncState().then((state) => {
+          const enabled = state.autoSyncEnabled !== false; // default true
+          if (enabled) {
+            this.sync();
+            this.pullChanges();
+          }
+        });
       }
     }, 30000);
   }
@@ -79,6 +85,7 @@ export class SyncManager {
     let synced = 0;
     let failed = 0;
     let conflicts = 0;
+    const start = new Date();
 
     try {
       const pendingItems = await db.syncQueue
@@ -121,6 +128,15 @@ export class SyncManager {
         .and((x) => x.createdAt < sevenDaysAgo)
         .delete();
 
+      await db.syncLogs.add({
+        startedAt: start,
+        endedAt: new Date(),
+        synced,
+        failed,
+        conflicts,
+        ok: true,
+      });
+      await setSyncState({ lastSyncedAt: new Date() });
       return { success: true, synced, failed, conflicts };
     } finally {
       this.isSyncing = false;

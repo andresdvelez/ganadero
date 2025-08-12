@@ -288,6 +288,17 @@ export interface SyncState {
   id?: number;
   lastPullCursor?: string;
   lastSyncedAt?: Date;
+  autoSyncEnabled?: boolean;
+}
+
+export interface SyncLog {
+  id?: number;
+  startedAt: Date;
+  endedAt?: Date;
+  synced: number;
+  failed: number;
+  conflicts: number;
+  ok: boolean;
 }
 
 export class GanadoDB extends Dexie {
@@ -310,6 +321,7 @@ export class GanadoDB extends Dexie {
   identities!: Table<OfflineIdentity>;
   deviceInfo!: Table<DeviceInfo>;
   syncState!: Table<SyncState>;
+  syncLogs!: Table<SyncLog>;
 
   constructor() {
     super("GanadoDB");
@@ -390,6 +402,13 @@ export class GanadoDB extends Dexie {
           "++id, uuid, userId, type, category, date, synced, createdAt",
         sensors: "++id, uuid, userId, status, type, synced, createdAt",
         locations: "++id, uuid, userId, name, type, synced, createdAt",
+      })
+      .upgrade(() => {});
+
+    // Version 9: sync logs
+    this.version(9)
+      .stores({
+        syncLogs: "++id, startedAt, endedAt",
       })
       .upgrade(() => {});
   }
