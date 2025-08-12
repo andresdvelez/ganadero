@@ -526,6 +526,53 @@ export const aiRouter = createTRPCRouter({
       return { ok: true, memoryId: memory.id };
     }),
 
+  // ---------- Conversations listing for multi-device ----------
+  listSessions: protectedProcedure
+    .input(
+      z.object({ limit: z.number().min(1).max(100).default(20) }).optional()
+    )
+    .query(async ({ input, ctx }) => {
+      const { userId } = ctx;
+      if (!userId) throw new Error("UNAUTHORIZED");
+      const rows = await prisma.aIConversation.findMany({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        take: (input?.limit ?? 20) * 10, // overfetch to dedupe
+        select: { sessionId: true, createdAt: true },
+      });
+      const seen = new Set<string>();
+      const sessions: Array<{ sessionId: string; updatedAt: Date }> = [];
+      for (const r of rows) {
+        if (!seen.has(r.sessionId)) {
+          seen.add(r.sessionId);
+          sessions.push({ sessionId: r.sessionId, updatedAt: r.createdAt });
+          if (sessions.length >= (input?.limit ?? 20)) break;
+        }
+      }
+      return sessions;
+    }),
+  listMessages: protectedProcedure
+    .input(
+      z.object({
+        sessionId: z.string(),
+        limit: z.number().min(1).max(500).default(200),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      const { userId } = ctx;
+      if (!userId) throw new Error("UNAUTHORIZED");
+      const msgs = await prisma.aIConversation.findMany({
+        where: { userId, sessionId: input.sessionId },
+        orderBy: { createdAt: "asc" },
+        take: input.limit,
+      });
+      return msgs.map((m) => ({
+        role: m.role,
+        content: m.content,
+        createdAt: m.createdAt,
+      }));
+    }),
+
   // ---------- Intent routing ----------
   routeIntent: protectedProcedure
     .input(z.object({ query: z.string() }))

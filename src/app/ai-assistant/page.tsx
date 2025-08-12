@@ -417,32 +417,23 @@ export default function AIAssistantPage() {
       <Card className="mt-2 p-3">
         <div className="flex items-center justify-between mb-2">
           <div className="text-sm font-medium">{title}</div>
-          <Button
-            size="sm"
-            variant="flat"
-            onPress={() => downloadSvg(ref.current, title)}
-          >
+          <Button size="sm" variant="flat" onPress={() => downloadSvg(ref.current, title)}>
             Descargar SVG
           </Button>
-          <Button
-            size="sm"
-            variant="flat"
-            onPress={() => downloadPngFromSvg(ref.current, title)}
-          >
+          <Button size="sm" variant="flat" onPress={() => downloadPngFromSvg(ref.current, title)}>
             Descargar PNG
           </Button>
-          {Array.isArray((message as any).dataCsv) &&
-            (message as any).dataCsv.length > 0 && (
-              <Button
-                size="sm"
-                variant="flat"
-                onPress={() =>
-                  downloadCsv((message as any).dataCsv, `${title}`)
-                }
-              >
-                Exportar CSV
-              </Button>
-            )}
+          {Array.isArray((message as any).dataCsv) && (message as any).dataCsv.length > 0 && (
+            <Button size="sm" variant="flat" onPress={() => downloadCsv((message as any).dataCsv, `${title}`)}>
+              Exportar CSV
+            </Button>
+          )}
+          <Button size="sm" variant="flat" onPress={async () => {
+            try {
+              await addToSyncQueue("create", "ai_memory", generateUUID(), { content: `saved_panel:${message.module || "analysis"}:${title}` , createdAt: new Date().toISOString() }, "dev-user");
+              setMessages((prev)=>[...prev,{ id:(Date.now()+6).toString(), role:"assistant", content:"Panel guardado para usar luego en /analysis.", timestamp:new Date() }]);
+            } catch {}
+          }}>Guardar como panel</Button>
         </div>
         {chart.kind === "pie" && (
           <svg ref={ref} width={w} height={h} role="img">
