@@ -195,4 +195,13 @@ export const inventoryRouter = createTRPCRouter({
         data: { ...input, userId: user.id },
       });
     }),
+
+  updateProductCost: protectedProcedure
+    .input(z.object({ productId: z.string(), cost: z.number().nonnegative() }))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.prisma.product.update({
+        where: { id: input.productId },
+        data: { cost: input.cost },
+      });
+    }),
 });

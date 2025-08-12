@@ -181,6 +181,7 @@ export default function AIAssistantPage() {
   const summarizeSession = trpc.ai.summarizeSession.useMutation();
   const recordChoice = trpc.ai.recordChoice.useMutation();
   const createApInvoice = trpc.financeAp.createInvoice.useMutation();
+  const updateProductCost = trpc.inventory.updateProductCost.useMutation();
 
   const MODEL_URL =
     process.env.NEXT_PUBLIC_MODEL_DOWNLOAD_URL ||
@@ -2335,13 +2336,18 @@ export default function AIAssistantPage() {
                                       },
                                     ],
                                   } as any);
+                                  // Update product standard cost if provided
+                                  if (unitCost && utils) {
+                                    try {
+                                      await updateProductCost.mutateAsync({ productId: postMovementCreate.context.productId, cost: unitCost } as any);
+                                    } catch {}
+                                  }
                                   setMessages((prev) => [
                                     ...prev,
                                     {
                                       id: (Date.now() + 4).toString(),
                                       role: "assistant",
-                                      content:
-                                        "Factura de compra (borrador) creada a partir del reorden.",
+                                      content: "Factura de compra (borrador) creada a partir del reorden.",
                                       timestamp: new Date(),
                                     },
                                   ]);

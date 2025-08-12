@@ -27,7 +27,12 @@ export function InventoryMovementNew({
   onClose,
   defaults,
 }: {
-  onCompleted?: () => void;
+  onCompleted?: (payload?: {
+    productId: string;
+    quantity: number;
+    unitCost?: number;
+    supplierId?: string;
+  }) => void;
   onClose?: () => void;
   defaults?: Partial<MovementFormData>;
 }) {
@@ -63,6 +68,8 @@ export function InventoryMovementNew({
       setValue("reason", defaults.reason);
     if (typeof defaults.occurredAt === "string")
       setValue("occurredAt", defaults.occurredAt);
+    if (typeof defaults.supplierId === "string")
+      setValue("supplierId", defaults.supplierId);
   }, [defaults, setValue]);
 
   const onSubmit = async (data: MovementFormData) => {
@@ -78,7 +85,12 @@ export function InventoryMovementNew({
         occurredAt: new Date(data.occurredAt),
       });
       addToast({ variant: "success", title: "Movimiento registrado" });
-      onCompleted?.();
+      onCompleted?.({
+        productId: data.productId,
+        quantity: data.quantity,
+        unitCost: data.unitCost,
+        supplierId: data.supplierId,
+      });
     } catch (error: any) {
       addToast({
         variant: "error",
