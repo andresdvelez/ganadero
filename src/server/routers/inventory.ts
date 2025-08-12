@@ -173,6 +173,49 @@ export const inventoryRouter = createTRPCRouter({
       });
     }),
 
+  getMovementAudit: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const m = await ctx.prisma.stockMovement.findFirst({
+        where: { id: input.id, user: { clerkId: ctx.userId } },
+      });
+      if (!m) throw new Error("Movimiento no encontrado");
+      // reversals: by convention, reason starts with "Reversión de <id>"
+      const reversals = await ctx.prisma.stockMovement.findMany({
+        where: {
+          user: { clerkId: ctx.userId },
+          reason: { contains: `Reversión de ${input.id}` },
+        },
+        orderBy: { occurredAt: "desc" },
+      });
+      return { movement: m, reversals };
+    }),
+
+  reverseMovement: protectedProcedure
+    .input(z.object({ id: z.string(), reason: z.string().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const orig = await ctx.prisma.stockMovement.findFirst({
+        where: { id: input.id, user: { clerkId: ctx.userId } },
+      });
+      if (!orig) throw new Error("Movimiento no encontrado");
+      // Create opposite quantity/type
+      const oppositeType =
+        orig.type === "in" ? "out" : orig.type === "out" ? "in" : "adjust";
+      const reversal = await ctx.prisma.stockMovement.create({
+        data: {
+          userId: orig.userId,
+          productId: orig.productId,
+          type: oppositeType,
+          quantity: orig.quantity,
+          unitCost: orig.unitCost,
+          reason: input.reason || `Reversión de ${orig.id}`,
+          relatedEntity: orig.relatedEntity || undefined,
+          occurredAt: new Date(),
+        } as any,
+      });
+      return reversal;
+    }),
+
   createMovement: protectedProcedure
     .input(
       z.object({
