@@ -1571,6 +1571,11 @@ export default function AIAssistantPage() {
             timestamp: new Date(),
           } as any,
         ]);
+        try {
+          const list = await utils.financeAp.listInvoices.fetch({ status, supplierId: supplier } as any);
+          const count = (list || []).length;
+          setMessages((prev)=>[...prev, { id: (Date.now()+0.5).toString(), role: "assistant", content: `Resumen rápido: ${count} factura(s).`, timestamp: new Date() } as any]);
+        } catch {}
         setMessages((prev) => [
           ...prev,
           {
@@ -1653,17 +1658,15 @@ export default function AIAssistantPage() {
             timestamp: new Date(),
           } as any,
         ]);
+        try {
+          const list = await utils.mastitis.list.fetch({ limit: 300 } as any);
+          const cFrom = from; const cTo = to;
+          const count = (list||[]).filter((r:any)=>{ const d = new Date(r.detectedAt); return (cFrom? d>=cFrom : true) && (cTo? d<=cTo : true); }).length;
+          setMessages((prev)=>[...prev, { id: (Date.now()+0.5).toString(), role: "assistant", content: `Resumen rápido: ${count} caso(s).`, timestamp: new Date() } as any]);
+        } catch {}
         setMessages((prev) => [
           ...prev,
-          {
-            id: (Date.now() + 1).toString(),
-            role: "assistant",
-            content: `Abrir Mastitis (${key}).`,
-            timestamp: new Date(),
-            action: "open-link",
-            module: "health",
-            data: { href },
-          } as any,
+          { id: (Date.now() + 1).toString(), role: "assistant", content: `Abrir Mastitis (${key}).`, timestamp: new Date(), action: "open-link", module: "health", data: { href } } as any,
         ]);
         setIsLoading(false);
         return;
@@ -1738,19 +1741,17 @@ export default function AIAssistantPage() {
             timestamp: new Date(),
           } as any,
         ]);
+        try {
+          const list = await utils.weights.listWeights.fetch({ limit: 300 } as any);
+          const cFrom = from; const cTo = to;
+          const count = (list||[]).filter((r:any)=> r.animalId===animalId).filter((r:any)=>{ const d=new Date(r.weighedAt); return (cFrom? d>=cFrom:true) && (cTo? d<=cTo:true);}).length;
+          setMessages((prev)=>[...prev, { id: (Date.now()+0.5).toString(), role: "assistant", content: `Resumen rápido: ${count} pesaje(s).`, timestamp: new Date() } as any]);
+        } catch {}
         setMessages((prev) => [
           ...prev,
-          {
-            id: (Date.now() + 1).toString(),
-            role: "assistant",
-            content: `Abrir Pesajes animal ${animalId}${
+          { id: (Date.now() + 1).toString(), role: "assistant", content: `Abrir Pesajes animal ${animalId}${
               periodKey ? ` (${periodKey})` : ""
-            }.`,
-            timestamp: new Date(),
-            action: "open-link",
-            module: "weights",
-            data: { href },
-          } as any,
+            }.`, timestamp: new Date(), action: "open-link", module: "weights", data: { href } } as any,
         ]);
         setIsLoading(false);
         return;
