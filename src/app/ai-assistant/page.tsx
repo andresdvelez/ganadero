@@ -778,7 +778,7 @@ export default function AIAssistantPage() {
 
       // Heuristic: if user asked explicitly for a chart of tasks, generate pie by status
       const chartRequested =
-        /\b(graf(ica|ico|íca|íco)|chart|gráfica|gráfico)\b/i.test(
+        /(graf(ica|ico|íca|íco)|chart|gráfica|gráfico)/i.test(
           userMessage.content
         );
       if (chartRequested && /tareas?/i.test(userMessage.content)) {
@@ -1533,6 +1533,27 @@ export default function AIAssistantPage() {
             setRunningTools((prev) => prev.filter((t) => t.id !== toolId));
           }
         })();
+      }
+
+      // Quick actions: AP filters and Inventory Kardex by product
+      const apMatch = userMessage.content.match(/\b(cxp|cuentas\s*por\s*pagar|facturas)\b.*(abiertas|pagadas|anuladas)?/i);
+      if (apMatch) {
+        const statusMap: Record<string, string> = { abiertas: "open", pagadas: "paid", anuladas: "cancelled" };
+        const status = apMatch[2] ? statusMap[apMatch[2].toLowerCase()] : undefined;
+        const supplier = (userMessage.content.match(/proveedor\s*[:#]?\s*([A-Za-z0-9_-]+)/i)?.[1]) || undefined;
+        const href = `/finance${status || supplier ? `?${new URLSearchParams({ status: status||"", supplierId: supplier||"" }).toString()}` : ""}`;
+        setMessages((prev)=> [...prev, { id: (Date.now()+1).toString(), role: "assistant", content: "Abrir CxP con filtros.", timestamp: new Date(), action: "open-link", module: "finance", data: { href } } as any]);
+        setIsLoading(false);
+        return;
+      }
+      const kardexMatch = userMessage.content.match(/kardex\s+del\s+producto\s+([A-Za-z0-9_-]+)/i);
+      if (kardexMatch) {
+        const code = kardexMatch[1];
+        // Pass code as search q for inventory; user can click "Ver Kardex" en tarjeta
+        const href = `/inventory?q=${encodeURIComponent(code)}`;
+        setMessages((prev)=> [...prev, { id: (Date.now()+1).toString(), role: "assistant", content: `Abrir Inventario filtrado por ${code} (luego click en Ver Kardex).`, timestamp: new Date(), action: "open-link", module: "inventory", data: { href } } as any]);
+        setIsLoading(false);
+        return;
       }
 
       // Intent quick path

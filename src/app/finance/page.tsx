@@ -7,12 +7,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { db } from "@/lib/dexie";
 import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc/client";
+import { useSearchParams } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 export default function FinancePage() {
+  const params = useSearchParams();
+  const statusParam = params.get("status") || undefined;
+  const supplierIdParam = params.get("supplierId") || undefined;
   const [items, setItems] = useState<any[]>([]);
-  const invoices = trpc.financeAp.listInvoices.useQuery({ limit: 50 });
+  const invoices = trpc.financeAp.listInvoices.useQuery({
+    limit: 50,
+    status: statusParam,
+    supplierId: supplierIdParam,
+  } as any);
   const updateStatus = trpc.financeAp.updateInvoiceStatus.useMutation({
     onSuccess: () => invoices.refetch(),
   });
