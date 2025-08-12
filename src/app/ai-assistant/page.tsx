@@ -503,6 +503,15 @@ export default function AIAssistantPage() {
           >
             Guardar como panel
           </Button>
+          {(message as any).data?.href && (
+            <Button
+              size="sm"
+              variant="flat"
+              onPress={() => router.push(String((message as any).data.href))}
+            >
+              Abrir en módulo
+            </Button>
+          )}
         </div>
         {chart.kind === "pie" && (
           <svg ref={ref} width={w} height={h} role="img">
@@ -2682,7 +2691,10 @@ export default function AIAssistantPage() {
               const dt = new Date(c.detectedAt);
               const first = new Date(dt.getFullYear(), 0, 1);
               const week = Math.ceil(
-                ((dt.getTime() - first.getTime()) / 86400000 + first.getDay() + 1) / 7
+                ((dt.getTime() - first.getTime()) / 86400000 +
+                  first.getDay() +
+                  1) /
+                  7
               );
               const key = `${dt.getFullYear()}-W${week}`;
               weekly.set(key, (weekly.get(key) || 0) + 1);
@@ -2698,14 +2710,26 @@ export default function AIAssistantPage() {
                 content: "Mastitis: casos por semana.",
                 timestamp: new Date(),
                 module: "mastitis",
-                widget: { type: "chart", title: "Mastitis: casos por semana", chart: { kind: "line", data: weeklyData } },
+                widget: {
+                  type: "chart",
+                  title: "Mastitis: casos por semana",
+                  chart: { kind: "line", data: weeklyData },
+                },
                 dataCsv: weeklyData,
               } as any,
             ]);
-            const counts: Record<string, number> = { LF: 0, LR: 0, RF: 0, RR: 0, Otros: 0 };
+            const counts: Record<string, number> = {
+              LF: 0,
+              LR: 0,
+              RF: 0,
+              RR: 0,
+              Otros: 0,
+            };
             rows.forEach((c: any) => {
               const q = String(c.quarter || "").toUpperCase();
-              if (q === "LF" || q === "LR" || q === "RF" || q === "RR") counts[q] = (counts[q] || 0) + 1; else counts.Otros = (counts.Otros || 0) + 1;
+              if (q === "LF" || q === "LR" || q === "RF" || q === "RR")
+                counts[q] = (counts[q] || 0) + 1;
+              else counts.Otros = (counts.Otros || 0) + 1;
             });
             const quadData = [
               { label: "LF", value: counts.LF || 0 },
@@ -2722,16 +2746,32 @@ export default function AIAssistantPage() {
                 content: "Mastitis: distribución por cuadrante.",
                 timestamp: new Date(),
                 module: "mastitis",
-                widget: { type: "chart", title: "Mastitis: por cuadrante", chart: { kind: "bar", data: quadData } },
+                widget: {
+                  type: "chart",
+                  title: "Mastitis: por cuadrante",
+                  chart: { kind: "bar", data: quadData },
+                },
                 dataCsv: quadData,
               } as any,
             ]);
           } else if (d.module === "ai-assets") {
-            const semen = await utils.aiAssets.listSemenBatches.fetch({ limit: 500 } as any);
-            const embryos = await utils.aiAssets.listEmbryoBatches.fetch({ limit: 500 } as any);
+            const semen = await utils.aiAssets.listSemenBatches.fetch({
+              limit: 500,
+            } as any);
+            const embryos = await utils.aiAssets.listEmbryoBatches.fetch({
+              limit: 500,
+            } as any);
             const filterName = (d as any).tankName as string | null;
-            const semenRows = (semen || []).filter((b: any) => !filterName || (b.tank?.name || "").toLowerCase() === filterName.toLowerCase());
-            const embryoRows = (embryos || []).filter((b: any) => !filterName || (b.tank?.name || "").toLowerCase() === filterName.toLowerCase());
+            const semenRows = (semen || []).filter(
+              (b: any) =>
+                !filterName ||
+                (b.tank?.name || "").toLowerCase() === filterName.toLowerCase()
+            );
+            const embryoRows = (embryos || []).filter(
+              (b: any) =>
+                !filterName ||
+                (b.tank?.name || "").toLowerCase() === filterName.toLowerCase()
+            );
             const semenMap = new Map<string, number>();
             semenRows.forEach((b: any) => {
               const key = b.tank?.name || "Sin termo";
@@ -2742,17 +2782,27 @@ export default function AIAssistantPage() {
               const key = b.tank?.name || "Sin termo";
               embMap.set(key, (embMap.get(key) || 0) + (b.strawCount || 0));
             });
-            const semenData = Array.from(semenMap.entries()).map(([label, value]) => ({ label, value }));
-            const embData = Array.from(embMap.entries()).map(([label, value]) => ({ label, value }));
+            const semenData = Array.from(semenMap.entries()).map(
+              ([label, value]) => ({ label, value })
+            );
+            const embData = Array.from(embMap.entries()).map(
+              ([label, value]) => ({ label, value })
+            );
             setMessages((prev) => [
               ...prev,
               {
                 id: (Date.now() + 1).toString(),
                 role: "assistant",
-                content: filterName ? `Semen por termo: ${filterName}` : "Semen por termo.",
+                content: filterName
+                  ? `Semen por termo: ${filterName}`
+                  : "Semen por termo.",
                 timestamp: new Date(),
                 module: "ai-assets",
-                widget: { type: "chart", title: "Semen por termo", chart: { kind: "bar", data: semenData } },
+                widget: {
+                  type: "chart",
+                  title: "Semen por termo",
+                  chart: { kind: "bar", data: semenData },
+                },
                 dataCsv: semenData,
               } as any,
             ]);
@@ -2761,17 +2811,35 @@ export default function AIAssistantPage() {
               {
                 id: (Date.now() + 2).toString(),
                 role: "assistant",
-                content: filterName ? `Embriones por termo: ${filterName}` : "Embriones por termo.",
+                content: filterName
+                  ? `Embriones por termo: ${filterName}`
+                  : "Embriones por termo.",
                 timestamp: new Date(),
                 module: "ai-assets",
-                widget: { type: "chart", title: "Embriones por termo", chart: { kind: "bar", data: embData } },
+                widget: {
+                  type: "chart",
+                  title: "Embriones por termo",
+                  chart: { kind: "bar", data: embData },
+                },
                 dataCsv: embData,
               } as any,
             ]);
             // Breakdown CSV por lote
             const breakdown = [
-              ...semenRows.map((b: any) => ({ tipo: "semen", codigo: b.code, termo: b.tank?.name || "Sin termo", canister: b.canister || "", pajuelas: b.strawCount || 0 })),
-              ...embryoRows.map((b: any) => ({ tipo: "embrion", codigo: b.code, termo: b.tank?.name || "Sin termo", canister: b.canister || "", pajuelas: b.strawCount || 0 })),
+              ...semenRows.map((b: any) => ({
+                tipo: "semen",
+                codigo: b.code,
+                termo: b.tank?.name || "Sin termo",
+                canister: b.canister || "",
+                pajuelas: b.strawCount || 0,
+              })),
+              ...embryoRows.map((b: any) => ({
+                tipo: "embrion",
+                codigo: b.code,
+                termo: b.tank?.name || "Sin termo",
+                canister: b.canister || "",
+                pajuelas: b.strawCount || 0,
+              })),
             ];
             setMessages((prev) => [
               ...prev,
@@ -3168,14 +3236,23 @@ export default function AIAssistantPage() {
                                 : "bg-white border border-neutral-200 shadow-sm text-neutral-800"
                             )}
                           >
-                                                        <p className="whitespace-pre-wrap leading-relaxed">
-                               {message.content}
-                             </p>
-                             {message.action === "open-link" && message.data?.href && (
-                               <div className="mt-2">
-                                 <Button size="sm" variant="flat" onPress={()=> router.push(String(message.data.href))}>Abrir</Button>
-                               </div>
-                             )}
+                            <p className="whitespace-pre-wrap leading-relaxed">
+                              {message.content}
+                            </p>
+                            {message.action === "open-link" &&
+                              message.data?.href && (
+                                <div className="mt-2">
+                                  <Button
+                                    size="sm"
+                                    variant="flat"
+                                    onPress={() =>
+                                      router.push(String(message.data.href))
+                                    }
+                                  >
+                                    Abrir
+                                  </Button>
+                                </div>
+                              )}
                             {Array.isArray(message.lowStock) &&
                               message.lowStock.length > 0 && (
                                 <div className="mt-2 space-y-2">
