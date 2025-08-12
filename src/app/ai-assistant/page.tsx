@@ -1499,6 +1499,13 @@ export default function AIAssistantPage() {
                   id: (Date.now() + 4).toString(),
                   role: "assistant",
                   content: `Abrir IA Assets con termo: ${topTank}`,
+                  action: "open-link",
+                  module: "ai-assets",
+                  data: {
+                    href: `/ai-assets?tankName=${encodeURIComponent(
+                      topTank || ""
+                    )}`,
+                  },
                   timestamp: new Date(),
                 } as any,
               ]);
@@ -3046,9 +3053,14 @@ export default function AIAssistantPage() {
                                 : "bg-white border border-neutral-200 shadow-sm text-neutral-800"
                             )}
                           >
-                            <p className="whitespace-pre-wrap leading-relaxed">
-                              {message.content}
-                            </p>
+                                                        <p className="whitespace-pre-wrap leading-relaxed">
+                               {message.content}
+                             </p>
+                             {message.action === "open-link" && message.data?.href && (
+                               <div className="mt-2">
+                                 <Button size="sm" variant="flat" onPress={()=> router.push(String(message.data.href))}>Abrir</Button>
+                               </div>
+                             )}
                             {Array.isArray(message.lowStock) &&
                               message.lowStock.length > 0 && (
                                 <div className="mt-2 space-y-2">
