@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc/client";
 import { useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +77,7 @@ function dlPng(node: SVGSVGElement | null, name: string) {
 
 export default function AnalysisHealthPage() {
   const [period, setPeriod] = useState<{ from?: string; to?: string }>({});
+  const router = useRouter();
   const k = trpc.health.kpis.useQuery({ from: period.from, to: period.to });
   const list = trpc.health.list.useQuery({ limit: 200 });
   const barRef = useRef<SVGSVGElement | null>(null);
@@ -122,6 +124,89 @@ export default function AnalysisHealthPage() {
             />
             <Button size="sm" variant="flat" onPress={() => k.refetch()}>
               Actualizar
+            </Button>
+            <div className="hidden md:flex items-center gap-1">
+              <Button
+                size="sm"
+                variant="flat"
+                onPress={() => {
+                  const now = new Date();
+                  const d = new Date(
+                    now.getFullYear(),
+                    now.getMonth(),
+                    now.getDate()
+                  );
+                  setPeriod({
+                    from: d.toISOString().slice(0, 10),
+                    to: d.toISOString().slice(0, 10),
+                  });
+                }}
+              >
+                Hoy
+              </Button>
+              <Button
+                size="sm"
+                variant="flat"
+                onPress={() => {
+                  const now = new Date();
+                  const from = new Date(now.getTime() - 7 * 86400000);
+                  setPeriod({
+                    from: from.toISOString().slice(0, 10),
+                    to: new Date().toISOString().slice(0, 10),
+                  });
+                }}
+              >
+                7 días
+              </Button>
+              <Button
+                size="sm"
+                variant="flat"
+                onPress={() => {
+                  const now = new Date();
+                  const from = new Date(now.getTime() - 30 * 86400000);
+                  setPeriod({
+                    from: from.toISOString().slice(0, 10),
+                    to: new Date().toISOString().slice(0, 10),
+                  });
+                }}
+              >
+                30 días
+              </Button>
+              <Button
+                size="sm"
+                variant="flat"
+                onPress={() => {
+                  const now = new Date();
+                  const from = new Date(now.getFullYear(), now.getMonth(), 1);
+                  const to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                  setPeriod({
+                    from: from.toISOString().slice(0, 10),
+                    to: to.toISOString().slice(0, 10),
+                  });
+                }}
+              >
+                Este mes
+              </Button>
+            </div>
+            <Button
+              size="sm"
+              variant="solid"
+              onPress={() => {
+                router.push("/ai-assistant");
+                setTimeout(() => {
+                  window.dispatchEvent(
+                    new CustomEvent("ai-seed-report", {
+                      detail: {
+                        module: "health",
+                        from: period.from || null,
+                        to: period.to || null,
+                      },
+                    })
+                  );
+                }, 350);
+              }}
+            >
+              Abrir en chat
             </Button>
           </div>
         </div>
