@@ -6,18 +6,25 @@ import { db } from "@/lib/dexie";
 import { useSearchParams } from "next/navigation";
 import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
 
 export default function InventoryClient() {
   const [products, setProducts] = useState<any[]>([]);
   const [q, setQ] = useState("");
   const [activeProductId, setActiveProductId] = useState<string | null>(null);
   const params = useSearchParams();
+  const router = useRouter();
   const movements = trpc.inventory.listMovements.useQuery({ limit: 20 });
   const history = trpc.inventory.listMovements.useQuery(
     { productId: activeProductId || undefined, limit: 200 },
     { enabled: !!activeProductId }
   );
   const reverse = trpc.inventory.reverseMovement.useMutation();
+  const [auditId, setAuditId] = useState<string | null>(null);
+  const audit = trpc.inventory.getMovementAudit.useQuery(
+    { id: auditId || "" },
+    { enabled: !!auditId }
+  );
   const downloadProductsCsv = () => {
     const header = ["code", "name", "unit", "min", "current"].join(",");
     const body = filtered
@@ -111,6 +118,8 @@ export default function InventoryClient() {
   useEffect(() => {
     const qp = params.get("q");
     if (qp != null) setQ(qp);
+    const pid = params.get("id");
+    if (pid) setActiveProductId(pid);
   }, [params]);
 
   const filtered = useMemo(
@@ -202,6 +211,13 @@ export default function InventoryClient() {
                         Revertir
                       </Button>
                     )}
+                    <Button
+                      size="sm"
+                      variant="light"
+                      onPress={() => setAuditId(m.id)}
+                    >
+                      Auditoría
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -241,8 +257,17 @@ export default function InventoryClient() {
                         {new Date(m.occurredAt).toLocaleString()} · {m.type} ·{" "}
                         {m.quantity} · {m.unitCost ?? "-"}
                       </div>
-                      <div className="text-xs text-neutral-500">
-                        {m.reason || ""}
+                      <div className="flex items-center gap-2">
+                        <div className="text-xs text-neutral-500">
+                          {m.reason || ""}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="light"
+                          onPress={() => setAuditId(m.id)}
+                        >
+                          Auditoría
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -251,6 +276,57 @@ export default function InventoryClient() {
                 <div className="text-sm text-neutral-500 mt-2">
                   Sin movimientos.
                 </div>
+              )}
+            </div>
+          )}
+
+          {auditId && (
+            <div className="mt-6 border rounded-md p-3 bg-white">
+              <div className="flex items-center justify-between">
+                <div className="font-semibold text-sm">
+                  Auditoría de movimiento
+                </div>
+                <Button size="sm" onPress={() => setAuditId(null)}>
+                  Cerrar
+                </Button>
+              </div>
+              {audit.data ? (
+                <div className="mt-2 text-sm">
+                  <div className="mb-2">
+                    Original:{" "}
+                    {new Date(audit.data.movement.occurredAt).toLocaleString()}{" "}
+                    · {audit.data.movement.type} ·{" "}
+                    {audit.data.movement.quantity} ·{" "}
+                    {audit.data.movement.unitCost ?? "-"}
+                  </div>
+                  <div className="text-xs text-neutral-500 mb-1">
+                    Reversiones vinculadas:
+                  </div>
+                  {audit.data.reversals.length ? (
+                    <div className="divide-y">
+                      {audit.data.reversals.map((r: any) => (
+                        <div
+                          key={r.id}
+                          className="py-1 flex items-center justify-between"
+                        >
+                          <div>
+                            {new Date(r.occurredAt).toLocaleString()} · {r.type}{" "}
+                            · {r.quantity}
+                          </div>
+                          <div className="text-xs text-neutral-500">
+                            {r.reason || ""}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-neutral-500">
+                      Sin reversiones.
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-sm text-neutral-500 mt-2">Cargando…</div>
               )}
             </div>
           )}
