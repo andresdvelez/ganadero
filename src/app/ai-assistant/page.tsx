@@ -493,6 +493,27 @@ export default function AIAssistantPage() {
     );
   };
 
+  // Simple date range inference from natural text (es)
+  const inferDateRange = (text: string): { from?: Date; to?: Date } => {
+    const now = new Date();
+    const lower = text.toLowerCase();
+    if (/hoy\b/.test(lower)) {
+      const from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      return { from, to: now };
+    }
+    if (/este mes|mes actual/.test(lower)) {
+      const from = new Date(now.getFullYear(), now.getMonth(), 1);
+      return { from, to: now };
+    }
+    const m = lower.match(/últimos?\s+(\d+)\s+d[ií]as/);
+    if (m) {
+      const n = Math.max(1, parseInt(m[1] || "7", 10));
+      const from = new Date(now.getTime() - n * 24 * 60 * 60 * 1000);
+      return { from, to: now };
+    }
+    return {};
+  };
+
   const handleSend = async (overrideText?: string) => {
     if (isPaused) {
       addToast({
@@ -511,7 +532,7 @@ export default function AIAssistantPage() {
       content: textToSend,
       timestamp: new Date(),
     };
-    setMessages((prev) => [...prev, userMessage]);
+    setMessages((prev) => [userMessage]);
     setInput(overrideText ? "" : "");
     setIsLoading(true);
     setCheckpoints((prev) => [
@@ -639,6 +660,269 @@ export default function AIAssistantPage() {
                 id: (Date.now() + 2).toString(),
                 role: "assistant",
                 content: "No pude construir la gráfica ahora mismo.",
+                timestamp: new Date(),
+              },
+            ]);
+          } finally {
+            setRunningTools((prev) => prev.filter((t) => t.id !== toolId));
+          }
+        })();
+      }
+
+      // Heuristic charts for other modules
+      if (chartRequested && /salud/i.test(userMessage.content)) {
+        const toolId = `tool-${Date.now()}`;
+        const range = inferDateRange(userMessage.content);
+        setRunningTools((prev) => [
+          ...prev,
+          { id: toolId, label: "Generando gráfica de salud…" },
+        ]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: "Preparando una gráfica de eventos de salud por tipo…",
+            timestamp: new Date(),
+          },
+        ]);
+        (async () => {
+          try {
+            const list = await utils.health.list.fetch({ limit: 100 });
+            const filtered = list.filter((r: any) =>
+              range.from ? new Date(r.performedAt) >= range.from : true
+            );
+            const counts: Record<string, number> = {};
+            filtered.forEach((r: any) => {
+              const key = (r.type || "Otro").toString();
+              counts[key] = (counts[key] || 0) + 1;
+            });
+            const chartMsg: Message = {
+              id: (Date.now() + 2).toString(),
+              role: "assistant",
+              content: "Distribución de eventos de salud por tipo.",
+              timestamp: new Date(),
+              widget: {
+                type: "chart",
+                title: "Salud por tipo",
+                chart: {
+                  kind: "bar",
+                  data: Object.entries(counts).map(([label, value]) => ({
+                    label,
+                    value,
+                  })),
+                },
+              },
+            };
+            setMessages((prev) => [...prev, chartMsg]);
+          } catch {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "No pude construir la gráfica de salud.",
+                timestamp: new Date(),
+              },
+            ]);
+          } finally {
+            setRunningTools((prev) => prev.filter((t) => t.id !== toolId));
+          }
+        })();
+      }
+
+      if (chartRequested && /leche|producci[oó]n/i.test(userMessage.content)) {
+        const toolId = `tool-${Date.now()}`;
+        const range = inferDateRange(userMessage.content);
+        setRunningTools((prev) => [
+          ...prev,
+          { id: toolId, label: "Generando gráfica de leche…" },
+        ]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: "Preparando una gráfica de litros por día…",
+            timestamp: new Date(),
+          },
+        ]);
+        (async () => {
+          try {
+            const list = await utils.milk.list.fetch({ limit: 100 });
+            const filtered = list.filter((r: any) => {
+              const d = new Date(r.recordedAt);
+              return (
+                (range.from ? d >= range.from : true) &&
+                (range.to ? d <= range.to : true)
+              );
+            });
+            const map = new Map<string, number>();
+            filtered.forEach((r: any) => {
+              const d = new Date(r.recordedAt);
+              const key = `${d.getFullYear()}-${(d.getMonth() + 1)
+                .toString()
+                .padStart(2, "0")}-${d.getDate().toString().padStart(2, "0")}`;
+              map.set(key, (map.get(key) || 0) + (r.liters || 0));
+            });
+            const data = Array.from(map.entries())
+              .sort(([a], [b]) => (a < b ? -1 : 1))
+              .map(([x, y]) => ({ x, y }));
+            const chartMsg: Message = {
+              id: (Date.now() + 2).toString(),
+              role: "assistant",
+              content: "Serie de producción de leche por día.",
+              timestamp: new Date(),
+              widget: {
+                type: "chart",
+                title: "Leche por día",
+                chart: { kind: "line", data },
+              },
+            };
+            setMessages((prev) => [...prev, chartMsg]);
+          } catch {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "No pude construir la gráfica de leche.",
+                timestamp: new Date(),
+              },
+            ]);
+          } finally {
+            setRunningTools((prev) => prev.filter((t) => t.id !== toolId));
+          }
+        })();
+      }
+
+      if (chartRequested && /inventario/i.test(userMessage.content)) {
+        const toolId = `tool-${Date.now()}`;
+        const range = inferDateRange(userMessage.content);
+        setRunningTools((prev) => [
+          ...prev,
+          { id: toolId, label: "Generando gráfica de inventario…" },
+        ]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: "Preparando movimientos de stock por tipo…",
+            timestamp: new Date(),
+          },
+        ]);
+        (async () => {
+          try {
+            const moves = await utils.inventory.listMovements.fetch({
+              limit: 100,
+            });
+            const filtered = moves.filter((r: any) => {
+              const d = new Date(r.occurredAt);
+              return (
+                (range.from ? d >= range.from : true) &&
+                (range.to ? d <= range.to : true)
+              );
+            });
+            const counts: Record<string, number> = { in: 0, out: 0, adjust: 0 };
+            filtered.forEach(
+              (m: any) => (counts[m.type] = (counts[m.type] || 0) + 1)
+            );
+            const chartMsg: Message = {
+              id: (Date.now() + 2).toString(),
+              role: "assistant",
+              content: "Movimientos de stock por tipo.",
+              timestamp: new Date(),
+              widget: {
+                type: "chart",
+                title: "Inventario: movimientos",
+                chart: {
+                  kind: "bar",
+                  data: [
+                    { label: "Entradas", value: counts.in || 0 },
+                    { label: "Salidas", value: counts.out || 0 },
+                    { label: "Ajustes", value: counts.adjust || 0 },
+                  ],
+                },
+              },
+            };
+            setMessages((prev) => [...prev, chartMsg]);
+          } catch {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "No pude construir la gráfica de inventario.",
+                timestamp: new Date(),
+              },
+            ]);
+          } finally {
+            setRunningTools((prev) => prev.filter((t) => t.id !== toolId));
+          }
+        })();
+      }
+
+      if (
+        chartRequested &&
+        /finanzas?|ingresos|egresos/i.test(userMessage.content)
+      ) {
+        const toolId = `tool-${Date.now()}`;
+        const range = inferDateRange(userMessage.content);
+        setRunningTools((prev) => [
+          ...prev,
+          { id: toolId, label: "Generando gráfica de finanzas…" },
+        ]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: "Preparando resumen de ingresos vs egresos…",
+            timestamp: new Date(),
+          },
+        ]);
+        (async () => {
+          try {
+            const txs = await utils.finance.getAll.fetch();
+            const filtered = txs.filter((t: any) => {
+              const d = new Date(t.date);
+              return (
+                (range.from ? d >= range.from : true) &&
+                (range.to ? d <= range.to : true)
+              );
+            });
+            const sumIn = filtered
+              .filter((t: any) => t.type === "income")
+              .reduce((s: number, t: any) => s + (t.amount || 0), 0);
+            const sumOut = filtered
+              .filter((t: any) => t.type === "expense")
+              .reduce((s: number, t: any) => s + (t.amount || 0), 0);
+            const chartMsg: Message = {
+              id: (Date.now() + 2).toString(),
+              role: "assistant",
+              content: "Totales de ingresos vs egresos en el periodo.",
+              timestamp: new Date(),
+              widget: {
+                type: "chart",
+                title: "Finanzas: Ingresos vs Egresos",
+                chart: {
+                  kind: "pie",
+                  data: [
+                    { label: "Ingresos", value: sumIn },
+                    { label: "Egresos", value: sumOut },
+                  ],
+                },
+              },
+            };
+            setMessages((prev) => [...prev, chartMsg]);
+          } catch {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "No pude construir la gráfica de finanzas.",
                 timestamp: new Date(),
               },
             ]);
@@ -861,6 +1145,259 @@ export default function AIAssistantPage() {
           setIsLoading(false);
           return;
         }
+      }
+      if (intent?.module === "health" && intent?.action === "list") {
+        const toolId = `tool-${Date.now()}`;
+        setRunningTools((prev) => [
+          ...prev,
+          { id: toolId, label: "Consultando salud…" },
+        ]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: "Voy a listar los últimos eventos de salud…",
+            timestamp: new Date(),
+            module: "health",
+            action: "list",
+          },
+        ]);
+        (async () => {
+          try {
+            const list = await utils.health.list.fetch({ limit: 50 });
+            const items = list
+              .map(
+                (r: any) =>
+                  `- ${r.type || "Evento"} (${new Date(
+                    r.performedAt
+                  ).toLocaleDateString()})`
+              )
+              .join("\n");
+            const content =
+              items.length > 0
+                ? `Eventos de salud recientes:\n${items}`
+                : "No encontré eventos de salud.";
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content,
+                timestamp: new Date(),
+                module: "health",
+                action: "list",
+              },
+            ]);
+          } catch {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "No pude consultar salud ahora mismo.",
+                timestamp: new Date(),
+                module: "health",
+                action: "list",
+              },
+            ]);
+          } finally {
+            setRunningTools((prev) => prev.filter((t) => t.id !== toolId));
+          }
+        })();
+        setIsLoading(false);
+        return;
+      }
+      if (intent?.module === "milk" && intent?.action === "list") {
+        const toolId = `tool-${Date.now()}`;
+        setRunningTools((prev) => [
+          ...prev,
+          { id: toolId, label: "Consultando leche…" },
+        ]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: "Voy a listar los últimos registros de leche…",
+            timestamp: new Date(),
+            module: "milk",
+            action: "list",
+          },
+        ]);
+        (async () => {
+          try {
+            const list = await utils.milk.list.fetch({ limit: 50 });
+            const items = list
+              .map(
+                (r: any) =>
+                  `- ${r.session}: ${r.liters} L (${new Date(
+                    r.recordedAt
+                  ).toLocaleDateString()})`
+              )
+              .join("\n");
+            const content =
+              items.length > 0
+                ? `Registros de leche recientes:\n${items}`
+                : "No encontré registros de leche.";
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content,
+                timestamp: new Date(),
+                module: "milk",
+                action: "list",
+              },
+            ]);
+          } catch {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "No pude consultar leche ahora mismo.",
+                timestamp: new Date(),
+                module: "milk",
+                action: "list",
+              },
+            ]);
+          } finally {
+            setRunningTools((prev) => prev.filter((t) => t.id !== toolId));
+          }
+        })();
+        setIsLoading(false);
+        return;
+      }
+      if (intent?.module === "inventory" && intent?.action === "list") {
+        const toolId = `tool-${Date.now()}`;
+        setRunningTools((prev) => [
+          ...prev,
+          { id: toolId, label: "Consultando inventario…" },
+        ]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: "Voy a listar los productos más recientes…",
+            timestamp: new Date(),
+            module: "inventory",
+            action: "list",
+          },
+        ]);
+        (async () => {
+          try {
+            const list = await utils.inventory.listProducts.fetch({
+              limit: 50,
+            });
+            const items = list
+              .map(
+                (p: any) =>
+                  `- ${p.name}${p.code ? ` [${p.code}]` : ""}${
+                    p.minStock ? ` (mín ${p.minStock})` : ""
+                  }`
+              )
+              .join("\n");
+            const content =
+              items.length > 0
+                ? `Productos recientes:\n${items}`
+                : "No encontré productos de inventario.";
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content,
+                timestamp: new Date(),
+                module: "inventory",
+                action: "list",
+              },
+            ]);
+          } catch {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "No pude consultar inventario ahora mismo.",
+                timestamp: new Date(),
+                module: "inventory",
+                action: "list",
+              },
+            ]);
+          } finally {
+            setRunningTools((prev) => prev.filter((t) => t.id !== toolId));
+          }
+        })();
+        setIsLoading(false);
+        return;
+      }
+      if (intent?.module === "finance" && intent?.action === "list") {
+        const toolId = `tool-${Date.now()}`;
+        setRunningTools((prev) => [
+          ...prev,
+          { id: toolId, label: "Consultando finanzas…" },
+        ]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: "Voy a listar los últimos movimientos de finanzas…",
+            timestamp: new Date(),
+            module: "finance",
+            action: "list",
+          },
+        ]);
+        (async () => {
+          try {
+            const list = await utils.finance.getAll.fetch();
+            const items = list
+              .slice(0, 50)
+              .map(
+                (t: any) =>
+                  `- ${t.type === "income" ? "+" : "-"}$${(
+                    t.amount || 0
+                  ).toLocaleString()}${
+                    t.category ? ` (${t.category})` : ""
+                  } ${new Date(t.date).toLocaleDateString()}`
+              )
+              .join("\n");
+            const content =
+              items.length > 0
+                ? `Movimientos recientes:\n${items}`
+                : "No encontré movimientos de finanzas.";
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content,
+                timestamp: new Date(),
+                module: "finance",
+                action: "list",
+              },
+            ]);
+          } catch {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "No pude consultar finanzas ahora mismo.",
+                timestamp: new Date(),
+                module: "finance",
+                action: "list",
+              },
+            ]);
+          } finally {
+            setRunningTools((prev) => prev.filter((t) => t.id !== toolId));
+          }
+        })();
+        setIsLoading(false);
+        return;
       }
 
       // Build richer context from server
