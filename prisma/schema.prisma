@@ -49,6 +49,25 @@ model User {
   financeTransactions FinanceTransaction[]
   sensors           Sensor[]
   locations         Location[]
+  // Phase 1 back-relations
+  breedingSyncBatches BreedingSyncBatch[]
+  palpationRecords     PalpationRecord[]
+  abortionRecords      AbortionRecord[]
+  mastitisCases        MastitisCase[]
+  weightRecords        WeightRecord[]
+  carcassData          CarcassData[]
+  suppliers            Supplier[]
+  purchaseInvoices     PurchaseInvoice[]
+  invoicePayments      InvoicePayment[]
+  alertRules           AlertRule[]
+  alertInstances       AlertInstance[]
+  pastureEvents        PastureEvent[]
+  pastureMeasurements  PastureMeasurement[]
+  aiTanks              AITank[]
+  semenBatches         SemenBatch[]
+  semenMovements       SemenMovement[]
+  embryoBatches        EmbryoBatch[]
+  embryoMovements      EmbryoMovement[]
   
   @@index([clerkId])
   @@index([email])
@@ -135,6 +154,16 @@ model Animal {
   sireRecords       BreedingRecord[]  @relation("SireBreedingRecords")
   milkRecords       MilkRecord[]
   labExams          LabExam[]
+  // Phase 1 back-relations
+  breedingSyncEntries BreedingSyncAnimal[]
+  palpationRecords     PalpationRecord[]
+  abortionRecords      AbortionRecord[]
+  mastitisCases        MastitisCase[]
+  weightRecords        WeightRecord[]
+  carcassData          CarcassData[]
+  embryoDonations      EmbryoBatch[]       @relation("EmbryoDonor")
+  embryoSireEmbryos    EmbryoBatch[]       @relation("EmbryoSire")
+  semenSireBatches     SemenBatch[]        @relation("SemenSire")
   
   @@index([userId])
   @@index([tagNumber])
@@ -257,6 +286,8 @@ model Product {
 
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   movements    StockMovement[]
+  // Phase 1 back-relations
+  purchaseItems PurchaseInvoiceItem[]
 
   @@index([userId])
   @@index([code])
@@ -322,6 +353,9 @@ model Pasture {
   updatedAt      DateTime @updatedAt
 
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Phase 1 back-relations
+  events         PastureEvent[]
+  measurements   PastureMeasurement[]
 
   @@index([userId])
 }
@@ -533,4 +567,389 @@ model DeletionLog {
   @@index([userId])
   @@index([entityType, entityId])
   @@index([deletedAt])
+}
+
+// Phase 1 — Reproduction: synchronization batches, palpations, abortions
+model BreedingSyncBatch {
+  id          String   @id @default(cuid())
+  userId      String
+  protocol    String?
+  startDate   DateTime
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  animals     BreedingSyncAnimal[]
+
+  @@index([userId])
+  @@index([startDate])
+}
+
+model BreedingSyncAnimal {
+  id        String   @id @default(cuid())
+  batchId   String
+  animalId  String
+  status    String?  // scheduled | applied | inseminated | failed
+  date      DateTime?
+  notes     String?
+
+  batch     BreedingSyncBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  animal    Animal            @relation(fields: [animalId], references: [id], onDelete: Cascade)
+
+  @@unique([batchId, animalId])
+  @@index([animalId])
+}
+
+model PalpationRecord {
+  id           String   @id @default(cuid())
+  userId       String
+  animalId     String
+  palpationDate DateTime
+  result       String   // pregnant | open | unknown
+  technician   String?
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  animal       Animal   @relation(fields: [animalId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([animalId])
+  @@index([palpationDate])
+}
+
+model AbortionRecord {
+  id        String   @id @default(cuid())
+  userId    String
+  animalId  String
+  date      DateTime
+  cause     String?
+  notes     String?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  animal    Animal   @relation(fields: [animalId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([animalId])
+  @@index([date])
+}
+
+// Phase 1 — Mastitis & CCS
+model MastitisCase {
+  id           String   @id @default(cuid())
+  userId       String
+  animalId     String
+  detectedAt   DateTime
+  quarter      String? // LF | LR | RF | RR
+  cmtScore     String? // CMT result if available
+  bacteria     String?
+  antibiogram  String? // normalized summary or LabExam linkage notes
+  labExamId    String?
+  treatment    String?
+  status       String   @default("open") // open | resolved
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  animal       Animal   @relation(fields: [animalId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([animalId])
+  @@index([detectedAt])
+  @@index([status])
+}
+
+// Phase 1 — Weights & Carcass
+model WeightRecord {
+  id         String   @id @default(cuid())
+  userId     String
+  animalId   String
+  weighedAt  DateTime
+  weightKg   Float
+  method     String? // electronic | manual | scale_id
+  source     String? // pasture | corral | sale | vet
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  animal     Animal   @relation(fields: [animalId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([animalId])
+  @@index([weighedAt])
+}
+
+model CarcassData {
+  id            String   @id @default(cuid())
+  userId        String
+  animalId      String
+  date          DateTime
+  hotCarcassKg  Float?
+  coldCarcassKg Float?
+  dressingPct   Float?
+  grade         String?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  animal        Animal   @relation(fields: [animalId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([animalId])
+  @@index([date])
+}
+
+// Phase 1 — Suppliers, AP & Purchase Invoices
+model Supplier {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  taxId     String?
+  phone     String?
+  email     String?
+  address   String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoices  PurchaseInvoice[]
+
+  @@index([userId])
+  @@index([name])
+}
+
+model PurchaseInvoice {
+  id           String   @id @default(cuid())
+  userId       String
+  supplierId   String
+  invoiceNumber String?
+  date         DateTime
+  subtotal     Float    @default(0)
+  tax          Float    @default(0)
+  total        Float    @default(0)
+  status       String   @default("open") // open | paid | cancelled
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  supplier     Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  items        PurchaseInvoiceItem[]
+  payments     InvoicePayment[]
+
+  @@index([userId])
+  @@index([supplierId])
+  @@index([date])
+  @@index([status])
+}
+
+model PurchaseInvoiceItem {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  productId   String?
+  description String?
+  quantity    Float
+  unit        String?
+  unitCost    Float
+  total       Float
+
+  invoice     PurchaseInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product     Product?        @relation(fields: [productId], references: [id])
+}
+
+model InvoicePayment {
+  id           String   @id @default(cuid())
+  userId       String
+  invoiceId    String
+  date         DateTime
+  amount       Float
+  method       String? // cash | transfer | credit
+  notes        String?
+
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoice      PurchaseInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([invoiceId])
+  @@index([date])
+}
+
+// Phase 1 — Alerts & Action Lists
+model AlertRule {
+  id           String   @id @default(cuid())
+  userId       String
+  name         String
+  module       String   // animals | health | breeding | milk | inventory | finance | pastures
+  condition    String   // JSON expression/config
+  enabled      Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  instances    AlertInstance[]
+
+  @@index([userId])
+  @@index([module])
+  @@index([enabled])
+}
+
+model AlertInstance {
+  id          String   @id @default(cuid())
+  userId      String
+  ruleId      String
+  entityType  String
+  entityId    String
+  triggeredAt DateTime @default(now())
+  status      String   @default("open") // open | acknowledged | resolved
+  payload     String?  // JSON snapshot
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rule        AlertRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([ruleId])
+  @@index([status])
+  @@index([triggeredAt])
+}
+
+// Phase 1 — PRV (Pasture Rotation & Forage)
+model PastureEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  pastureId String
+  type      String   // enter | leave | rest
+  date      DateTime
+  groupName String?
+  notes     String?
+
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pasture   Pasture @relation(fields: [pastureId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([pastureId])
+  @@index([date])
+}
+
+model PastureMeasurement {
+  id          String   @id @default(cuid())
+  userId      String
+  pastureId   String
+  date        DateTime
+  forageKgDMHa Float?
+  restDays    Int?
+  growthRate  Float? // kg DM/ha/day
+  notes       String?
+
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pasture     Pasture @relation(fields: [pastureId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([pastureId])
+  @@index([date])
+}
+
+// Phase 1 — IA Assets: Tanks, Semen & Embryos
+model AITank {
+  id             String   @id @default(cuid())
+  userId         String
+  name           String
+  serial         String?
+  location       String?
+  capacityLiters Float?
+  nitrogenLevel  Float? // %
+  lastRefillAt   DateTime?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  semenBatches   SemenBatch[]
+  embryoBatches  EmbryoBatch[]
+
+  @@index([userId])
+}
+
+model SemenBatch {
+  id         String   @id @default(cuid())
+  userId     String
+  code       String
+  sireId     String?
+  breed      String?
+  strawCount Int      @default(0)
+  tankId     String?
+  canister   String?
+  acquiredAt DateTime?
+  notes      String?
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tank       AITank?  @relation(fields: [tankId], references: [id])
+  sire       Animal?  @relation("SemenSire", fields: [sireId], references: [id])
+  movements  SemenMovement[]
+
+  @@index([userId])
+  @@index([code])
+}
+
+model SemenMovement {
+  id           String   @id @default(cuid())
+  userId       String
+  semenBatchId String
+  type         String   // in | out | adjust
+  quantity     Int
+  date         DateTime
+  reason       String?
+
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  semenBatch   SemenBatch @relation(fields: [semenBatchId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([semenBatchId])
+  @@index([date])
+}
+
+model EmbryoBatch {
+  id          String   @id @default(cuid())
+  userId      String
+  code        String
+  donorId     String?
+  sireId      String?
+  stage       String?
+  strawCount  Int      @default(0)
+  tankId      String?
+  canister    String?
+  frozenAt    DateTime?
+  notes       String?
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tank        AITank?  @relation(fields: [tankId], references: [id])
+  donor       Animal?  @relation("EmbryoDonor", fields: [donorId], references: [id])
+  sire        Animal?  @relation("EmbryoSire", fields: [sireId], references: [id])
+  movements   EmbryoMovement[]
+
+  @@index([userId])
+  @@index([code])
+}
+
+model EmbryoMovement {
+  id            String   @id @default(cuid())
+  userId        String
+  embryoBatchId String
+  type          String   // in | out | adjust
+  quantity      Int
+  date          DateTime
+  reason        String?
+
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  embryoBatch   EmbryoBatch @relation(fields: [embryoBatchId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([embryoBatchId])
+  @@index([date])
 }

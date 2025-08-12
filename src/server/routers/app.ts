@@ -12,6 +12,13 @@ import { financeRouter } from "./finance";
 import { tasksRouter } from "./tasks";
 import { sensorsRouter } from "./sensors";
 import { locationsRouter } from "./locations";
+import { breedingAdvRouter } from "./breeding";
+import { mastitisRouter } from "./mastitis";
+import { weightsRouter } from "./weights";
+import { financeApRouter } from "./finance-ap";
+import { alertsRouter } from "./alerts";
+import { pasturesAdvRouter } from "./pastures-adv";
+import { aiAssetsRouter } from "./ai-assets";
 
 export const appRouter = createTRPCRouter({
   animal: animalRouter,
@@ -27,6 +34,14 @@ export const appRouter = createTRPCRouter({
   tasks: tasksRouter,
   sensors: sensorsRouter,
   locations: locationsRouter,
+  // Phase 1 advanced routers
+  breedingAdv: breedingAdvRouter,
+  mastitis: mastitisRouter,
+  weights: weightsRouter,
+  financeAp: financeApRouter,
+  alerts: alertsRouter,
+  pasturesAdv: pasturesAdvRouter,
+  aiAssets: aiAssetsRouter,
 });
 
 export type AppRouter = typeof appRouter;

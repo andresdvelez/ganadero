@@ -22,6 +22,8 @@ import {
   Heart,
 } from "lucide-react";
 import { formatDate, formatCurrency } from "@/lib/utils";
+import { MastitisCases } from "@/components/embedded/mastitis-cases";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface HealthRecord {
   id?: number;
@@ -47,6 +49,7 @@ export default function HealthClient() {
   const [filterType, setFilterType] = useState("all");
   const [showUpcoming, setShowUpcoming] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [tab, setTab] = useState("all");
 
   useEffect(() => {
     loadHealthRecords();
@@ -181,242 +184,264 @@ export default function HealthClient() {
           </Link>
         </div>
 
-        {upcomingAlerts.length > 0 && (
-          <Card className="border-yellow-300 bg-yellow-50">
-            <CardHeader>
-              <CardTitle className="flex items-center text-yellow-800">
-                <AlertTriangle className="h-5 w-5 mr-2" />
-                {translations.health.upcomingVaccinations}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {upcomingAlerts.map((a) => (
-                  <div
-                    key={a.uuid}
-                    className="flex justify-between items-center p-2 bg-white rounded-lg"
-                  >
-                    <div className="flex items-center gap-3">
-                      {getTypeIcon(a.type)}
-                      <div>
-                        <p className="font-medium text-ranch-900">
-                          {a.animalName}
-                        </p>
-                        <p className="text-sm text-ranch-600">
-                          {a.description}
-                        </p>
-                      </div>
-                    </div>
-                    <p className="text-sm font-medium text-yellow-700">
-                      {a.nextDueDate && formatDate(a.nextDueDate)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-ranch-600">Vacunaciones</p>
-                  <p className="text-2xl font-bold text-ranch-900">
-                    {records.filter((r) => r.type === "vaccination").length}
-                  </p>
-                </div>
-                <Syringe className="h-8 w-8 text-sky-500" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-ranch-600">Tratamientos</p>
-                  <p className="text-2xl font-bold text-ranch-900">
-                    {records.filter((r) => r.type === "treatment").length}
-                  </p>
-                </div>
-                <Pill className="h-8 w-8 text-pasture-500" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-ranch-600">Desparasitaciones</p>
-                  <p className="text-2xl font-bold text-ranch-900">
-                    {records.filter((r) => r.type === "deworming").length}
-                  </p>
-                </div>
-                <Bug className="h-8 w-8 text-cattle-500" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-ranch-600">Costo Total</p>
-                  <p className="text-2xl font-bold text-ranch-900">
-                    {formatCurrency(
-                      records.reduce((s, r) => s + (r.cost || 0), 0)
-                    )}
-                  </p>
-                </div>
-                <DollarSign className="h-8 w-8 text-green-500" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-ranch-400" />
-                  <input
-                    type="text"
-                    placeholder="Buscar por animal, descripción o medicamento..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-ranch-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-ranch-500"
-                  />
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Filter className="h-5 w-5 text-ranch-600" />
-                <select
-                  value={filterType}
-                  onChange={(e) => setFilterType(e.target.value)}
-                  aria-label="Filtrar por tipo"
-                  className="px-4 py-2 border border-ranch-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-ranch-500"
-                >
-                  <option value="all">Todos</option>
-                  <option value="vaccination">
-                    {translations.health.vaccination}
-                  </option>
-                  <option value="treatment">
-                    {translations.health.treatment}
-                  </option>
-                  <option value="deworming">
-                    {translations.health.deworming}
-                  </option>
-                  <option value="checkup">{translations.health.checkup}</option>
-                </select>
-              </div>
-              <Button
-                variant={showUpcoming ? "solid" : "bordered"}
-                onClick={() => setShowUpcoming(!showUpcoming)}
-                className={
-                  showUpcoming ? "bg-yellow-500 hover:bg-yellow-600" : ""
-                }
-              >
-                <Clock className="h-5 w-5 mr-2" /> Próximos 30 días
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {isLoading ? (
-          <div className="text-center py-12">
-            <p className="text-ranch-600">{translations.common.loading}</p>
-          </div>
-        ) : filteredRecords.length === 0 ? (
-          <Card>
-            <CardContent className="text-center py-12">
-              <Stethoscope className="h-12 w-12 text-ranch-400 mx-auto mb-4" />
-              <p className="text-ranch-600">
-                {searchTerm || filterType !== "all" || showUpcoming
-                  ? "No se encontraron registros con los filtros aplicados"
-                  : translations.common.noData}
-              </p>
-              <Link href="/health/new">
-                <Button className="mt-4 bg-pasture-500 hover:bg-pasture-600 text-white">
-                  <Plus className="h-5 w-5 mr-2" />
-                  {translations.health.addRecord}
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            {filteredRecords.map((record) => (
-              <Card
-                key={record.uuid}
-                className="hover:shadow-md transition-shadow"
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-4">
+        {/* New tabs section including Mastitis */}
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList>
+            <TabsTrigger value="all">General</TabsTrigger>
+            <TabsTrigger value="mastitis">Mastitis</TabsTrigger>
+          </TabsList>
+          <TabsContent value="mastitis">
+            <MastitisCases />
+          </TabsContent>
+          <TabsContent value="all">
+            {upcomingAlerts.length > 0 && (
+              <Card className="border-yellow-300 bg-yellow-50">
+                <CardHeader>
+                  <CardTitle className="flex items-center text-yellow-800">
+                    <AlertTriangle className="h-5 w-5 mr-2" />
+                    {translations.health.upcomingVaccinations}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {upcomingAlerts.map((a) => (
                       <div
-                        className={`p-2 rounded-lg ${
-                          getTypeColor(record.type).split(" ")[0]
-                        }`}
+                        key={a.uuid}
+                        className="flex justify-between items-center p-2 bg-white rounded-lg"
                       >
-                        {getTypeIcon(record.type)}
-                      </div>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-ranch-900">
-                            {record.animalName}
-                          </h3>
-                          <span
-                            className={`px-2 py-1 rounded-full text-xs font-medium ${getTypeColor(
-                              record.type
-                            )}`}
-                          >
-                            {getTypeLabel(record.type)}
-                          </span>
+                        <div className="flex items-center gap-3">
+                          {getTypeIcon(a.type)}
+                          <div>
+                            <p className="font-medium text-ranch-900">
+                              {a.animalName}
+                            </p>
+                            <p className="text-sm text-ranch-600">
+                              {a.description}
+                            </p>
+                          </div>
                         </div>
-                        <p className="text-ranch-700">{record.description}</p>
-                        {record.medication && (
-                          <p className="text-sm text-ranch-600">
-                            <span className="font-medium">Medicamento:</span>{" "}
-                            {record.medication}
-                            {record.dosage && ` - ${record.dosage}`}
-                          </p>
-                        )}
-                        {record.veterinarian && (
-                          <p className="text-sm text-ranch-600">
-                            <span className="font-medium">Veterinario:</span>{" "}
-                            {record.veterinarian}
-                          </p>
-                        )}
-                        {record.notes && (
-                          <p className="text-sm text-ranch-600 italic">
-                            {record.notes}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-right space-y-1">
-                      <p className="text-sm text-ranch-600">
-                        <Calendar className="inline h-4 w-4 mr-1" />
-                        {formatDate(record.performedAt)}
-                      </p>
-                      {record.nextDueDate && (
                         <p className="text-sm font-medium text-yellow-700">
-                          Próxima: {formatDate(record.nextDueDate)}
+                          {a.nextDueDate && formatDate(a.nextDueDate)}
                         </p>
-                      )}
-                      {record.cost && (
-                        <p className="text-sm font-medium text-green-700">
-                          {formatCurrency(record.cost)}
-                        </p>
-                      )}
-                    </div>
+                      </div>
+                    ))}
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        )}
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-ranch-600">Vacunaciones</p>
+                      <p className="text-2xl font-bold text-ranch-900">
+                        {records.filter((r) => r.type === "vaccination").length}
+                      </p>
+                    </div>
+                    <Syringe className="h-8 w-8 text-sky-500" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-ranch-600">Tratamientos</p>
+                      <p className="text-2xl font-bold text-ranch-900">
+                        {records.filter((r) => r.type === "treatment").length}
+                      </p>
+                    </div>
+                    <Pill className="h-8 w-8 text-pasture-500" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-ranch-600">
+                        Desparasitaciones
+                      </p>
+                      <p className="text-2xl font-bold text-ranch-900">
+                        {records.filter((r) => r.type === "deworming").length}
+                      </p>
+                    </div>
+                    <Bug className="h-8 w-8 text-cattle-500" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-ranch-600">Costo Total</p>
+                      <p className="text-2xl font-bold text-ranch-900">
+                        {formatCurrency(
+                          records.reduce((s, r) => s + (r.cost || 0), 0)
+                        )}
+                      </p>
+                    </div>
+                    <DollarSign className="h-8 w-8 text-green-500" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="flex-1">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-ranch-400" />
+                      <input
+                        type="text"
+                        placeholder="Buscar por animal, descripción o medicamento..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-ranch-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-ranch-500"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Filter className="h-5 w-5 text-ranch-600" />
+                    <select
+                      value={filterType}
+                      onChange={(e) => setFilterType(e.target.value)}
+                      aria-label="Filtrar por tipo"
+                      className="px-4 py-2 border border-ranch-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-ranch-500"
+                    >
+                      <option value="all">Todos</option>
+                      <option value="vaccination">
+                        {translations.health.vaccination}
+                      </option>
+                      <option value="treatment">
+                        {translations.health.treatment}
+                      </option>
+                      <option value="deworming">
+                        {translations.health.deworming}
+                      </option>
+                      <option value="checkup">
+                        {translations.health.checkup}
+                      </option>
+                    </select>
+                  </div>
+                  <Button
+                    variant={showUpcoming ? "solid" : "bordered"}
+                    onClick={() => setShowUpcoming(!showUpcoming)}
+                    className={
+                      showUpcoming ? "bg-yellow-500 hover:bg-yellow-600" : ""
+                    }
+                  >
+                    <Clock className="h-5 w-5 mr-2" /> Próximos 30 días
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {isLoading ? (
+              <div className="text-center py-12">
+                <p className="text-ranch-600">{translations.common.loading}</p>
+              </div>
+            ) : filteredRecords.length === 0 ? (
+              <Card>
+                <CardContent className="text-center py-12">
+                  <Stethoscope className="h-12 w-12 text-ranch-400 mx-auto mb-4" />
+                  <p className="text-ranch-600">
+                    {searchTerm || filterType !== "all" || showUpcoming
+                      ? "No se encontraron registros con los filtros aplicados"
+                      : translations.common.noData}
+                  </p>
+                  <Link href="/health/new">
+                    <Button className="mt-4 bg-pasture-500 hover:bg-pasture-600 text-white">
+                      <Plus className="h-5 w-5 mr-2" />
+                      {translations.health.addRecord}
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {filteredRecords.map((record) => (
+                  <Card
+                    key={record.uuid}
+                    className="hover:shadow-md transition-shadow"
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start gap-4">
+                          <div
+                            className={`p-2 rounded-lg ${
+                              getTypeColor(record.type).split(" ")[0]
+                            }`}
+                          >
+                            {getTypeIcon(record.type)}
+                          </div>
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-semibold text-ranch-900">
+                                {record.animalName}
+                              </h3>
+                              <span
+                                className={`px-2 py-1 rounded-full text-xs font-medium ${getTypeColor(
+                                  record.type
+                                )}`}
+                              >
+                                {getTypeLabel(record.type)}
+                              </span>
+                            </div>
+                            <p className="text-ranch-700">
+                              {record.description}
+                            </p>
+                            {record.medication && (
+                              <p className="text-sm text-ranch-600">
+                                <span className="font-medium">
+                                  Medicamento:
+                                </span>{" "}
+                                {record.medication}
+                                {record.dosage && ` - ${record.dosage}`}
+                              </p>
+                            )}
+                            {record.veterinarian && (
+                              <p className="text-sm text-ranch-600">
+                                <span className="font-medium">
+                                  Veterinario:
+                                </span>{" "}
+                                {record.veterinarian}
+                              </p>
+                            )}
+                            {record.notes && (
+                              <p className="text-sm text-ranch-600 italic">
+                                {record.notes}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right space-y-1">
+                          <p className="text-sm text-ranch-600">
+                            <Calendar className="inline h-4 w-4 mr-1" />
+                            {formatDate(record.performedAt)}
+                          </p>
+                          {record.nextDueDate && (
+                            <p className="text-sm font-medium text-yellow-700">
+                              Próxima: {formatDate(record.nextDueDate)}
+                            </p>
+                          )}
+                          {record.cost && (
+                            <p className="text-sm font-medium text-green-700">
+                              {formatCurrency(record.cost)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </DashboardLayout>
   );
