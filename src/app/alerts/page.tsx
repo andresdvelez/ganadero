@@ -23,12 +23,16 @@ export default function AlertsPage() {
     status: "open",
     limit: 200,
   });
+  const rules = trpc.alerts.listRules.useQuery();
   const seed = trpc.alerts.seedDefaultRules.useMutation();
   const evaluate = trpc.alerts.evaluateAll.useMutation({
     onSuccess: () => list.refetch(),
   });
   const update = trpc.alerts.updateInstance.useMutation({
     onSuccess: () => list.refetch(),
+  });
+  const updateRule = trpc.alerts.updateRule.useMutation({
+    onSuccess: () => rules.refetch(),
   });
 
   useEffect(() => {
@@ -78,6 +82,37 @@ export default function AlertsPage() {
             />
             <Button size="sm" variant="flat" onPress={() => evaluate.mutate()}>
               Evaluar reglas
+            </Button>
+            <Button
+              size="sm"
+              variant="flat"
+              onPress={() => {
+                const items = (list.data || []).map((a: any) => ({
+                  id: a.id,
+                  rule: a.rule?.name,
+                  module: a.rule?.module,
+                  entityType: a.entityType,
+                  entityId: a.entityId,
+                  triggeredAt: new Date(a.triggeredAt).toISOString(),
+                  status: a.status,
+                }));
+                const headers = Object.keys(items[0] || { id: "", rule: "", module: "", entityType: "", entityId: "", triggeredAt: "", status: "" });
+                const csv = [
+                  headers.join(","),
+                  ...items.map((r) => headers.map((h) => JSON.stringify((r as any)[h] ?? "")).join(",")),
+                ].join("\n");
+                const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "alertas.csv";
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+              }}
+            >
+              CSV
             </Button>
             <Button size="sm" variant="solid" onPress={resolveSelected}>
               Resolver seleccionadas
@@ -152,6 +187,34 @@ export default function AlertsPage() {
                   </div>
                 ))}
               </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Reglas ({rules.data?.length || 0})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {rules.data?.length ? (
+              <div className="divide-y text-sm">
+                {rules.data.map((r: any) => (
+                  <div key={r.id} className="py-2 flex items-center justify-between">
+                    <div>
+                      <div className="font-medium">{r.name}</div>
+                      <div className="text-xs text-neutral-500">{r.module} · {r.condition}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs px-2 py-1 rounded-full border">{r.enabled ? "Activa" : "Pausada"}</span>
+                      <Button size="sm" variant="flat" onPress={() => updateRule.mutate({ id: r.id, data: { enabled: !r.enabled } })}>
+                        {r.enabled ? "Pausar" : "Activar"}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-sm text-neutral-500">Sin reglas</div>
             )}
           </CardContent>
         </Card>

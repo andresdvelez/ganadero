@@ -2141,6 +2141,95 @@ export default function AIAssistantPage() {
           }
         }
       }
+
+      if (chartRequested && /pesajes?|peso|canal/i.test(userMessage.content)) {
+        const toolId = `tool-${Date.now()}`;
+        const range =
+          period.from || period.to
+            ? {
+                from: period.from ? new Date(period.from) : undefined,
+                to: period.to ? new Date(period.to) : undefined,
+              }
+            : inferDateRange(userMessage.content);
+        setRunningTools((prev) => [
+          ...prev,
+          { id: toolId, label: "Generando resumen de pesajes…" },
+        ]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: "Preparando serie de pesajes por fecha…",
+            timestamp: new Date(),
+          },
+        ]);
+        (async () => {
+          try {
+            const list = await utils.weights.listWeights.fetch({ limit: 300 } as any);
+            const filtered = list.filter((r: any) => {
+              const d = new Date(r.weighedAt);
+              return (
+                (range.from ? d >= (range.from as Date) : true) &&
+                (range.to ? d <= (range.to as Date) : true)
+              );
+            });
+            const map = new Map<string, number>();
+            filtered.forEach((r: any) => {
+              const d = new Date(r.weighedAt);
+              const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+                d.getDate()
+              ).padStart(2, "0")}`;
+              map.set(key, (map.get(key) || 0) + 1);
+            });
+            const data = Array.from(map.entries())
+              .sort(([a], [b]) => (a < b ? -1 : 1))
+              .map(([x, y]) => ({ x, y }));
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "Conteo de pesajes por día.",
+                timestamp: new Date(),
+                module: "weights",
+                widget: { type: "chart", title: "Pesajes por día", chart: { kind: "line", data } },
+                dataCsv: data,
+              } as any,
+            ]);
+            // deep link to weights with optional animal and dates if present in text
+            const animalMatch = userMessage.content.match(/animal\s*[:#]?\s*([A-Za-z0-9_-]+)/i);
+            const params = new URLSearchParams();
+            if (animalMatch) params.set("animalId", animalMatch[1]);
+            if (range.from) params.set("from", (range.from as Date).toISOString().slice(0, 10));
+            if (range.to) params.set("to", (range.to as Date).toISOString().slice(0, 10));
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 3).toString(),
+                role: "assistant",
+                content: "Abrir módulo de Pesajes con filtros aplicados",
+                timestamp: new Date(),
+                action: "open-link",
+                module: "weights",
+                data: { href: `/weights${params.toString() ? `?${params.toString()}` : ""}` },
+              } as any,
+            ]);
+          } catch {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "No pude construir el resumen de pesajes.",
+                timestamp: new Date(),
+              },
+            ]);
+          } finally {
+            setRunningTools((prev) => prev.filter((t) => t.id !== toolId));
+          }
+        })();
+      }
     } catch (error) {
       console.error("Error procesando consulta:", error);
       setMessages((prev) => [
