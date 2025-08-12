@@ -60,8 +60,8 @@ export const sensorsRouter = createTRPCRouter({
       return ctx.prisma.sensor.update({
         where: { id: input.id },
         data: {
-          ...(input.data.name !== undefined ? { name: input.data.name } : {}),
-          ...(input.data.type !== undefined ? { type: input.data.type } : {}),
+          ...(input.data.name !== undefined && input.data.name !== null ? { name: input.data.name } : {}),
+                      ...(input.data.type !== undefined ? { type: input.data.type ?? null } : {}),
           ...(input.data.status !== undefined
             ? { status: input.data.status }
             : {}),
@@ -72,12 +72,8 @@ export const sensorsRouter = createTRPCRouter({
                   : null,
               }
             : {}),
-          ...(input.data.locationName !== undefined
-            ? { locationName: input.data.locationName }
-            : {}),
-          ...(input.data.notes !== undefined
-            ? { notes: input.data.notes }
-            : {}),
+                      ...(input.data.locationName !== undefined ? { locationName: input.data.locationName ?? null } : {}),
+                      ...(input.data.notes !== undefined ? { notes: input.data.notes ?? null } : {}),
         },
       });
     }),
