@@ -141,6 +141,9 @@ export default function AIAssistantPage() {
     Record<string, { content: string }>
   >({});
   const [isGeneratingPreviews, setIsGeneratingPreviews] = useState(false);
+  const [runningTools, setRunningTools] = useState<
+    Array<{ id: string; label: string }>
+  >([]);
 
   // New TRPC hooks for AI context/memories
   const recordMessage = trpc.ai.recordMessage.useMutation();
@@ -519,6 +522,72 @@ export default function AIAssistantPage() {
         };
         setMessages((prev) => [...prev, assistantMessage]);
         setDrawerTool({ type: "inventory.movement" });
+        return;
+      }
+      if (intent?.module === "breeding" && intent?.action === "list") {
+        // Example: query heats today in background and show a spinner tool
+        const toolId = `tool-${Date.now()}`;
+        setRunningTools((prev) => [
+          ...prev,
+          { id: toolId, label: "Consultando reproducción de hoy…" },
+        ]);
+        // Inform user immediately
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content:
+              "Voy a listar los eventos de celo registrados hoy en la finca para verificarlo…",
+            timestamp: new Date(),
+          },
+        ]);
+        // Background fetch
+        (async () => {
+          try {
+            const heats = await utils.breedingAdv.kpis
+              .fetch()
+              .catch(() => null);
+            const todayHeats = await utils.breedingAdv.listHeats
+              .fetch()
+              .catch(() => []);
+            const items = (todayHeats || [])
+              .map(
+                (h: any) =>
+                  `- ${h.animal?.name || "(sin nombre)"} #${
+                    h.animal?.tagNumber || h.animalId
+                  } a las ${new Date(h.eventDate).toLocaleTimeString()}`
+              )
+              .join("\n");
+            const content =
+              items && items.length > 0
+                ? `Eventos de celo hoy:\n${items}`
+                : "No encontré eventos de celo registrados hoy. ¿Deseas crear un evento de celo?";
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content,
+                timestamp: new Date(),
+              },
+            ]);
+          } catch {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content:
+                  "No pude consultar reproducción ahora mismo. Intenta nuevamente más tarde.",
+                timestamp: new Date(),
+              },
+            ]);
+          } finally {
+            setRunningTools((prev) => prev.filter((t) => t.id !== toolId));
+          }
+        })();
+        setIsLoading(false);
         return;
       }
 

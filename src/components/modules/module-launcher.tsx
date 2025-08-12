@@ -134,7 +134,7 @@ export function ModuleLauncher({
                 {items.map((m) => (
                   <Link
                     key={m.id}
-                    href={m.path || `/${m.id}`}
+                    href={(m.path || `/${m.id}`).replace(/^\/_\//, "/")}
                     onClick={onClose}
                     className={cn(
                       "rounded-2xl border border-neutral-200 bg-white hover:shadow-md transition-shadow p-4",
@@ -145,7 +145,7 @@ export function ModuleLauncher({
                       {m.name}
                     </div>
                     <div className="text-xs text-neutral-500">
-                      {m.path || `/${m.id}`}
+                      {(m.path || `/${m.id}`).replace(/^\/_\//, "/")}
                     </div>
                     {m.tags && (
                       <div className="flex items-center gap-1 flex-wrap mt-1">

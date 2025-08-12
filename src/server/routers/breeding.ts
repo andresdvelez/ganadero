@@ -548,4 +548,43 @@ export const breedingAdvRouter = createTRPCRouter({
         })),
       };
     }),
+
+  // List heats for a specific day (defaults to today)
+  listHeats: protectedProcedure
+    .input(z.object({ date: z.string().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const base = input?.date ? new Date(input.date) : new Date();
+      const from = new Date(
+        base.getFullYear(),
+        base.getMonth(),
+        base.getDate(),
+        0,
+        0,
+        0
+      );
+      const to = new Date(
+        base.getFullYear(),
+        base.getMonth(),
+        base.getDate(),
+        23,
+        59,
+        59
+      );
+      const rows = await ctx.prisma.breedingRecord.findMany({
+        where: {
+          userId: ctx.userId!,
+          eventType: "heat",
+          eventDate: { gte: from, lte: to },
+        },
+        orderBy: { eventDate: "desc" },
+        select: { id: true, eventDate: true, animalId: true },
+      });
+      const animalIds = Array.from(new Set(rows.map((r) => r.animalId)));
+      const animals = await ctx.prisma.animal.findMany({
+        where: { id: { in: animalIds } },
+        select: { id: true, tagNumber: true, name: true },
+      });
+      const map = new Map(animals.map((a) => [a.id, a] as const));
+      return rows.map((r) => ({ ...r, animal: map.get(r.animalId) }));
+    }),
 });
