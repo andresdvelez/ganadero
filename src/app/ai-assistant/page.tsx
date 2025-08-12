@@ -1604,6 +1604,33 @@ export default function AIAssistantPage() {
               } as any,
             ]);
           }
+          // If viewing paid, show top 2 payment lines
+          if ((status || "").toLowerCase() === "paid") {
+            const payments = (list || []).flatMap((inv: any) =>
+              (inv.payments || []).map((p: any) => ({ ...p, inv }))
+            );
+            payments.sort((a: any, b: any) =>
+              new Date(b.date).getTime() - new Date(a.date).getTime()
+            );
+            const payTop = payments.slice(0, 2);
+            if (payTop.length) {
+              const plines = payTop.map(
+                (p: any) =>
+                  `· Pago ${new Date(p.date).toISOString().slice(0, 10)} · $${
+                    (p.amount || 0).toLocaleString()
+                  } · #${(p.inv?.id || "").slice(0, 6)}`
+              );
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: (Date.now() + 0.7).toString(),
+                  role: "assistant",
+                  content: plines.join("\n"),
+                  timestamp: new Date(),
+                } as any,
+              ]);
+            }
+          }
         } catch {}
         setMessages((prev) => [
           ...prev,
@@ -1788,12 +1815,31 @@ export default function AIAssistantPage() {
         setMessages((prev) => [
           ...prev,
           {
-            id: Date.now().toString(),
+            id: (Date.now()).toString(),
             role: "assistant",
             content: `Voy a abrir IA Assets para el termo ${tankName}.`,
             timestamp: new Date(),
           } as any,
         ]);
+        try {
+          const semen = await utils.aiAssets.listSemenBatches.fetch({ limit: 200 } as any);
+          const emb = await utils.aiAssets.listEmbryoBatches.fetch({ limit: 200 } as any);
+          const filter = tankName.toLowerCase();
+          const rows = ([...(semen||[]), ...(emb||[])]).filter((b:any)=> (b.tank?.name||"").toLowerCase()===filter);
+          const sorted = rows.sort((a:any,b:any)=> (b.strawCount||0)-(a.strawCount||0)).slice(0,2);
+          if (sorted.length) {
+            const lines = sorted.map((b:any)=> `- ${b.code||"lote"} · ${b.strawCount||0} pajuelas · ${(b.tank?.name)||""}${b.canister?` (${b.canister})`:""}`);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now()+0.5).toString(),
+                role: "assistant",
+                content: `\n${lines.join("\n")}`,
+                timestamp: new Date(),
+              } as any,
+            ]);
+          }
+        } catch {}
         setMessages((prev) => [
           ...prev,
           {
