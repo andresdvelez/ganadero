@@ -1572,13 +1572,37 @@ export default function AIAssistantPage() {
           } as any,
         ]);
         try {
-          const list = await utils.financeAp.listInvoices.fetch({ status, supplierId: supplier } as any);
+          const list = await utils.financeAp.listInvoices.fetch({
+            status,
+            supplierId: supplier,
+          } as any);
           const count = (list || []).length;
-          setMessages((prev)=>[...prev, { id: (Date.now()+0.5).toString(), role: "assistant", content: `Resumen rápido: ${count} factura(s).`, timestamp: new Date() } as any]);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: (Date.now() + 0.5).toString(),
+              role: "assistant",
+              content: `Resumen rápido: ${count} factura(s).`,
+              timestamp: new Date(),
+            } as any,
+          ]);
           if (count > 0) {
             const top = (list || []).slice(0, 2);
-            const lines = top.map((inv:any)=> `- ${new Date(inv.date).toISOString().slice(0,10)} · ${inv.supplier?.name||"Proveedor"} · $${(inv.total||0).toLocaleString()} · ${inv.status}`);
-            setMessages((prev)=>[...prev, { id: (Date.now()+0.6).toString(), role: "assistant", content: `\n${lines.join("\n")}`, timestamp: new Date() } as any]);
+            const lines = top.map(
+              (inv: any) =>
+                `- ${new Date(inv.date).toISOString().slice(0, 10)} · ${
+                  inv.supplier?.name || "Proveedor"
+                } · $${(inv.total || 0).toLocaleString()} · ${inv.status}`
+            );
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 0.6).toString(),
+                role: "assistant",
+                content: `\n${lines.join("\n")}`,
+                timestamp: new Date(),
+              } as any,
+            ]);
           }
         } catch {}
         setMessages((prev) => [
@@ -1612,6 +1636,41 @@ export default function AIAssistantPage() {
             timestamp: new Date(),
           } as any,
         ]);
+        // Mini preview: últimos 2 movimientos del producto si se encuentra
+        try {
+          const prods = await utils.inventory.listProducts.fetch({
+            q: code,
+            limit: 5,
+          } as any);
+          const prod =
+            (prods || []).find(
+              (p: any) => (p.code || "").toLowerCase() === code.toLowerCase()
+            ) || (prods || [])[0];
+          if (prod) {
+            const moves = await utils.inventory.listMovements.fetch({
+              productId: prod.id,
+              limit: 10,
+            } as any);
+            const top = (moves || []).slice(0, 2);
+            if (top.length) {
+              const lines = top.map(
+                (m: any) =>
+                  `- ${new Date(m.occurredAt).toISOString().slice(0, 10)} · ${
+                    m.type
+                  } · ${m.quantity}${m.unitCost ? ` · $${m.unitCost}` : ""}`
+              );
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: (Date.now() + 0.5).toString(),
+                  role: "assistant",
+                  content: `\n${lines.join("\n")}`,
+                  timestamp: new Date(),
+                } as any,
+              ]);
+            }
+          }
+        } catch {}
         setMessages((prev) => [
           ...prev,
           {
@@ -1665,18 +1724,56 @@ export default function AIAssistantPage() {
         ]);
         try {
           const list = await utils.mastitis.list.fetch({ limit: 300 } as any);
-          const cFrom = from; const cTo = to;
-          const count = (list||[]).filter((r:any)=>{ const d = new Date(r.detectedAt); return (cFrom? d>=cFrom : true) && (cTo? d<=cTo : true); }).length;
-          setMessages((prev)=>[...prev, { id: (Date.now()+0.5).toString(), role: "assistant", content: `Resumen rápido: ${count} caso(s).`, timestamp: new Date() } as any]);
+          const cFrom = from;
+          const cTo = to;
+          const count = (list || []).filter((r: any) => {
+            const d = new Date(r.detectedAt);
+            return (cFrom ? d >= cFrom : true) && (cTo ? d <= cTo : true);
+          }).length;
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: (Date.now() + 0.5).toString(),
+              role: "assistant",
+              content: `Resumen rápido: ${count} caso(s).`,
+              timestamp: new Date(),
+            } as any,
+          ]);
           if (count > 0) {
-            const rows = (list||[]).filter((r:any)=>{ const d = new Date(r.detectedAt); return (cFrom? d>=cFrom : true) && (cTo? d<=cTo : true); }).slice(0,2);
-            const lines = rows.map((r:any)=> `- ${new Date(r.detectedAt).toISOString().slice(0,10)} · ${(r.animal?.tagNumber||r.animalId)||"animal"} · ${r.status||""}`);
-            setMessages((prev)=>[...prev, { id: (Date.now()+0.6).toString(), role: "assistant", content: `\n${lines.join("\n")}`, timestamp: new Date() } as any]);
+            const rows = (list || [])
+              .filter((r: any) => {
+                const d = new Date(r.detectedAt);
+                return (cFrom ? d >= cFrom : true) && (cTo ? d <= cTo : true);
+              })
+              .slice(0, 2);
+            const lines = rows.map(
+              (r: any) =>
+                `- ${new Date(r.detectedAt).toISOString().slice(0, 10)} · ${
+                  r.animal?.tagNumber || r.animalId || "animal"
+                } · ${r.status || ""}`
+            );
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 0.6).toString(),
+                role: "assistant",
+                content: `\n${lines.join("\n")}`,
+                timestamp: new Date(),
+              } as any,
+            ]);
           }
         } catch {}
         setMessages((prev) => [
           ...prev,
-          { id: (Date.now() + 1).toString(), role: "assistant", content: `Abrir Mastitis (${key}).`, timestamp: new Date(), action: "open-link", module: "health", data: { href } } as any,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: `Abrir Mastitis (${key}).`,
+            timestamp: new Date(),
+            action: "open-link",
+            module: "health",
+            data: { href },
+          } as any,
         ]);
         setIsLoading(false);
         return;
@@ -1752,21 +1849,64 @@ export default function AIAssistantPage() {
           } as any,
         ]);
         try {
-          const list = await utils.weights.listWeights.fetch({ limit: 300 } as any);
-          const cFrom = from; const cTo = to;
-          const count = (list||[]).filter((r:any)=> r.animalId===animalId).filter((r:any)=>{ const d=new Date(r.weighedAt); return (cFrom? d>=cFrom:true) && (cTo? d<=cTo:true);}).length;
-          setMessages((prev)=>[...prev, { id: (Date.now()+0.5).toString(), role: "assistant", content: `Resumen rápido: ${count} pesaje(s).`, timestamp: new Date() } as any]);
+          const list = await utils.weights.listWeights.fetch({
+            limit: 300,
+          } as any);
+          const cFrom = from;
+          const cTo = to;
+          const count = (list || [])
+            .filter((r: any) => r.animalId === animalId)
+            .filter((r: any) => {
+              const d = new Date(r.weighedAt);
+              return (cFrom ? d >= cFrom : true) && (cTo ? d <= cTo : true);
+            }).length;
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: (Date.now() + 0.5).toString(),
+              role: "assistant",
+              content: `Resumen rápido: ${count} pesaje(s).`,
+              timestamp: new Date(),
+            } as any,
+          ]);
           if (count > 0) {
-            const rows = (list||[]).filter((r:any)=> r.animalId===animalId).filter((r:any)=>{ const d=new Date(r.weighedAt); return (cFrom? d>=cFrom:true) && (cTo? d<=cTo:true);}).slice(0,2);
-            const lines = rows.map((r:any)=> `- ${new Date(r.weighedAt).toISOString().slice(0,10)} · ${r.weightKg} kg`);
-            setMessages((prev)=>[...prev, { id: (Date.now()+0.6).toString(), role: "assistant", content: `\n${lines.join("\n")}`, timestamp: new Date() } as any]);
+            const rows = (list || [])
+              .filter((r: any) => r.animalId === animalId)
+              .filter((r: any) => {
+                const d = new Date(r.weighedAt);
+                return (cFrom ? d >= cFrom : true) && (cTo ? d <= cTo : true);
+              })
+              .slice(0, 2);
+            const lines = rows.map(
+              (r: any) =>
+                `- ${new Date(r.weighedAt).toISOString().slice(0, 10)} · ${
+                  r.weightKg
+                } kg`
+            );
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 0.6).toString(),
+                role: "assistant",
+                content: `\n${lines.join("\n")}`,
+                timestamp: new Date(),
+              } as any,
+            ]);
           }
         } catch {}
         setMessages((prev) => [
           ...prev,
-          { id: (Date.now() + 1).toString(), role: "assistant", content: `Abrir Pesajes animal ${animalId}${
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: `Abrir Pesajes animal ${animalId}${
               periodKey ? ` (${periodKey})` : ""
-            }.`, timestamp: new Date(), action: "open-link", module: "weights", data: { href } } as any,
+            }.`,
+            timestamp: new Date(),
+            action: "open-link",
+            module: "weights",
+            data: { href },
+          } as any,
         ]);
         setIsLoading(false);
         return;
@@ -1801,6 +1941,26 @@ export default function AIAssistantPage() {
             timestamp: new Date(),
           } as any,
         ]);
+        // Mini preview: top 2 categorías por IEP
+        try {
+          const k = await utils.breedingAdv.kpis.fetch({
+            from: from ? from.toISOString().slice(0, 10) : undefined,
+            to: to ? to.toISOString().slice(0, 10) : undefined,
+          } as any);
+          const rows = (k.iepByCategory || []).slice(0, 2);
+          if (rows.length) {
+            const lines = rows.map((r: any) => `- ${r.label}: ${r.avgIEP}`);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 0.5).toString(),
+                role: "assistant",
+                content: `\n${lines.join("\n")}`,
+                timestamp: new Date(),
+              } as any,
+            ]);
+          }
+        } catch {}
         setMessages((prev) => [
           ...prev,
           {
