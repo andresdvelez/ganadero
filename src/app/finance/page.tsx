@@ -13,6 +13,12 @@ export const dynamic = "force-dynamic";
 export default function FinancePage() {
   const [items, setItems] = useState<any[]>([]);
   const invoices = trpc.financeAp.listInvoices.useQuery({ limit: 50 });
+  const updateStatus = trpc.financeAp.updateInvoiceStatus.useMutation({
+    onSuccess: () => invoices.refetch(),
+  });
+  const addNote = trpc.financeAp.createDebitCreditNote.useMutation({
+    onSuccess: () => invoices.refetch(),
+  });
 
   useEffect(() => {
     db.financeTransactions
@@ -73,22 +79,24 @@ export default function FinancePage() {
             {invoices.data?.length ? (
               <div className="space-y-3">
                 {invoices.data.map((inv) => (
-                  <div key={inv.id} className="border rounded-md p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm">
-                        #{inv.id.slice(0, 6)} ·{" "}
-                        {inv.supplier?.name || "Proveedor"} ·{" "}
-                        {new Date(inv.date).toLocaleDateString()}
-                      </div>
-                      <div className="text-sm font-semibold">
-                        ${inv.total.toLocaleString("es-CO")}
-                      </div>
-                    </div>
-                    <div className="mt-2 text-xs text-neutral-600">
-                      Adjuntos: (se agregan desde el chat y se listarán aquí
-                      cuando se sincronicen)
-                    </div>
-                  </div>
+                  <InvoiceRow
+                    key={inv.id}
+                    inv={inv}
+                    onChangeStatus={async (status) => {
+                      await updateStatus.mutateAsync({
+                        invoiceId: inv.id,
+                        status,
+                      });
+                    }}
+                    onAddNote={async (type, amount, reason) => {
+                      await addNote.mutateAsync({
+                        invoiceId: inv.id,
+                        type,
+                        amount,
+                        reason,
+                      });
+                    }}
+                  />
                 ))}
               </div>
             ) : (
@@ -100,5 +108,144 @@ export default function FinancePage() {
         </Card>
       </div>
     </DashboardLayout>
+  );
+}
+
+function InvoiceRow({
+  inv,
+  onChangeStatus,
+  onAddNote,
+}: {
+  inv: any;
+  onChangeStatus: (status: "open" | "paid" | "cancelled") => Promise<void>;
+  onAddNote: (
+    type: "debit" | "credit",
+    amount: number,
+    reason?: string
+  ) => Promise<void>;
+}) {
+  const [status, setStatus] = useState(
+    inv.status as "open" | "paid" | "cancelled"
+  );
+  const [noteAmount, setNoteAmount] = useState(0);
+  const [noteReason, setNoteReason] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  return (
+    <div className="border rounded-md p-3">
+      <div className="flex items-center justify-between">
+        <div className="text-sm">
+          #{inv.id.slice(0, 6)} · {inv.supplier?.name || "Proveedor"} ·{" "}
+          {new Date(inv.date).toLocaleDateString()} ·{" "}
+          <span className="uppercase">{inv.status}</span>
+        </div>
+        <div className="text-sm font-semibold">
+          ${inv.total.toLocaleString("es-CO")}
+        </div>
+      </div>
+      <div className="mt-2 text-xs text-neutral-600">
+        Adjuntos: (se agregan desde el chat y se listarán aquí cuando se
+        sincronicen)
+      </div>
+      <div className="mt-3 grid md:grid-cols-3 gap-3 items-end">
+        <div>
+          <label className="block text-xs text-neutral-600 mb-1">
+            Cambiar estado
+          </label>
+          <select
+            aria-label="Estado de la factura"
+            className="w-full border rounded-md px-2 py-2 text-sm"
+            value={status}
+            onChange={(e) => setStatus(e.target.value as any)}
+          >
+            <option value="open">Abierta</option>
+            <option value="paid">Pagada</option>
+            <option value="cancelled">Anulada</option>
+          </select>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="flat"
+            isDisabled={busy || status === inv.status}
+            onPress={async () => {
+              setBusy(true);
+              try {
+                await onChangeStatus(status);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Guardar
+          </Button>
+        </div>
+        <div />
+      </div>
+      <div className="mt-3 grid md:grid-cols-4 gap-3 items-end">
+        <div>
+          <label className="block text-xs text-neutral-600 mb-1">
+            Monto nota
+          </label>
+          <input
+            aria-label="Monto de la nota"
+            className="w-full border rounded-md px-2 py-2 text-sm"
+            type="number"
+            step="0.01"
+            placeholder="0.00"
+            value={noteAmount}
+            onChange={(e) => setNoteAmount(parseFloat(e.target.value || "0"))}
+          />
+        </div>
+        <div className="md:col-span-2">
+          <label className="block text-xs text-neutral-600 mb-1">
+            Motivo (opcional)
+          </label>
+          <input
+            aria-label="Motivo de la nota"
+            className="w-full border rounded-md px-2 py-2 text-sm"
+            placeholder="Motivo de la nota"
+            value={noteReason}
+            onChange={(e) => setNoteReason(e.target.value)}
+          />
+        </div>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="flat"
+            isDisabled={busy || noteAmount <= 0}
+            onPress={async () => {
+              setBusy(true);
+              try {
+                await onAddNote("debit", noteAmount, noteReason || undefined);
+                setNoteAmount(0);
+                setNoteReason("");
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Nota débito
+          </Button>
+          <Button
+            size="sm"
+            variant="flat"
+            isDisabled={busy || noteAmount <= 0}
+            onPress={async () => {
+              setBusy(true);
+              try {
+                await onAddNote("credit", noteAmount, noteReason || undefined);
+                setNoteAmount(0);
+                setNoteReason("");
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Nota crédito
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
