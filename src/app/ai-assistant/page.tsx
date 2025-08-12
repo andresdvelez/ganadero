@@ -192,8 +192,16 @@ export default function AIAssistantPage() {
   const recordChoice = trpc.ai.recordChoice.useMutation();
   const createApInvoice = trpc.financeAp.createInvoice.useMutation();
   const updateProductCost = trpc.inventory.updateProductCost.useMutation();
-  const alertsCountQuery = trpc.alerts.listInstances.useQuery({ status: "open", limit: 10 }, { refetchInterval: 30000 });
+  const alertsCountQuery = trpc.alerts.listInstances.useQuery(
+    { status: "open", limit: 10 },
+    { refetchInterval: 30000 }
+  );
   const alertsEvaluate = trpc.alerts.evaluateAll.useMutation();
+  const listSessions = trpc.ai.listSessions.useQuery(
+    { limit: 20 },
+    { refetchInterval: 60000 }
+  );
+  // We'll fetch messages with utils.ai.listMessages when needed
 
   const MODEL_URL =
     process.env.NEXT_PUBLIC_MODEL_DOWNLOAD_URL ||
@@ -225,17 +233,38 @@ export default function AIAssistantPage() {
       const uuid = e?.detail?.uuid as string;
       if (!uuid) return;
       setChatUuid(uuid);
-      const msgs = await db.chatMessages
-        .where({ chatUuid: uuid })
-        .sortBy("createdAt");
-      setMessages(
-        msgs.map((m) => ({
-          id: String(m.id),
-          role: m.role,
-          content: m.content,
-          timestamp: new Date(m.createdAt),
-        })) as Message[]
-      );
+      // Try server first
+      try {
+        const serverMsgs = await utils.ai.listMessages.fetch({
+          sessionId: uuid,
+          limit: 500,
+        });
+        if (serverMsgs?.length) {
+          setMessages(
+            serverMsgs.map((m: any, i: number) => ({
+              id: `${Date.now()}-${i}`,
+              role: m.role,
+              content: m.content,
+              timestamp: new Date(m.createdAt),
+            })) as Message[]
+          );
+          return;
+        }
+      } catch {}
+      // Fallback to local
+      try {
+        const msgs = await db.chatMessages
+          .where({ chatUuid: uuid })
+          .sortBy("createdAt");
+        setMessages(
+          msgs.map((m) => ({
+            id: String(m.id),
+            role: m.role,
+            content: m.content,
+            timestamp: new Date(m.createdAt),
+          })) as Message[]
+        );
+      } catch {}
     };
     window.addEventListener("ai-new-chat", onNewChat as any);
     window.addEventListener("ai-open-chat", onOpenChat as any);
@@ -417,23 +446,63 @@ export default function AIAssistantPage() {
       <Card className="mt-2 p-3">
         <div className="flex items-center justify-between mb-2">
           <div className="text-sm font-medium">{title}</div>
-          <Button size="sm" variant="flat" onPress={() => downloadSvg(ref.current, title)}>
+          <Button
+            size="sm"
+            variant="flat"
+            onPress={() => downloadSvg(ref.current, title)}
+          >
             Descargar SVG
           </Button>
-          <Button size="sm" variant="flat" onPress={() => downloadPngFromSvg(ref.current, title)}>
+          <Button
+            size="sm"
+            variant="flat"
+            onPress={() => downloadPngFromSvg(ref.current, title)}
+          >
             Descargar PNG
           </Button>
-          {Array.isArray((message as any).dataCsv) && (message as any).dataCsv.length > 0 && (
-            <Button size="sm" variant="flat" onPress={() => downloadCsv((message as any).dataCsv, `${title}`)}>
-              Exportar CSV
-            </Button>
-          )}
-          <Button size="sm" variant="flat" onPress={async () => {
-            try {
-              await addToSyncQueue("create", "ai_memory", generateUUID(), { content: `saved_panel:${message.module || "analysis"}:${title}` , createdAt: new Date().toISOString() }, "dev-user");
-              setMessages((prev)=>[...prev,{ id:(Date.now()+6).toString(), role:"assistant", content:"Panel guardado para usar luego en /analysis.", timestamp:new Date() }]);
-            } catch {}
-          }}>Guardar como panel</Button>
+          {Array.isArray((message as any).dataCsv) &&
+            (message as any).dataCsv.length > 0 && (
+              <Button
+                size="sm"
+                variant="flat"
+                onPress={() =>
+                  downloadCsv((message as any).dataCsv, `${title}`)
+                }
+              >
+                Exportar CSV
+              </Button>
+            )}
+          <Button
+            size="sm"
+            variant="flat"
+            onPress={async () => {
+              try {
+                await addToSyncQueue(
+                  "create",
+                  "ai_memory",
+                  generateUUID(),
+                  {
+                    content: `saved_panel:${
+                      message.module || "analysis"
+                    }:${title}`,
+                    createdAt: new Date().toISOString(),
+                  },
+                  "dev-user"
+                );
+                setMessages((prev) => [
+                  ...prev,
+                  {
+                    id: (Date.now() + 6).toString(),
+                    role: "assistant",
+                    content: "Panel guardado para usar luego en /analysis.",
+                    timestamp: new Date(),
+                  },
+                ]);
+              } catch {}
+            }}
+          >
+            Guardar como panel
+          </Button>
         </div>
         {chart.kind === "pie" && (
           <svg ref={ref} width={w} height={h} role="img">
@@ -2108,53 +2177,261 @@ export default function AIAssistantPage() {
     // Listen seeded report from analysis pages
     const onSeed = (e: any) => {
       const d = e?.detail || {};
-      const title = `Abrí el reporte de ${d.module} para el periodo ${d.from || "(desde)"} → ${d.to || "(hasta)"}.`;
-      const msg: Message = { id: Date.now().toString(), role: "assistant", content: title, timestamp: new Date(), module: d.module };
+      const title = `Abrí el reporte de ${d.module} para el periodo ${
+        d.from || "(desde)"
+      } → ${d.to || "(hasta)"}.`;
+      const msg: Message = {
+        id: Date.now().toString(),
+        role: "assistant",
+        content: title,
+        timestamp: new Date(),
+        module: d.module,
+      };
       setMessages((prev) => [...prev, msg]);
       const toolId = `seed-${Date.now()}`;
-      setRunningTools((prev) => [...prev, { id: toolId, label: `Generando reporte de ${d.module}…` }]);
+      setRunningTools((prev) => [
+        ...prev,
+        { id: toolId, label: `Generando reporte de ${d.module}…` },
+      ]);
       (async () => {
         try {
           if (d.module === "breeding") {
-            const k = await utils.breedingAdv.kpis.fetch({ from: d.from, to: d.to });
+            const k = await utils.breedingAdv.kpis.fetch({
+              from: d.from,
+              to: d.to,
+            });
             // KPIs summary
-            setMessages((prev) => [...prev, { id: (Date.now()+1).toString(), role: "assistant", content: `KPIs — Días abiertos: ${k.kpis?.avgDaysOpen ?? 0}, Tasa preñez: ${k.kpis?.pregnancyRate ?? 0}%, IEP: ${k.kpis?.avgCalvingInterval ?? 0}`, timestamp: new Date(), module: "breeding" }]);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 1).toString(),
+                role: "assistant",
+                content: `KPIs — Días abiertos: ${
+                  k.kpis?.avgDaysOpen ?? 0
+                }, Tasa preñez: ${k.kpis?.pregnancyRate ?? 0}%, IEP: ${
+                  k.kpis?.avgCalvingInterval ?? 0
+                }`,
+                timestamp: new Date(),
+                module: "breeding",
+              },
+            ]);
             // Trend line
-            setMessages((prev) => [...prev, { id: (Date.now()+2).toString(), role: "assistant", content: "Concepciones por mes.", timestamp: new Date(), module: "breeding", widget: { type: "chart", title: "Reproducción: concepciones/mes", chart: { kind: "line", data: (k.trend || []).map((t:any)=>({ x: t.period, y: t.value })) } }, dataCsv: k.trend } as any]);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "Concepciones por mes.",
+                timestamp: new Date(),
+                module: "breeding",
+                widget: {
+                  type: "chart",
+                  title: "Reproducción: concepciones/mes",
+                  chart: {
+                    kind: "line",
+                    data: (k.trend || []).map((t: any) => ({
+                      x: t.period,
+                      y: t.value,
+                    })),
+                  },
+                },
+                dataCsv: k.trend,
+              } as any,
+            ]);
             // IEP by category
-            setMessages((prev) => [...prev, { id: (Date.now()+3).toString(), role: "assistant", content: "IEP por raza.", timestamp: new Date(), module: "breeding", widget: { type: "chart", title: "Reproducción: IEP por raza", chart: { kind: "bar", data: (k.iepByCategory || []).map((c:any)=>({ label: c.label, value: c.avgIEP })) } }, dataCsv: k.iepByCategory } as any]);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 3).toString(),
+                role: "assistant",
+                content: "IEP por raza.",
+                timestamp: new Date(),
+                module: "breeding",
+                widget: {
+                  type: "chart",
+                  title: "Reproducción: IEP por raza",
+                  chart: {
+                    kind: "bar",
+                    data: (k.iepByCategory || []).map((c: any) => ({
+                      label: c.label,
+                      value: c.avgIEP,
+                    })),
+                  },
+                },
+                dataCsv: k.iepByCategory,
+              } as any,
+            ]);
           } else if (d.module === "milk") {
             // Per-day series from recent list filtered by period
             const list = await utils.milk.list.fetch({ limit: 300 });
-            const f = d.from ? new Date(d.from) : null; const t = d.to ? new Date(d.to) : null;
-            const rows = list.filter((r:any)=>{ const dt=new Date(r.recordedAt); return (f?dt>=f:true)&&(t?dt<=t:true); });
+            const f = d.from ? new Date(d.from) : null;
+            const t = d.to ? new Date(d.to) : null;
+            const rows = list.filter((r: any) => {
+              const dt = new Date(r.recordedAt);
+              return (f ? dt >= f : true) && (t ? dt <= t : true);
+            });
             const map = new Map<string, number>();
-            rows.forEach((r:any)=>{ const dt=new Date(r.recordedAt); const key=`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`; map.set(key,(map.get(key)||0)+(r.liters||0)); });
-            const perDay = Array.from(map.entries()).sort().map(([x,y])=>({ x, y }));
-            setMessages((prev)=>[...prev,{ id:(Date.now()+1).toString(), role:"assistant", content:"Litros por día.", timestamp:new Date(), module:"milk", widget:{ type:"chart", title:"Leche por día", chart:{ kind:"line", data: perDay.map(p=>({ x:p.x, y:p.y })) } }, dataCsv: perDay } as any]);
-            const k = await utils.milk.kpis.fetch({ from: d.from, to: d.to, top: 10 });
-            setMessages((prev)=>[...prev,{ id:(Date.now()+2).toString(), role:"assistant", content:`CCS promedio del rebaño: ${Math.round(k.herdAvgCCS||0)}`, timestamp:new Date(), module:"milk" }]);
-            const topCsv = (k.topLiters||[]).map((t:any)=>({ animal: `${t.animal?.name||"(sin nombre)"} #${t.animal?.tagNumber||t.animalId}`, liters: t.liters }));
-            setMessages((prev)=>[...prev,{ id:(Date.now()+3).toString(), role:"assistant", content:"Top animales por litros.", timestamp:new Date(), module:"milk", widget:{ type:"chart", title:"Leche: top litros", chart:{ kind:"bar", data:(k.topLiters||[]).map((t:any)=>({ label: t.animal?.tagNumber||t.animalId, value: t.liters })) } }, dataCsv: topCsv } as any]);
+            rows.forEach((r: any) => {
+              const dt = new Date(r.recordedAt);
+              const key = `${dt.getFullYear()}-${String(
+                dt.getMonth() + 1
+              ).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+              map.set(key, (map.get(key) || 0) + (r.liters || 0));
+            });
+            const perDay = Array.from(map.entries())
+              .sort()
+              .map(([x, y]) => ({ x, y }));
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 1).toString(),
+                role: "assistant",
+                content: "Litros por día.",
+                timestamp: new Date(),
+                module: "milk",
+                widget: {
+                  type: "chart",
+                  title: "Leche por día",
+                  chart: {
+                    kind: "line",
+                    data: perDay.map((p) => ({ x: p.x, y: p.y })),
+                  },
+                },
+                dataCsv: perDay,
+              } as any,
+            ]);
+            const k = await utils.milk.kpis.fetch({
+              from: d.from,
+              to: d.to,
+              top: 10,
+            });
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: `CCS promedio del rebaño: ${Math.round(
+                  k.herdAvgCCS || 0
+                )}`,
+                timestamp: new Date(),
+                module: "milk",
+              },
+            ]);
+            const topCsv = (k.topLiters || []).map((t: any) => ({
+              animal: `${t.animal?.name || "(sin nombre)"} #${
+                t.animal?.tagNumber || t.animalId
+              }`,
+              liters: t.liters,
+            }));
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 3).toString(),
+                role: "assistant",
+                content: "Top animales por litros.",
+                timestamp: new Date(),
+                module: "milk",
+                widget: {
+                  type: "chart",
+                  title: "Leche: top litros",
+                  chart: {
+                    kind: "bar",
+                    data: (k.topLiters || []).map((t: any) => ({
+                      label: t.animal?.tagNumber || t.animalId,
+                      value: t.liters,
+                    })),
+                  },
+                },
+                dataCsv: topCsv,
+              } as any,
+            ]);
           } else if (d.module === "health") {
             const h = await utils.health.kpis.fetch({ from: d.from, to: d.to });
             const sumMap = new Map<string, number>();
-            (h.series||[]).forEach((row:any)=>{ sumMap.set(row.type, (sumMap.get(row.type)||0)+(row.cost||0)); });
-            const rows = Array.from(sumMap.entries()).map(([label,value])=>({ label, value }));
-            setMessages((prev)=>[...prev,{ id:(Date.now()+1).toString(), role:"assistant", content:"Costo de salud por tipo.", timestamp:new Date(), module:"health", widget:{ type:"chart", title:"Salud: costo por tipo", chart:{ kind:"bar", data: rows } }, dataCsv: h.series } as any]);
+            (h.series || []).forEach((row: any) => {
+              sumMap.set(
+                row.type,
+                (sumMap.get(row.type) || 0) + (row.cost || 0)
+              );
+            });
+            const rows = Array.from(sumMap.entries()).map(([label, value]) => ({
+              label,
+              value,
+            }));
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 1).toString(),
+                role: "assistant",
+                content: "Costo de salud por tipo.",
+                timestamp: new Date(),
+                module: "health",
+                widget: {
+                  type: "chart",
+                  title: "Salud: costo por tipo",
+                  chart: { kind: "bar", data: rows },
+                },
+                dataCsv: h.series,
+              } as any,
+            ]);
           } else if (d.module === "inventory") {
-            const inv = await utils.inventory.kpis.fetch({ from: d.from, to: d.to, topLow: 10 });
-            setMessages((prev)=>[...prev,{ id:(Date.now()+1).toString(), role:"assistant", content:"Costo por categoría.", timestamp:new Date(), module:"inventory", widget:{ type:"chart", title:"Inventario: costo por categoría", chart:{ kind:"bar", data:(inv.costByCategory||[]).map((c:any)=>({ label: c.label, value: c.value })) } }, dataCsv: inv.costByCategory } as any]);
-            const lowArr = (inv.lowStock||[]).map((r:any)=>({ productId: r.product.id, name: r.product.name, code: r.product.code, current: r.current, min: r.min }));
-            setMessages((prev)=>[...prev,{ id:(Date.now()+2).toString(), role:"assistant", content: lowArr.length?"Productos con stock bajo:":"Sin productos con stock bajo.", timestamp:new Date(), module:"inventory", lowStock: lowArr }]);
+            const inv = await utils.inventory.kpis.fetch({
+              from: d.from,
+              to: d.to,
+              topLow: 10,
+            });
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 1).toString(),
+                role: "assistant",
+                content: "Costo por categoría.",
+                timestamp: new Date(),
+                module: "inventory",
+                widget: {
+                  type: "chart",
+                  title: "Inventario: costo por categoría",
+                  chart: {
+                    kind: "bar",
+                    data: (inv.costByCategory || []).map((c: any) => ({
+                      label: c.label,
+                      value: c.value,
+                    })),
+                  },
+                },
+                dataCsv: inv.costByCategory,
+              } as any,
+            ]);
+            const lowArr = (inv.lowStock || []).map((r: any) => ({
+              productId: r.product.id,
+              name: r.product.name,
+              code: r.product.code,
+              current: r.current,
+              min: r.min,
+            }));
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: lowArr.length
+                  ? "Productos con stock bajo:"
+                  : "Sin productos con stock bajo.",
+                timestamp: new Date(),
+                module: "inventory",
+                lowStock: lowArr,
+              },
+            ]);
           }
         } finally {
-          setRunningTools((prev)=>prev.filter((t)=>t.id!==toolId));
+          setRunningTools((prev) => prev.filter((t) => t.id !== toolId));
         }
       })();
     };
     window.addEventListener("ai-seed-report", onSeed as any);
-    return () => { window.removeEventListener("ai-seed-report", onSeed as any); };
+    return () => {
+      window.removeEventListener("ai-seed-report", onSeed as any);
+    };
   }, []);
 
   return (
@@ -2162,11 +2439,19 @@ export default function AIAssistantPage() {
       <DashboardLayout
         leftSlot={
           <AISidebar
-            chats={chatList.map((c) => ({
-              uuid: c.uuid,
-              title: c.title,
-              updatedAt: c.updatedAt,
-            }))}
+            chats={
+              listSessions.data && listSessions.data.length
+                ? listSessions.data.map((s: any) => ({
+                    uuid: s.sessionId,
+                    title: s.sessionId.slice(0, 8),
+                    updatedAt: s.updatedAt,
+                  }))
+                : chatList.map((c) => ({
+                    uuid: c.uuid,
+                    title: c.title,
+                    updatedAt: c.updatedAt,
+                  }))
+            }
             activeChatUuid={chatUuid}
             onNewChat={() => window.dispatchEvent(new Event("ai-new-chat"))}
             onSelectChat={(uuid) =>
@@ -2179,10 +2464,21 @@ export default function AIAssistantPage() {
       >
         <div className="flex flex-col h-[calc(100vh-4rem)]">
           <div className="p-2 border-b border-neutral-200 flex items-center justify-between gap-3">
-            <div className="text-sm text-neutral-600">Periodo seleccionado: {period.from || "(desde)"} → {period.to || "(hasta)"}</div>
+            <div className="text-sm text-neutral-600">
+              Periodo seleccionado: {period.from || "(desde)"} →{" "}
+              {period.to || "(hasta)"}
+            </div>
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="flat" onPress={() => alertsEvaluate.mutate()}>Evaluar alertas</Button>
-              <div className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700">Alertas abiertas: {alertsCountQuery.data?.length ?? 0}</div>
+              <Button
+                size="sm"
+                variant="flat"
+                onPress={() => alertsEvaluate.mutate()}
+              >
+                Evaluar alertas
+              </Button>
+              <div className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700">
+                Alertas abiertas: {alertsCountQuery.data?.length ?? 0}
+              </div>
             </div>
           </div>
           {/* hidden input for invoice attachment */}
