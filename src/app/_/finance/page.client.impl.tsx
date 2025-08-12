@@ -203,6 +203,21 @@ function InvoiceRow({
   const attachments = trpc.financeAp.listInvoiceAttachments.useQuery({
     invoiceId: inv.id,
   });
+  const [showAudit, setShowAudit] = useState(false);
+  const parsedNotes = (()=>{
+    const list: { type: 'DEBIT'|'CREDIT'|'ATTACH'; payload: string }[] = [];
+    const lines = String(inv.notes||'').split('\n').filter(Boolean);
+    for(const ln of lines){
+      if(ln.startsWith('ATTACH::')){
+        const parts = ln.split('::');
+        list.push({ type: 'ATTACH', payload: parts[2] || '' });
+      } else if(ln.startsWith('DEBIT::') || ln.startsWith('CREDIT::')){
+        const [kind, , amount, reason] = ln.split('::');
+        list.push({ type: (kind.startsWith('DEBIT')?'DEBIT':'CREDIT'), payload: `$${Number(amount||0).toLocaleString()} ${reason?`· ${reason}`:''}` });
+      }
+    }
+    return list;
+  })();
 
   return (
     <div className="border rounded-md p-3">
@@ -226,6 +241,9 @@ function InvoiceRow({
         >
           Refrescar
         </Button>
+        <Button size="sm" variant="light" className="ml-2" onPress={()=> setShowAudit((v)=>!v)}>
+          {showAudit? 'Ocultar auditoría' : 'Ver auditoría'}
+        </Button>
       </div>
       {attachments.data?.length ? (
         <div className="mt-1 text-xs flex flex-wrap gap-2">
@@ -236,6 +254,33 @@ function InvoiceRow({
           ))}
         </div>
       ) : null}
+      {showAudit && (
+        <div className="mt-2 text-xs border-t pt-2">
+          <div className="font-medium mb-1">Pagos</div>
+          {inv.payments?.length ? (
+            <div className="divide-y">
+              {inv.payments.map((p:any)=> (
+                <div key={p.id} className="py-1 flex items-center justify-between">
+                  <div>{new Date(p.date).toLocaleDateString()} · ${p.amount.toLocaleString('es-CO')} {p.method?`· ${p.method}`:''}</div>
+                  <div className="text-neutral-500">{p.notes||''}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-neutral-500">Sin pagos</div>
+          )}
+          <div className="font-medium mt-2 mb-1">Notas</div>
+          {parsedNotes.length ? (
+            <div className="flex flex-wrap gap-2">
+              {parsedNotes.map((n,i)=> (
+                <span key={i} className={`px-2 py-1 rounded-full border ${n.type==='DEBIT'?'bg-amber-50 border-amber-200':'bg-slate-50 border-slate-200'}`}>{n.type}: {n.payload}</span>
+              ))}
+            </div>
+          ) : (
+            <div className="text-neutral-500">Sin notas</div>
+          )}
+        </div>
+      )}
       <div className="mt-3 grid md:grid-cols-3 gap-3 items-end">
         <div>
           <label className="block text-xs text-neutral-600 mb-1">
