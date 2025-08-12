@@ -361,6 +361,26 @@ export default function AIAssistantPage() {
     }, "image/png");
   };
 
+  const downloadCsv = (rows: Array<Record<string, any>>, filename: string) => {
+    if (!rows.length) return;
+    const headers = Object.keys(rows[0]);
+    const csv = [
+      headers.join(","),
+      ...rows.map((r) =>
+        headers.map((h) => JSON.stringify(r[h] ?? "")).join(",")
+      ),
+    ].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename.endsWith(".csv") ? filename : `${filename}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   const ChartWidget: React.FC<{ message: Message }> = ({ message }) => {
     const ref = useRef<SVGSVGElement | null>(null);
     if (!message.widget || message.widget.type !== "chart") return null;
@@ -386,6 +406,18 @@ export default function AIAssistantPage() {
           >
             Descargar PNG
           </Button>
+          {Array.isArray((message as any).dataCsv) &&
+            (message as any).dataCsv.length > 0 && (
+              <Button
+                size="sm"
+                variant="flat"
+                onPress={() =>
+                  downloadCsv((message as any).dataCsv, `${title}`)
+                }
+              >
+                Exportar CSV
+              </Button>
+            )}
         </div>
         {chart.kind === "pie" && (
           <svg ref={ref} width={w} height={h} role="img">
@@ -735,38 +767,39 @@ export default function AIAssistantPage() {
           {
             id: (Date.now() + 1).toString(),
             role: "assistant",
-            content: "Preparando una gráfica de eventos de salud por tipo…",
+            content: "Preparando costos de salud por tipo y mes…",
             timestamp: new Date(),
           },
         ]);
         (async () => {
           try {
-            const list = await utils.health.list.fetch({ limit: 100 });
-            const filtered = list.filter((r: any) =>
-              range.from ? new Date(r.performedAt) >= range.from : true
-            );
-            const counts: Record<string, number> = {};
-            filtered.forEach((r: any) => {
-              const key = (r.type || "Otro").toString();
-              counts[key] = (counts[key] || 0) + 1;
+            const k = await utils.health.kpis.fetch({
+              from: range.from?.toISOString(),
+              to: range.to?.toISOString(),
             });
+            // Acumular costos por tipo (último mes o rango seleccionado) y exportable
+            const sumByType = new Map<string, number>();
+            (k.series || []).forEach((row: any) => {
+              sumByType.set(
+                row.type,
+                (sumByType.get(row.type) || 0) + (row.cost || 0)
+              );
+            });
+            const data = Array.from(sumByType.entries()).map(
+              ([label, value]) => ({ label, value })
+            );
             const chartMsg: Message = {
               id: (Date.now() + 2).toString(),
               role: "assistant",
-              content: "Distribución de eventos de salud por tipo.",
+              content: "Costo de salud por tipo.",
               timestamp: new Date(),
               widget: {
                 type: "chart",
-                title: "Salud por tipo",
-                chart: {
-                  kind: "bar",
-                  data: Object.entries(counts).map(([label, value]) => ({
-                    label,
-                    value,
-                  })),
-                },
+                title: "Salud: costo por tipo",
+                chart: { kind: "bar", data },
               },
-            };
+              dataCsv: k.series,
+            } as any;
             setMessages((prev) => [...prev, chartMsg]);
           } catch {
             setMessages((prev) => [
@@ -933,21 +966,48 @@ export default function AIAssistantPage() {
         /finanzas?|ingresos|egresos/i.test(userMessage.content)
       ) {
         const toolId = `tool-${Date.now()}`;
-        const range = period.from || period.to ? { from: period.from ? new Date(period.from) : undefined, to: period.to ? new Date(period.to) : undefined } : inferDateRange(userMessage.content);
-        setRunningTools((prev) => [...prev, { id: toolId, label: "Generando gráfica de finanzas…" }]);
+        const range =
+          period.from || period.to
+            ? {
+                from: period.from ? new Date(period.from) : undefined,
+                to: period.to ? new Date(period.to) : undefined,
+              }
+            : inferDateRange(userMessage.content);
+        setRunningTools((prev) => [
+          ...prev,
+          { id: toolId, label: "Generando gráfica de finanzas…" },
+        ]);
         setMessages((prev) => [
           ...prev,
-          { id: (Date.now() + 1).toString(), role: "assistant", content: "Preparando resumen de ingresos vs egresos…", timestamp: new Date() },
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: "Preparando resumen de ingresos vs egresos…",
+            timestamp: new Date(),
+          },
         ]);
         (async () => {
           try {
-            const k = await utils.finance.kpis.fetch({ from: range.from?.toISOString(), to: range.to?.toISOString() });
+            const k = await utils.finance.kpis.fetch({
+              from: range.from?.toISOString(),
+              to: range.to?.toISOString(),
+            });
             const pieMsg: Message = {
               id: (Date.now() + 2).toString(),
               role: "assistant",
               content: "Totales de ingresos vs egresos en el periodo.",
               timestamp: new Date(),
-              widget: { type: "chart", title: "Finanzas: Ingresos vs Egresos", chart: { kind: "pie", data: [ { label: "Ingresos", value: k.income }, { label: "Egresos", value: k.expense } ] } },
+              widget: {
+                type: "chart",
+                title: "Finanzas: Ingresos vs Egresos",
+                chart: {
+                  kind: "pie",
+                  data: [
+                    { label: "Ingresos", value: k.income },
+                    { label: "Egresos", value: k.expense },
+                  ],
+                },
+              },
             };
             setMessages((prev) => [...prev, pieMsg]);
             const barMsg: Message = {
@@ -955,13 +1015,113 @@ export default function AIAssistantPage() {
               role: "assistant",
               content: "Margen por categoría.",
               timestamp: new Date(),
-              widget: { type: "chart", title: "Finanzas: Margen por categoría", chart: { kind: "bar", data: (k.byCategory || []).map((c: any) => ({ label: c.label, value: c.margin })) } },
+              widget: {
+                type: "chart",
+                title: "Finanzas: Margen por categoría",
+                chart: {
+                  kind: "bar",
+                  data: (k.byCategory || []).map((c: any) => ({
+                    label: c.label,
+                    value: c.margin,
+                  })),
+                },
+              },
             };
             setMessages((prev) => [...prev, barMsg]);
           } catch {
             setMessages((prev) => [
               ...prev,
-              { id: (Date.now() + 2).toString(), role: "assistant", content: "No pude construir la gráfica de finanzas.", timestamp: new Date() },
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "No pude construir la gráfica de finanzas.",
+                timestamp: new Date(),
+              },
+            ]);
+          } finally {
+            setRunningTools((prev) => prev.filter((t) => t.id !== toolId));
+          }
+        })();
+      }
+
+      if (
+        chartRequested &&
+        /reproducci[oó]n|pren[eé]z|iep/i.test(userMessage.content)
+      ) {
+        const toolId = `tool-${Date.now()}`;
+        const range =
+          period.from || period.to
+            ? {
+                from: period.from ? new Date(period.from) : undefined,
+                to: period.to ? new Date(period.to) : undefined,
+              }
+            : inferDateRange(userMessage.content);
+        setRunningTools((prev) => [
+          ...prev,
+          { id: toolId, label: "Generando KPIs de reproducción…" },
+        ]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content:
+              "Preparando tasa de concepción por mes e IEP por categoría…",
+            timestamp: new Date(),
+          },
+        ]);
+        (async () => {
+          try {
+            const k = await utils.breedingAdv.kpis.fetch({
+              from: range.from?.toISOString(),
+              to: range.to?.toISOString(),
+            });
+            const lineMsg: Message = {
+              id: (Date.now() + 2).toString(),
+              role: "assistant",
+              content: "Concepciones confirmadas por mes.",
+              timestamp: new Date(),
+              widget: {
+                type: "chart",
+                title: "Reproducción: concepciones/mes",
+                chart: {
+                  kind: "line",
+                  data: (k.trend || []).map((t: any) => ({
+                    x: t.period,
+                    y: t.value,
+                  })),
+                },
+              },
+              dataCsv: k.trend,
+            } as any;
+            const barMsg: Message = {
+              id: (Date.now() + 3).toString(),
+              role: "assistant",
+              content: "IEP promedio por categoría.",
+              timestamp: new Date(),
+              widget: {
+                type: "chart",
+                title: "Reproducción: IEP por categoría",
+                chart: {
+                  kind: "bar",
+                  data: (k.iepByCategory || []).map((c: any) => ({
+                    label: c.label,
+                    value: c.avgIEP,
+                  })),
+                },
+              },
+              dataCsv: k.iepByCategory,
+            } as any;
+            setMessages((prev) => [...prev, lineMsg, barMsg]);
+          } catch {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "No pude construir las gráficas de reproducción.",
+                timestamp: new Date(),
+              },
             ]);
           } finally {
             setRunningTools((prev) => prev.filter((t) => t.id !== toolId));
@@ -1881,7 +2041,9 @@ export default function AIAssistantPage() {
               type="date"
               className="border rounded-md px-2 py-1 text-sm"
               value={period.from || ""}
-              onChange={(e) => setPeriod((p) => ({ ...p, from: e.target.value }))}
+              onChange={(e) =>
+                setPeriod((p) => ({ ...p, from: e.target.value }))
+              }
             />
             <input
               aria-label="Hasta"
@@ -1891,29 +2053,75 @@ export default function AIAssistantPage() {
               onChange={(e) => setPeriod((p) => ({ ...p, to: e.target.value }))}
             />
             <div className="flex items-center gap-1">
-              <Button size="sm" variant="flat" onPress={() => {
-                const now = new Date();
-                const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                setPeriod({ from: d.toISOString().slice(0,10), to: d.toISOString().slice(0,10) });
-              }}>Hoy</Button>
-              <Button size="sm" variant="flat" onPress={() => {
-                const now = new Date();
-                const from = new Date(now.getTime() - 7*24*60*60*1000);
-                setPeriod({ from: from.toISOString().slice(0,10), to: new Date().toISOString().slice(0,10) });
-              }}>Últimos 7 días</Button>
-              <Button size="sm" variant="flat" onPress={() => {
-                const now = new Date();
-                const from = new Date(now.getTime() - 30*24*60*60*1000);
-                setPeriod({ from: from.toISOString().slice(0,10), to: new Date().toISOString().slice(0,10) });
-              }}>Últimos 30 días</Button>
-              <Button size="sm" variant="flat" onPress={() => {
-                const now = new Date();
-                const from = new Date(now.getFullYear(), now.getMonth(), 1);
-                const to = new Date(now.getFullYear(), now.getMonth()+1, 0);
-                setPeriod({ from: from.toISOString().slice(0,10), to: to.toISOString().slice(0,10) });
-              }}>Este mes</Button>
+              <Button
+                size="sm"
+                variant="flat"
+                onPress={() => {
+                  const now = new Date();
+                  const d = new Date(
+                    now.getFullYear(),
+                    now.getMonth(),
+                    now.getDate()
+                  );
+                  setPeriod({
+                    from: d.toISOString().slice(0, 10),
+                    to: d.toISOString().slice(0, 10),
+                  });
+                }}
+              >
+                Hoy
+              </Button>
+              <Button
+                size="sm"
+                variant="flat"
+                onPress={() => {
+                  const now = new Date();
+                  const from = new Date(
+                    now.getTime() - 7 * 24 * 60 * 60 * 1000
+                  );
+                  setPeriod({
+                    from: from.toISOString().slice(0, 10),
+                    to: new Date().toISOString().slice(0, 10),
+                  });
+                }}
+              >
+                Últimos 7 días
+              </Button>
+              <Button
+                size="sm"
+                variant="flat"
+                onPress={() => {
+                  const now = new Date();
+                  const from = new Date(
+                    now.getTime() - 30 * 24 * 60 * 60 * 1000
+                  );
+                  setPeriod({
+                    from: from.toISOString().slice(0, 10),
+                    to: new Date().toISOString().slice(0, 10),
+                  });
+                }}
+              >
+                Últimos 30 días
+              </Button>
+              <Button
+                size="sm"
+                variant="flat"
+                onPress={() => {
+                  const now = new Date();
+                  const from = new Date(now.getFullYear(), now.getMonth(), 1);
+                  const to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                  setPeriod({
+                    from: from.toISOString().slice(0, 10),
+                    to: to.toISOString().slice(0, 10),
+                  });
+                }}
+              >
+                Este mes
+              </Button>
             </div>
-            <div className="text-xs text-neutral-500">Usado por gráficas y listados cuando aplica.</div>
+            <div className="text-xs text-neutral-500">
+              Usado por gráficas y listados cuando aplica.
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto p-0">
             {messages.length > 0 ? (

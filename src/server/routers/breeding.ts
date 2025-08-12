@@ -320,7 +320,41 @@ export const breedingAdvRouter = createTRPCRouter({
         .sort((a, b) => (a[0] > b[0] ? 1 : -1))
         .map(([period, value]) => ({ period, value }));
 
-      return { kpis, trend };
+      // IEP por categoría sencilla (si el animal tiene category)
+      const animalIds = Array.from(byAnimal.keys());
+      const animals = await ctx.prisma.animal.findMany({
+        where: { id: { in: animalIds } },
+        select: { id: true, breed: true },
+      });
+      const catMap = new Map(
+        animals.map((a) => [a.id, a.breed || "Sin categoría"] as const)
+      );
+      const iepByCat = new Map<string, number[]>();
+      byAnimal.forEach((events, animalId) => {
+        const cat = catMap.get(animalId) || "Sin categoría";
+        const births = events
+          .filter((e) => e.type === "birth")
+          .map((e) => e.date);
+        for (let i = 1; i < births.length; i++) {
+          const diff =
+            (births[i].getTime() - births[i - 1].getTime()) / 86400000;
+          if (diff > 0 && diff < 1000) {
+            const arr = iepByCat.get(cat) || [];
+            arr.push(diff);
+            iepByCat.set(cat, arr);
+          }
+        }
+      });
+      const iepByCategory = Array.from(iepByCat.entries()).map(
+        ([label, arr]) => ({
+          label,
+          avgIEP: arr.length
+            ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length)
+            : 0,
+        })
+      );
+
+      return { kpis, trend, iepByCategory };
     }),
 
   // Crear eventos rápidos: celo, servicio IA/MN/TE, parto
