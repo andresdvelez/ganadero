@@ -1644,6 +1644,7 @@ export default function AIAssistantPage() {
             data: { href },
           } as any,
         ]);
+        setMessages((prev)=>[...prev, { id: (Date.now()+0.7).toString(), role: "assistant", content: `Ver más…`, timestamp: new Date(), action: "open-link", module: "finance", data: { href } } as any]);
         setIsLoading(false);
         return;
       }
