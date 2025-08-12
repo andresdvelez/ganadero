@@ -82,6 +82,13 @@ interface Message {
           | { kind: "line"; data: Array<{ x: string; y: number }> };
       }
     | undefined;
+  lowStock?: Array<{
+    productId: string;
+    name: string;
+    code?: string | null;
+    current: number;
+    min: number;
+  }>;
 }
 
 export default function AIAssistantPage() {
@@ -819,26 +826,42 @@ export default function AIAssistantPage() {
 
       if (chartRequested && /leche|producci[oó]n/i.test(userMessage.content)) {
         const toolId = `tool-${Date.now()}`;
-        const range = period.from || period.to ? { from: period.from ? new Date(period.from) : undefined, to: period.to ? new Date(period.to) : undefined } : inferDateRange(userMessage.content);
-        setRunningTools((prev) => [...prev, { id: toolId, label: "Generando gráfica de leche…" }]);
+        const range =
+          period.from || period.to
+            ? {
+                from: period.from ? new Date(period.from) : undefined,
+                to: period.to ? new Date(period.to) : undefined,
+              }
+            : inferDateRange(userMessage.content);
+        setRunningTools((prev) => [
+          ...prev,
+          { id: toolId, label: "Generando gráfica de leche…" },
+        ]);
         setMessages((prev) => [
           ...prev,
-          { id: (Date.now() + 1).toString(), role: "assistant", content: "Preparando una gráfica de litros por día…", timestamp: new Date() },
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: "Preparando una gráfica de litros por día…",
+            timestamp: new Date(),
+          },
         ]);
         (async () => {
           try {
             const list = await utils.milk.list.fetch({ limit: 100 });
             const filtered = list.filter((r: any) => {
               const d = new Date(r.recordedAt);
-              return (range.from ? d >= range.from : true) && (range.to ? d <= range.to : true);
+              return (
+                (range.from ? d >= range.from : true) &&
+                (range.to ? d <= range.to : true)
+              );
             });
             const map = new Map<string, number>();
             filtered.forEach((r: any) => {
               const d = new Date(r.recordedAt);
-              const key = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}-${d
-                .getDate()
+              const key = `${d.getFullYear()}-${(d.getMonth() + 1)
                 .toString()
-                .padStart(2, "0")}`;
+                .padStart(2, "0")}-${d.getDate().toString().padStart(2, "0")}`;
               map.set(key, (map.get(key) || 0) + (r.liters || 0));
             });
             const data = Array.from(map.entries())
@@ -849,21 +872,33 @@ export default function AIAssistantPage() {
               role: "assistant",
               content: "Serie de producción de leche por día.",
               timestamp: new Date(),
-              widget: { type: "chart", title: "Leche por día", chart: { kind: "line", data } },
+              widget: {
+                type: "chart",
+                title: "Leche por día",
+                chart: { kind: "line", data },
+              },
             };
             setMessages((prev) => [...prev, chartMsg]);
 
             // KPIs: herd avg CCS and top liters (CSV)
-            const k = await utils.milk.kpis.fetch({ from: range.from?.toISOString(), to: range.to?.toISOString(), top: 10 });
+            const k = await utils.milk.kpis.fetch({
+              from: range.from?.toISOString(),
+              to: range.to?.toISOString(),
+              top: 10,
+            });
             const herdMsg: Message = {
               id: (Date.now() + 3).toString(),
               role: "assistant",
-              content: `CCS promedio del rebaño: ${Math.round((k.herdAvgCCS || 0)).toLocaleString()}`,
+              content: `CCS promedio del rebaño: ${Math.round(
+                k.herdAvgCCS || 0
+              ).toLocaleString()}`,
               timestamp: new Date(),
             };
             setMessages((prev) => [...prev, herdMsg]);
             const topLitersCsv = (k.topLiters || []).map((t: any) => ({
-              animal: `${t.animal?.name || "(sin nombre)"} #${t.animal?.tagNumber || t.animalId}`,
+              animal: `${t.animal?.name || "(sin nombre)"} #${
+                t.animal?.tagNumber || t.animalId
+              }`,
               liters: t.liters,
             }));
             const topMsg: Message = {
@@ -871,14 +906,29 @@ export default function AIAssistantPage() {
               role: "assistant",
               content: "Top animales por litros en el periodo.",
               timestamp: new Date(),
-              widget: { type: "chart", title: "Top litros por animal", chart: { kind: "bar", data: (k.topLiters || []).map((t: any) => ({ label: t.animal?.tagNumber || t.animalId, value: t.liters })) } },
+              widget: {
+                type: "chart",
+                title: "Top litros por animal",
+                chart: {
+                  kind: "bar",
+                  data: (k.topLiters || []).map((t: any) => ({
+                    label: t.animal?.tagNumber || t.animalId,
+                    value: t.liters,
+                  })),
+                },
+              },
               dataCsv: topLitersCsv,
             } as any;
             setMessages((prev) => [...prev, topMsg]);
           } catch {
             setMessages((prev) => [
               ...prev,
-              { id: (Date.now() + 2).toString(), role: "assistant", content: "No pude construir la gráfica de leche.", timestamp: new Date() },
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "No pude construir la gráfica de leche.",
+                timestamp: new Date(),
+              },
             ]);
           } finally {
             setRunningTools((prev) => prev.filter((t) => t.id !== toolId));
@@ -888,21 +938,42 @@ export default function AIAssistantPage() {
 
       if (chartRequested && /inventario/i.test(userMessage.content)) {
         const toolId = `tool-${Date.now()}`;
-        const range = period.from || period.to ? { from: period.from ? new Date(period.from) : undefined, to: period.to ? new Date(period.to) : undefined } : inferDateRange(userMessage.content);
-        setRunningTools((prev) => [...prev, { id: toolId, label: "Generando gráfica de inventario…" }]);
+        const range =
+          period.from || period.to
+            ? {
+                from: period.from ? new Date(period.from) : undefined,
+                to: period.to ? new Date(period.to) : undefined,
+              }
+            : inferDateRange(userMessage.content);
+        setRunningTools((prev) => [
+          ...prev,
+          { id: toolId, label: "Generando gráfica de inventario…" },
+        ]);
         setMessages((prev) => [
           ...prev,
-          { id: (Date.now() + 1).toString(), role: "assistant", content: "Preparando movimientos de stock por tipo…", timestamp: new Date() },
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: "Preparando movimientos de stock por tipo…",
+            timestamp: new Date(),
+          },
         ]);
         (async () => {
           try {
-            const moves = await utils.inventory.listMovements.fetch({ limit: 100 });
+            const moves = await utils.inventory.listMovements.fetch({
+              limit: 100,
+            });
             const filtered = moves.filter((r: any) => {
               const d = new Date(r.occurredAt);
-              return (range.from ? d >= range.from : true) && (range.to ? d <= range.to : true);
+              return (
+                (range.from ? d >= range.from : true) &&
+                (range.to ? d <= range.to : true)
+              );
             });
             const counts: Record<string, number> = { in: 0, out: 0, adjust: 0 };
-            filtered.forEach((m: any) => (counts[m.type] = (counts[m.type] || 0) + 1));
+            filtered.forEach(
+              (m: any) => (counts[m.type] = (counts[m.type] || 0) + 1)
+            );
             const chartMsg: Message = {
               id: (Date.now() + 2).toString(),
               role: "assistant",
@@ -924,19 +995,37 @@ export default function AIAssistantPage() {
             setMessages((prev) => [...prev, chartMsg]);
 
             // Low stock dashboard
-            const k = await utils.inventory.kpis.fetch({ from: range.from?.toISOString(), to: range.to?.toISOString(), topLow: 10 });
-            const low = (k.lowStock || []).map((r: any) => `- ${r.product.name}${r.product.code ? ` [${r.product.code}]` : ""}: ${r.current} (mín ${r.min})` ).join("\n");
+            const k = await utils.inventory.kpis.fetch({
+              from: range.from?.toISOString(),
+              to: range.to?.toISOString(),
+              topLow: 10,
+            });
+            const lowArr = (k.lowStock || []).map((r: any) => ({
+              productId: r.product.id,
+              name: r.product.name,
+              code: r.product.code,
+              current: r.current,
+              min: r.min,
+            }));
             const lowMsg: Message = {
               id: (Date.now() + 3).toString(),
               role: "assistant",
-              content: low ? `Productos con stock bajo:\n${low}` : "No hay productos con stock bajo.",
+              content: lowArr.length
+                ? "Productos con stock bajo:"
+                : "No hay productos con stock bajo.",
               timestamp: new Date(),
+              lowStock: lowArr,
             };
             setMessages((prev) => [...prev, lowMsg]);
           } catch {
             setMessages((prev) => [
               ...prev,
-              { id: (Date.now() + 2).toString(), role: "assistant", content: "No pude construir la gráfica de inventario.", timestamp: new Date() },
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "No pude construir la gráfica de inventario.",
+                timestamp: new Date(),
+              },
             ]);
           } finally {
             setRunningTools((prev) => prev.filter((t) => t.id !== toolId));
@@ -2210,6 +2299,7 @@ export default function AIAssistantPage() {
                     )}
                     {drawerTool?.type === "inventory.movement" && (
                       <InventoryMovementNew
+                        defaults={drawerTool?.props?.defaults || undefined}
                         onCompleted={() => {
                           setDrawerTool(null);
                           setMessages((prev) => [
@@ -2310,6 +2400,43 @@ export default function AIAssistantPage() {
                             <p className="whitespace-pre-wrap leading-relaxed">
                               {message.content}
                             </p>
+                            {Array.isArray(message.lowStock) &&
+                              message.lowStock.length > 0 && (
+                                <div className="mt-2 space-y-2">
+                                  {message.lowStock.map((it) => (
+                                    <div
+                                      key={it.productId}
+                                      className="flex items-center justify-between gap-3 text-sm"
+                                    >
+                                      <div>
+                                        {it.name}
+                                        {it.code ? ` [${it.code}]` : ""} —{" "}
+                                        {it.current} (mín {it.min})
+                                      </div>
+                                      <Button
+                                        size="sm"
+                                        variant="flat"
+                                        onPress={() => {
+                                          setDrawerTool({
+                                            type: "inventory.movement",
+                                            props: {
+                                              defaults: {
+                                                productId: it.productId,
+                                                type: "in",
+                                                occurredAt: new Date()
+                                                  .toISOString()
+                                                  .slice(0, 10),
+                                              },
+                                            },
+                                          });
+                                        }}
+                                      >
+                                        Reordenar
+                                      </Button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             {message.widget?.type === "chart" && (
                               <ChartWidget message={message} />
                             )}
