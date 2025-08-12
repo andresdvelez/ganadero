@@ -169,6 +169,10 @@ export default function AIAssistantPage() {
     Array<{ id: string; label: string }>
   >([]);
   const [period, setPeriod] = useState<{ from?: string; to?: string }>({});
+  const [postMovementCreate, setPostMovementCreate] = useState<null | {
+    kind: "create-invoice";
+    context: { productId: string; suggestedQty?: number };
+  }>(null);
 
   // New TRPC hooks for AI context/memories
   const recordMessage = trpc.ai.recordMessage.useMutation();
@@ -176,6 +180,7 @@ export default function AIAssistantPage() {
   const confirmMemories = trpc.ai.confirmMemories.useMutation();
   const summarizeSession = trpc.ai.summarizeSession.useMutation();
   const recordChoice = trpc.ai.recordChoice.useMutation();
+  const createApInvoice = trpc.financeAp.createInvoice.useMutation();
 
   const MODEL_URL =
     process.env.NEXT_PUBLIC_MODEL_DOWNLOAD_URL ||
@@ -2302,6 +2307,60 @@ export default function AIAssistantPage() {
                         defaults={drawerTool?.props?.defaults || undefined}
                         onCompleted={() => {
                           setDrawerTool(null);
+                          // If requested, create a draft purchase invoice after movement
+                          (async () => {
+                            try {
+                              if (
+                                postMovementCreate?.kind === "create-invoice"
+                              ) {
+                                const defaults =
+                                  drawerTool?.props?.defaults || {};
+                                const supplierId =
+                                  defaults?.supplierId || undefined;
+                                if (supplierId) {
+                                  const qty =
+                                    defaults?.quantity ||
+                                    postMovementCreate.context.suggestedQty ||
+                                    1;
+                                  const unitCost = defaults?.unitCost || 0;
+                                  await createApInvoice.mutateAsync({
+                                    supplierId,
+                                    date: new Date().toISOString(),
+                                    items: [
+                                      {
+                                        productId:
+                                          postMovementCreate.context.productId,
+                                        quantity: qty,
+                                        unitCost,
+                                      },
+                                    ],
+                                  } as any);
+                                  setMessages((prev) => [
+                                    ...prev,
+                                    {
+                                      id: (Date.now() + 4).toString(),
+                                      role: "assistant",
+                                      content:
+                                        "Factura de compra (borrador) creada a partir del reorden.",
+                                      timestamp: new Date(),
+                                    },
+                                  ]);
+                                } else {
+                                  setMessages((prev) => [
+                                    ...prev,
+                                    {
+                                      id: (Date.now() + 4).toString(),
+                                      role: "assistant",
+                                      content:
+                                        "Movimiento registrado. Para crear la factura, selecciona un proveedor en el formulario.",
+                                      timestamp: new Date(),
+                                    },
+                                  ]);
+                                }
+                              }
+                            } catch {}
+                            setPostMovementCreate(null);
+                          })();
                           setMessages((prev) => [
                             ...prev,
                             {
@@ -2438,6 +2497,40 @@ export default function AIAssistantPage() {
                                         }}
                                       >
                                         Reordenar
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="solid"
+                                        onPress={() => {
+                                          const qty = Math.max(
+                                            0,
+                                            it.min - it.current
+                                          );
+                                          setDrawerTool({
+                                            type: "inventory.movement",
+                                            props: {
+                                              defaults: {
+                                                productId: it.productId,
+                                                type: "in",
+                                                quantity:
+                                                  qty > 0 ? qty : undefined,
+                                                occurredAt: new Date()
+                                                  .toISOString()
+                                                  .slice(0, 10),
+                                              },
+                                            },
+                                          });
+                                          setPostMovementCreate({
+                                            kind: "create-invoice",
+                                            context: {
+                                              productId: it.productId,
+                                              suggestedQty:
+                                                qty > 0 ? qty : undefined,
+                                            },
+                                          });
+                                        }}
+                                      >
+                                        Reordenar + Factura
                                       </Button>
                                     </div>
                                   ))}
