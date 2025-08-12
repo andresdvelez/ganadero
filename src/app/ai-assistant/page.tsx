@@ -1279,6 +1279,197 @@ export default function AIAssistantPage() {
         })();
       }
 
+      if (chartRequested && /mastitis|ccs/i.test(userMessage.content)) {
+        const toolId = `tool-${Date.now()}`;
+        const range =
+          period.from || period.to
+            ? {
+                from: period.from ? new Date(period.from) : undefined,
+                to: period.to ? new Date(period.to) : undefined,
+              }
+            : inferDateRange(userMessage.content);
+        setRunningTools((prev) => [
+          ...prev,
+          { id: toolId, label: "Generando gráficas de mastitis…" },
+        ]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: "Preparando casos por semana y distribución por cuadrante…",
+            timestamp: new Date(),
+          },
+        ]);
+        (async () => {
+          try {
+            const list = await utils.mastitis.list.fetch({ limit: 200 });
+            const filtered = list.filter((c: any) => {
+              const d = new Date(c.detectedAt);
+              return (
+                (range.from ? d >= (range.from as Date) : true) &&
+                (range.to ? d <= (range.to as Date) : true)
+              );
+            });
+            // weekly aggregation
+            const weekly = new Map<string, number>();
+            filtered.forEach((c: any) => {
+              const d = new Date(c.detectedAt);
+              const first = new Date(d.getFullYear(), 0, 1);
+              const week = Math.ceil(
+                ((d.getTime() - first.getTime()) / 86400000 + first.getDay() + 1) /
+                  7
+              );
+              const key = `${d.getFullYear()}-W${week}`;
+              weekly.set(key, (weekly.get(key) || 0) + 1);
+            });
+            const weeklyData = Array.from(weekly.entries())
+              .sort(([a], [b]) => (a < b ? -1 : 1))
+              .map(([x, y]) => ({ x, y }));
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "Casos por semana en el periodo.",
+                timestamp: new Date(),
+                widget: {
+                  type: "chart",
+                  title: "Mastitis: casos por semana",
+                  chart: { kind: "line", data: weeklyData },
+                },
+                dataCsv: weeklyData,
+              } as any,
+            ]);
+            // quadrant distribution
+            const counts: Record<string, number> = {
+              LF: 0,
+              LR: 0,
+              RF: 0,
+              RR: 0,
+              Otros: 0,
+            };
+            filtered.forEach((c: any) => {
+              const q = String(c.quarter || "").toUpperCase();
+              if (q === "LF" || q === "LR" || q === "RF" || q === "RR")
+                counts[q] = (counts[q] || 0) + 1;
+              else counts["Otros"] = (counts["Otros"] || 0) + 1;
+            });
+            const barData = [
+              { label: "LF", value: counts.LF || 0 },
+              { label: "LR", value: counts.LR || 0 },
+              { label: "RF", value: counts.RF || 0 },
+              { label: "RR", value: counts.RR || 0 },
+              { label: "Otros", value: counts.Otros || 0 },
+            ];
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 3).toString(),
+                role: "assistant",
+                content: "Distribución por cuadrante.",
+                timestamp: new Date(),
+                widget: {
+                  type: "chart",
+                  title: "Mastitis: por cuadrante",
+                  chart: { kind: "bar", data: barData },
+                },
+                dataCsv: barData,
+              } as any,
+            ]);
+          } catch {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "No pude construir las gráficas de mastitis.",
+                timestamp: new Date(),
+              },
+            ]);
+          } finally {
+            setRunningTools((prev) => prev.filter((t) => t.id !== toolId));
+          }
+        })();
+      }
+
+      if (chartRequested && /(semen|semén|embriones|termos|tanques|\bia\b)/i.test(userMessage.content)) {
+        const toolId = `tool-${Date.now()}`;
+        setRunningTools((prev) => [
+          ...prev,
+          { id: toolId, label: "Generando inventario de IA por termo…" },
+        ]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: "Preparando resumen de pajuelas por termo…",
+            timestamp: new Date(),
+          },
+        ]);
+        (async () => {
+          try {
+            const semen = await utils.aiAssets.listSemenBatches.fetch({ limit: 200 } as any);
+            const embryos = await utils.aiAssets.listEmbryoBatches.fetch({ limit: 200 } as any);
+            const semenMap = new Map<string, number>();
+            (semen || []).forEach((b: any) => {
+              const key = b.tank?.name || "Sin termo";
+              semenMap.set(key, (semenMap.get(key) || 0) + (b.strawCount || 0));
+            });
+            const embMap = new Map<string, number>();
+            (embryos || []).forEach((b: any) => {
+              const key = b.tank?.name || "Sin termo";
+              embMap.set(key, (embMap.get(key) || 0) + (b.strawCount || 0));
+            });
+            const semenData = Array.from(semenMap.entries()).map(([label, value]) => ({ label, value }));
+            const embData = Array.from(embMap.entries()).map(([label, value]) => ({ label, value }));
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "Semen por termo (pajuelas).",
+                timestamp: new Date(),
+                widget: {
+                  type: "chart",
+                  title: "Semen por termo",
+                  chart: { kind: "bar", data: semenData },
+                },
+                dataCsv: semenData,
+              } as any,
+            ]);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 3).toString(),
+                role: "assistant",
+                content: "Embriones por termo (pajuelas).",
+                timestamp: new Date(),
+                widget: {
+                  type: "chart",
+                  title: "Embriones por termo",
+                  chart: { kind: "bar", data: embData },
+                },
+                dataCsv: embData,
+              } as any,
+            ]);
+          } catch {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "No pude construir el resumen de IA por termo.",
+                timestamp: new Date(),
+              },
+            ]);
+          } finally {
+            setRunningTools((prev) => prev.filter((t) => t.id !== toolId));
+          }
+        })();
+      }
+
       // Intent quick path
       const intent = await routeIntent.mutateAsync({
         query: userMessage.content,
