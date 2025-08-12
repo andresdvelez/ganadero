@@ -18,6 +18,8 @@ function TreeNode({ label, onClick }: { label: string; onClick?: () => void }) {
   );
 }
 
+export const dynamic = "force-dynamic";
+
 export default function AnimalTreePage() {
   const params = useSearchParams();
   const router = useRouter();
