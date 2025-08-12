@@ -156,4 +156,46 @@ export const financeApRouter = createTRPCRouter({
       }
       return payment;
     }),
+
+  // Attachments (demo in-DB via LabExam-like table would be better; here use PurchaseInvoice.notes to store refs or a dedicated table if exists)
+  attachInvoiceFile: protectedProcedure
+    .input(
+      z.object({
+        invoiceId: z.string(),
+        fileName: z.string(),
+        mimeType: z.string(),
+        dataUrl: z.string(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // For demo, append a JSON line to notes with attachment metadata
+      const inv = await ctx.prisma.purchaseInvoice.findFirst({
+        where: { id: input.invoiceId, userId: ctx.userId! },
+        select: { id: true, notes: true },
+      });
+      if (!inv) throw new Error("Factura no encontrada");
+      const prev = inv.notes ? inv.notes + "\n" : "";
+      const tag = `ATTACH::${Date.now()}::${input.fileName}::${input.mimeType}`;
+      await ctx.prisma.purchaseInvoice.update({
+        where: { id: inv.id },
+        data: { notes: prev + tag },
+      });
+      return { ok: true, tag };
+    }),
+  listInvoiceAttachments: protectedProcedure
+    .input(z.object({ invoiceId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const inv = await ctx.prisma.purchaseInvoice.findFirst({
+        where: { id: input.invoiceId, userId: ctx.userId! },
+        select: { notes: true },
+      });
+      const list = (inv?.notes || "")
+        .split("\n")
+        .filter((l) => l.startsWith("ATTACH::"))
+        .map((l) => {
+          const [, ts, fileName, mimeType] = l.split("::");
+          return { id: ts, fileName, mimeType };
+        });
+      return list;
+    }),
 });

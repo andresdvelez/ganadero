@@ -6,11 +6,13 @@ import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { db } from "@/lib/dexie";
 import { useEffect, useState } from "react";
+import { trpc } from "@/lib/trpc/client";
 
 export const dynamic = "force-dynamic";
 
 export default function FinancePage() {
   const [items, setItems] = useState<any[]>([]);
+  const invoices = trpc.financeAp.listInvoices.useQuery({ limit: 50 });
 
   useEffect(() => {
     db.financeTransactions
@@ -58,6 +60,40 @@ export default function FinancePage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Facturas de compra (borradores recientes)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {invoices.data?.length ? (
+              <div className="space-y-3">
+                {invoices.data.map((inv) => (
+                  <div key={inv.id} className="border rounded-md p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm">
+                        #{inv.id.slice(0, 6)} ·{" "}
+                        {inv.supplier?.name || "Proveedor"} ·{" "}
+                        {new Date(inv.date).toLocaleDateString()}
+                      </div>
+                      <div className="text-sm font-semibold">
+                        ${inv.total.toLocaleString("es-CO")}
+                      </div>
+                    </div>
+                    <div className="mt-2 text-xs text-neutral-600">
+                      Adjuntos: (se agregan desde el chat y se listarán aquí
+                      cuando se sincronicen)
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-sm text-neutral-500">
+                No hay facturas recientes.
               </div>
             )}
           </CardContent>
