@@ -55,12 +55,10 @@ export const tasksRouter = createTRPCRouter({
       return ctx.prisma.task.update({
         where: { id: input.id },
         data: {
-          ...(input.data.title !== undefined
+          ...(input.data.title !== undefined && input.data.title !== null
             ? { title: input.data.title }
             : {}),
-          ...(input.data.description !== undefined
-            ? { description: input.data.description }
-            : {}),
+          ...(input.data.description !== undefined ? { description: input.data.description ?? null } : {}),
           ...(input.data.status !== undefined
             ? { status: input.data.status }
             : {}),
