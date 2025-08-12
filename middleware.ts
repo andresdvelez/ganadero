@@ -33,9 +33,16 @@ export default clerkMiddleware(async (auth, req) => {
     url.pathname = "/offline";
     return NextResponse.redirect(url, 308);
   }
+  // Generic redirect: any /_/segment → /segment (Next private folders)
+  if (pathname.startsWith("/_/")) {
+    const url = req.nextUrl.clone();
+    url.pathname = pathname.replace(/^\/_\/+/, "/");
+    return NextResponse.redirect(url, 308);
+  }
 
   // Do not enforce protection on API routes, but still let Clerk run to set auth context
-  const isApiRoute = pathname.startsWith("/api/") || pathname.startsWith("/trpc");
+  const isApiRoute =
+    pathname.startsWith("/api/") || pathname.startsWith("/trpc");
 
   if (!isPublicRoute(req) && !isApiRoute) {
     await auth.protect();
