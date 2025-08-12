@@ -330,6 +330,11 @@ export function MastitisCases() {
                 >
                   Crear examen lab
                 </Button>
+                {c.labExamId && (
+                  <Button asChild size="sm" variant="light">
+                    <a href={`/lab?ref=${c.labExamId}`}>Ver examen</a>
+                  </Button>
+                )}
               </div>
             </div>
             {c.labExamId && (
