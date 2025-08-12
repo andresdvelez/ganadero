@@ -535,10 +535,61 @@ export const aiRouter = createTRPCRouter({
         .normalize("NFD")
         .replace(/\p{Diacritic}/gu, "");
 
+      // Bypass para saludos/conversación casual → usar chat normal
+      const isGreeting =
+        /\b(hola|buenas|buenos dias|buenas tardes|buenas noches|que tal|qué tal|como estas|cómo estas|hey|ola|gracias|ok|listo|vale)\b/i.test(
+          input.query
+        );
+      if (isGreeting) {
+        return {
+          module: "chat",
+          action: "none",
+          data: {},
+          confidence: 1,
+        } as any;
+      }
+
+      // Verbos de acción
+      const wantsCreate =
+        /\b(agregar|registrar|crear|anadir|añadir|nuevo|cargar|ingresar)\b/.test(
+          q
+        );
+      const wantsList = /\b(ver|listar|mostrar|consultar|abrir|revisar)\b/.test(
+        q
+      );
+
+      // Heurísticas por dominio
+      const isAnimal =
+        /\banimal(es)?\b|\bvaca\b|\bternero\b|\btoro\b|\bganado\b/.test(q);
+      const isHealth = /salud|vacuna|tratamiento|enfermedad/.test(q);
+      const isPastures =
+        /pastura(s)?|potrero(s)?|pastoreo|pradera(s)?|forraje|rotacion|rotación|nutricion|nutrición/.test(
+          q
+        );
+      const isFinance =
+        /(ingreso|egreso|venta\s+de\s+ganado|venta|compra|factura|contabilidad|flujo|costo|pago|cobro)/.test(
+          q
+        );
+
+      // Si no hay verbos de acción ni señales de dominio claras → chat
+      if (
+        !(isAnimal || isHealth || isPastures || isFinance) &&
+        !wantsCreate &&
+        !wantsList
+      ) {
+        return {
+          module: "chat",
+          action: "none",
+          data: {},
+          confidence: 1,
+        } as any;
+      }
+
       // Find best matching module by tags/id/name tokens
       const modules = aiModuleSpecs;
       let bestModule: { id: string; score: number } | null = null;
       let secondBest: { id: string; score: number } | null = null;
+      const scored: Array<{ id: string; score: number }> = [];
       for (const m of modules) {
         const haystack = [m.id, m.name, ...(m.tags || [])]
           .join(" ")
@@ -547,6 +598,7 @@ export const aiRouter = createTRPCRouter({
           .replace(/\p{Diacritic}/gu, "");
         const hit = buildTfIdfCosine(q, [haystack])[0];
         const score = hit?.score ?? 0;
+        scored.push({ id: m.id, score });
         if (!bestModule || score > bestModule.score) {
           secondBest = bestModule;
           bestModule = { id: m.id, score };
@@ -573,19 +625,7 @@ export const aiRouter = createTRPCRouter({
         chosenAction = bestAction?.id;
       }
 
-      // Domain keyword heuristics to override when module detection is weak
-      const isAnimal =
-        /\banimal(es)?\b|\bvaca\b|\bternero\b|\btoro\b|\bganado\b/.test(q);
-      const isHealth = /salud|vacuna|tratamiento|enfermedad/.test(q);
-      const isPastures =
-        /pastura(s)?|potrero(s)?|pastoreo|pradera(s)?|forraje|rotacion|rotación|nutricion|nutrición/.test(
-          q
-        );
-      const isFinance =
-        /(ingreso|egreso|venta\s+de\s+ganado|venta|compra|factura|contabilidad|flujo|costo|pago|cobro)/.test(
-          q
-        );
-
+      // Dominio keyword heuristics override cuando la detección del módulo es débil
       if (!current || (bestModule && bestModule.score < 0.05)) {
         if (isFinance) chosenModule = "finance";
         else if (isPastures) chosenModule = "pastures";
@@ -593,38 +633,45 @@ export const aiRouter = createTRPCRouter({
         else if (isHealth) chosenModule = "health";
       }
 
-      // If both finance and animals keywords present, prefer finance for terms like "venta de ganado", "ingreso", etc.
+      // Preferir finanzas si aparece "venta de ganado", etc.
       if (isFinance) chosenModule = "finance";
 
-      // Default action based on verbs present
+      // Acción por defecto
       if (!chosenAction) {
-        const wantsCreate =
-          /\b(agregar|registrar|crear|anadir|añadir|nuevo|cargar|ingresar)\b/.test(
-            q
-          );
-        const wantsList =
-          /\b(ver|listar|mostrar|consultar|abrir|revisar)\b/.test(q);
         chosenAction = wantsCreate ? "create" : wantsList ? "list" : "none";
       }
 
-      const MIN_CONFIDENCE = 0.18;
-      if ((bestModule?.score ?? 0) < MIN_CONFIDENCE) {
-        // low confidence → request disambiguation, return candidates
-        const candidates = [bestModule, secondBest]
-          .filter(Boolean)
-          .map((c) => ({
-            id: (c as any).id,
-            score: (c as any).score,
-          })) as Array<{
-          id: string;
-          score: number;
-        }>;
+      // Si la confianza es baja y no hay verbos claros → chat (evitar desambiguación temprana)
+      if (confidence < 0.12 && !wantsCreate && !wantsList) {
+        return { module: "chat", action: "none", data: {}, confidence } as any;
+      }
+
+      // Desambiguación SOLO si hay dos módulos fuertes y muy cercanos, y hay verbos de acción
+      const strongMatches = scored
+        .filter((s) => s.score >= 0.12)
+        .sort((a, b) => b.score - a.score);
+      const hasTwoStrong = strongMatches.length >= 2;
+      const diffTop = hasTwoStrong
+        ? Math.abs(strongMatches[0].score - strongMatches[1].score)
+        : 1;
+      const shouldDisambiguate =
+        hasTwoStrong && diffTop < 0.03 && (wantsCreate || wantsList);
+
+      if (shouldDisambiguate) {
+        const candidates = strongMatches
+          .slice(0, 2)
+          .map((c) => ({ id: c.id, score: c.score }));
         return {
           module: "unknown",
           action: "none",
           data: { candidates },
           confidence,
         } as any;
+      }
+
+      // Si no hay señales claras, mantener chat como comportamiento por defecto
+      if (!wantsCreate && !wantsList && confidence < 0.22) {
+        return { module: "chat", action: "none", data: {}, confidence } as any;
       }
 
       return {

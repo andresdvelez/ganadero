@@ -137,6 +137,10 @@ export default function AIAssistantPage() {
     summary: string;
     payload: any;
   }>(null);
+  const [candidatePreviews, setCandidatePreviews] = useState<
+    Record<string, { content: string }>
+  >({});
+  const [isGeneratingPreviews, setIsGeneratingPreviews] = useState(false);
 
   // New TRPC hooks for AI context/memories
   const recordMessage = trpc.ai.recordMessage.useMutation();
@@ -388,17 +392,17 @@ export default function AIAssistantPage() {
           role: "assistant",
           content:
             intent?.action === "create"
-              ? "Abrí el módulo de Finanzas para registrar una transacción."
-              : "Abrí el módulo de Finanzas.",
+              ? "Gracias por tu mensaje. Utilizando el módulo de Finanzas para registrar una transacción."
+              : "Gracias por tu mensaje. Abriendo el módulo de Finanzas.",
           timestamp: new Date(),
           module: intent.module,
           action: intent.action,
         };
         setMessages((prev) => [...prev, assistantMessage]);
-        // open launcher or navigate
-        setModulesOpen(true);
-        // You can also push to a dedicated finance page if present
-        // router.push("/_/finance");
+        // Navegar directo al módulo (si existe página), sin abrir launcher
+        try {
+          router.push("/finance");
+        } catch {}
         setIsLoading(false);
         return;
       }
@@ -905,6 +909,35 @@ export default function AIAssistantPage() {
 
   const cancelPending = () => setPendingAction(null);
 
+  useEffect(() => {
+    (async () => {
+      if (!pendingCandidates) return;
+      setIsGeneratingPreviews(true);
+      const previews: Record<string, { content: string }> = {};
+      try {
+        // limitar a 2 mejores candidatos
+        const top = pendingCandidates.modules.slice(0, 2);
+        for (const c of top) {
+          try {
+            const res = await aiClient.processQuery(
+              pendingCandidates.originalText,
+              {
+                currentModule: c.id,
+                recentMessages: messages.slice(-3),
+              }
+            );
+            previews[c.id] = { content: String(res.content || "") };
+          } catch {
+            previews[c.id] = { content: "(Sin vista previa disponible)" };
+          }
+        }
+      } finally {
+        setCandidatePreviews(previews);
+        setIsGeneratingPreviews(false);
+      }
+    })();
+  }, [pendingCandidates]);
+
   return (
     <TRPCProvider>
       <DashboardLayout
@@ -1343,77 +1376,183 @@ export default function AIAssistantPage() {
 
                     {/* Disambiguation candidates prompt */}
                     {pendingCandidates && (
-                      <div className="mx-auto max-w-3xl mt-2">
+                      <div className="mx-auto max-w-5xl mt-2">
                         <div className="rounded-2xl bg-white border border-neutral-200 p-3 shadow-sm">
-                          <div className="text-sm text-neutral-700 mb-2">
-                            ¿Te refieres a alguno de estos módulos?
+                          <div className="text-sm text-neutral-700 mb-3">
+                            ¿Te refieres a alguno de estos módulos? Compara y
+                            elige:
                           </div>
-                          <div className="flex flex-wrap gap-2">
-                            {pendingCandidates.modules.map((c) => (
-                              <Button
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {pendingCandidates.modules.slice(0, 2).map((c) => (
+                              <div
                                 key={c.id}
-                                size="sm"
-                                variant="flat"
-                                onPress={async () => {
-                                  const choice = {
-                                    sessionId: chatUuid || "",
-                                    messageId:
-                                      messages[messages.length - 1]?.id ||
-                                      undefined,
-                                    chosenModule: c.id,
-                                    chosenAction: undefined,
-                                    keywords: pendingCandidates.originalText
-                                      .split(/\s+/)
-                                      .slice(0, 6),
-                                    tone: undefined,
-                                    candidates: pendingCandidates.modules,
-                                  } as any;
-                                  // local record
-                                  await db.aiChoices.add({
-                                    uuid: generateUUID(),
-                                    userId: "dev-user",
-                                    sessionId: choice.sessionId,
-                                    messageId: choice.messageId,
-                                    chosenModule: choice.chosenModule,
-                                    chosenAction: choice.chosenAction,
-                                    keywords: JSON.stringify(choice.keywords),
-                                    tone: choice.tone || null,
-                                    candidates: JSON.stringify(
-                                      choice.candidates
-                                    ),
-                                    synced: false,
-                                    createdAt: new Date(),
-                                    updatedAt: new Date(),
-                                  });
-                                  // queue to sync
-                                  await addToSyncQueue(
-                                    "create",
-                                    "ai_choice",
-                                    `${chatUuid || ""}-choice-${Date.now()}`,
-                                    choice,
-                                    "dev-user"
-                                  );
-                                  // try server record (best effort)
-                                  try {
-                                    await recordChoice.mutateAsync(choice);
-                                  } catch {}
-                                  setPendingCandidates(null);
-                                  // proceed by routing to chosen module
-                                  setMessages((prev) => [
-                                    ...prev,
-                                    {
-                                      id: (Date.now() + 1).toString(),
-                                      role: "assistant",
-                                      content: `Entendido. Abrí el módulo ${c.id}.`,
-                                      timestamp: new Date(),
-                                      module: c.id,
-                                    },
-                                  ]);
-                                  setModulesOpen(true);
-                                }}
+                                className="rounded-xl border border-neutral-200 p-3 bg-neutral-50"
                               >
-                                {c.id}
-                              </Button>
+                                <div className="text-sm font-medium mb-2">
+                                  Respuesta usando {c.id}
+                                </div>
+                                <div className="text-sm text-neutral-700 whitespace-pre-wrap min-h-[64px]">
+                                  {isGeneratingPreviews
+                                    ? "Generando vista previa…"
+                                    : candidatePreviews[c.id]?.content ||
+                                      "(Sin vista previa)"}
+                                </div>
+                                <div className="mt-3 flex justify-end">
+                                  <Button
+                                    size="sm"
+                                    onPress={async () => {
+                                      const choice = {
+                                        sessionId: chatUuid || "",
+                                        messageId:
+                                          messages[messages.length - 1]?.id ||
+                                          undefined,
+                                        chosenModule: c.id,
+                                        chosenAction: undefined,
+                                        keywords: pendingCandidates.originalText
+                                          .split(/\s+/)
+                                          .slice(0, 6),
+                                        tone: undefined,
+                                        candidates: pendingCandidates.modules,
+                                      } as any;
+                                      // local record
+                                      await db.aiChoices.add({
+                                        uuid: generateUUID(),
+                                        userId: "dev-user",
+                                        sessionId: choice.sessionId,
+                                        messageId: choice.messageId,
+                                        chosenModule: choice.chosenModule,
+                                        chosenAction: choice.chosenAction,
+                                        keywords: JSON.stringify(
+                                          choice.keywords
+                                        ),
+                                        tone: choice.tone || null,
+                                        candidates: JSON.stringify(
+                                          choice.candidates
+                                        ),
+                                        synced: false,
+                                        createdAt: new Date(),
+                                        updatedAt: new Date(),
+                                      });
+                                      await addToSyncQueue(
+                                        "create",
+                                        "ai_choice",
+                                        `${
+                                          chatUuid || ""
+                                        }-choice-${Date.now()}`,
+                                        choice,
+                                        "dev-user"
+                                      );
+                                      try {
+                                        await recordChoice.mutateAsync(choice);
+                                      } catch {}
+                                      setPendingCandidates(null);
+                                      setMessages((prev) => [
+                                        ...prev,
+                                        {
+                                          id: (Date.now() + 1).toString(),
+                                          role: "assistant",
+                                          content: `Gracias por tu respuesta. Utilizando el módulo de ${c.id}.`,
+                                          timestamp: new Date(),
+                                          module: c.id,
+                                        },
+                                      ]);
+                                      // Ruteo/ejecución directa similar al flujo de los chips
+                                      const forced =
+                                        await routeIntent.mutateAsync({
+                                          query: `${pendingCandidates.originalText} [module:${c.id}]`,
+                                        });
+                                      if (c.id === "pastures") {
+                                        const doList =
+                                          !forced?.action ||
+                                          forced.action === "list";
+                                        if (doList) {
+                                          const list =
+                                            await utils.pasture.getAll.fetch();
+                                          const items = list
+                                            .map(
+                                              (p) =>
+                                                `- ${p.name}${
+                                                  p.areaHa
+                                                    ? ` (${p.areaHa} ha)`
+                                                    : ""
+                                                }`
+                                            )
+                                            .join("\n");
+                                          const content =
+                                            items.length > 0
+                                              ? `Estas son tus pasturas registradas:\n${items}`
+                                              : "No encontré pasturas registradas.";
+                                          setMessages((prev) => [
+                                            ...prev,
+                                            {
+                                              id: (Date.now() + 2).toString(),
+                                              role: "assistant",
+                                              content,
+                                              timestamp: new Date(),
+                                              module: "pastures",
+                                              action: "list",
+                                            },
+                                          ]);
+                                          return;
+                                        } else if (
+                                          forced?.action === "create"
+                                        ) {
+                                          router.push("/_/pastures/new");
+                                          return;
+                                        }
+                                      }
+                                      if (
+                                        c.id === "animals" &&
+                                        (forced?.action === "create" ||
+                                          !forced?.action)
+                                      ) {
+                                        setInlineTool({
+                                          type: "animals.create",
+                                        });
+                                        return;
+                                      }
+                                      if (
+                                        c.id === "health" &&
+                                        (forced?.action === "create" ||
+                                          !forced?.action)
+                                      ) {
+                                        setInlineTool({
+                                          type: "health.create",
+                                        });
+                                        return;
+                                      }
+                                      if (
+                                        c.id === "milk" &&
+                                        (forced?.action === "create" ||
+                                          !forced?.action)
+                                      ) {
+                                        setInlineTool({ type: "milk.create" });
+                                        return;
+                                      }
+                                      if (c.id === "inventory") {
+                                        if (forced?.action === "movement") {
+                                          setDrawerTool({
+                                            type: "inventory.movement",
+                                          });
+                                          return;
+                                        }
+                                        setDrawerTool({
+                                          type: "inventory.create",
+                                        });
+                                        return;
+                                      }
+                                      if (c.id === "finance") {
+                                        try {
+                                    router.push("/finance");
+                                  } catch {}
+                                  return;
+                                      }
+                                    }}
+                                  >
+                                    Elegir esta
+                                  </Button>
+                                </div>
+                              </div>
                             ))}
                           </div>
                         </div>
