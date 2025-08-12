@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useSearchParams } from "next/navigation";
 
 export default function AIAssetsClient() {
   const [tab, setTab] = useState("tanks");
@@ -92,6 +93,15 @@ function TanksTab() {
 function SemenTab() {
   const tanks = trpc.aiAssets.listTanks.useQuery();
   const [tankFilter, setTankFilter] = useState<string>("");
+  const params = useSearchParams();
+  // Seed tank filter by name
+  const tankName = params.get("tankName");
+  if (tankName && tanks.data && !tankFilter) {
+    const found = tanks.data.find(
+      (t) => t.name?.toLowerCase() === tankName.toLowerCase()
+    );
+    if (found) setTankFilter(found.id);
+  }
   const [q, setQ] = useState("");
   const [limit, setLimit] = useState(50);
   const list = trpc.aiAssets.listSemenBatches.useQuery({
@@ -297,6 +307,14 @@ function SemenTab() {
 function EmbryosTab() {
   const tanks = trpc.aiAssets.listTanks.useQuery();
   const [tankFilter, setTankFilter] = useState<string>("");
+  const params = useSearchParams();
+  const tankName = params.get("tankName");
+  if (tankName && tanks.data && !tankFilter) {
+    const found = tanks.data.find(
+      (t) => t.name?.toLowerCase() === tankName.toLowerCase()
+    );
+    if (found) setTankFilter(found.id);
+  }
   const [q, setQ] = useState("");
   const [limit, setLimit] = useState(50);
   const list = trpc.aiAssets.listEmbryoBatches.useQuery({

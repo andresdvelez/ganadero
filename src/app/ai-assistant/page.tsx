@@ -1297,7 +1297,8 @@ export default function AIAssistantPage() {
           {
             id: (Date.now() + 1).toString(),
             role: "assistant",
-            content: "Preparando casos por semana y distribución por cuadrante…",
+            content:
+              "Preparando casos por semana y distribución por cuadrante…",
             timestamp: new Date(),
           },
         ]);
@@ -1317,7 +1318,9 @@ export default function AIAssistantPage() {
               const d = new Date(c.detectedAt);
               const first = new Date(d.getFullYear(), 0, 1);
               const week = Math.ceil(
-                ((d.getTime() - first.getTime()) / 86400000 + first.getDay() + 1) /
+                ((d.getTime() - first.getTime()) / 86400000 +
+                  first.getDay() +
+                  1) /
                   7
               );
               const key = `${d.getFullYear()}-W${week}`;
@@ -1377,6 +1380,24 @@ export default function AIAssistantPage() {
                 dataCsv: barData,
               } as any,
             ]);
+            // Deep link to open Mastitis with current period
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 4).toString(),
+                role: "assistant",
+                content: `Abrir Mastitis con periodo: ${
+                  (range.from || "") && (range.to || "")
+                    ? `${(range.from as Date).toISOString().slice(0, 10)} → ${(
+                        range.to as Date
+                      )
+                        .toISOString()
+                        .slice(0, 10)}`
+                    : "actual"
+                }`,
+                timestamp: new Date(),
+              } as any,
+            ]);
           } catch {
             setMessages((prev) => [
               ...prev,
@@ -1393,7 +1414,12 @@ export default function AIAssistantPage() {
         })();
       }
 
-      if (chartRequested && /(semen|semén|embriones|termos|tanques|\bia\b)/i.test(userMessage.content)) {
+      if (
+        chartRequested &&
+        /(semen|semén|embriones|termos|tanques|\bia\b)/i.test(
+          userMessage.content
+        )
+      ) {
         const toolId = `tool-${Date.now()}`;
         setRunningTools((prev) => [
           ...prev,
@@ -1410,8 +1436,12 @@ export default function AIAssistantPage() {
         ]);
         (async () => {
           try {
-            const semen = await utils.aiAssets.listSemenBatches.fetch({ limit: 200 } as any);
-            const embryos = await utils.aiAssets.listEmbryoBatches.fetch({ limit: 200 } as any);
+            const semen = await utils.aiAssets.listSemenBatches.fetch({
+              limit: 200,
+            } as any);
+            const embryos = await utils.aiAssets.listEmbryoBatches.fetch({
+              limit: 200,
+            } as any);
             const semenMap = new Map<string, number>();
             (semen || []).forEach((b: any) => {
               const key = b.tank?.name || "Sin termo";
@@ -1422,8 +1452,12 @@ export default function AIAssistantPage() {
               const key = b.tank?.name || "Sin termo";
               embMap.set(key, (embMap.get(key) || 0) + (b.strawCount || 0));
             });
-            const semenData = Array.from(semenMap.entries()).map(([label, value]) => ({ label, value }));
-            const embData = Array.from(embMap.entries()).map(([label, value]) => ({ label, value }));
+            const semenData = Array.from(semenMap.entries()).map(
+              ([label, value]) => ({ label, value })
+            );
+            const embData = Array.from(embMap.entries()).map(
+              ([label, value]) => ({ label, value })
+            );
             setMessages((prev) => [
               ...prev,
               {
@@ -1454,6 +1488,21 @@ export default function AIAssistantPage() {
                 dataCsv: embData,
               } as any,
             ]);
+            // Deep links to open modules with context
+            const topTank = semenData
+              .concat(embData)
+              .sort((a, b) => b.value - a.value)[0]?.label;
+            if (topTank) {
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: (Date.now() + 4).toString(),
+                  role: "assistant",
+                  content: `Abrir IA Assets con termo: ${topTank}`,
+                  timestamp: new Date(),
+                } as any,
+              ]);
+            }
           } catch {
             setMessages((prev) => [
               ...prev,
