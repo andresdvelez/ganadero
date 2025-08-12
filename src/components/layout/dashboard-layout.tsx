@@ -7,6 +7,7 @@ import { UserButton } from "@clerk/nextjs";
 import { useEffect, useState } from "react";
 import { getSyncManager } from "@/services/sync/sync-manager";
 import { db } from "@/lib/dexie";
+import { Button } from "@/components/ui/button";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -25,6 +26,8 @@ export function DashboardLayout({
     syncing: boolean;
     pending: number;
   }>({ online: true, syncing: false, pending: 0 });
+  const [conflictsOpen, setConflictsOpen] = useState(false);
+  const [conflicts, setConflicts] = useState<any[]>([]);
   useEffect(() => {
     const mgr = getSyncManager();
     const refresh = async () => {
@@ -72,6 +75,24 @@ export function DashboardLayout({
                 : "Sincronizado"
               : "Offline"}
           </div>
+          <Button
+            size="sm"
+            variant="flat"
+            onPress={async () => {
+              const mgr = getSyncManager();
+              await mgr.sync();
+              const rows = await db.syncQueue
+                .where("status")
+                .anyOf(["conflict", "failed", "synced"])
+                .reverse()
+                .limit(20)
+                .toArray();
+              setConflicts(rows);
+              setConflictsOpen(true);
+            }}
+          >
+            Sincronizar ahora
+          </Button>
           <Link
             href="/offline-setup"
             className="text-sm text-neutral-600 hover:text-neutral-900"
@@ -94,6 +115,72 @@ export function DashboardLayout({
           <div />
         )}
       </div>
+      {conflictsOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/30">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="font-semibold">Resultado de sincronización</div>
+              <button
+                className="text-sm"
+                onClick={() => setConflictsOpen(false)}
+              >
+                Cerrar
+              </button>
+            </div>
+            <div className="text-sm text-neutral-600 mb-3">
+              Últimos 20 elementos con estado conflict/failed/synced.
+            </div>
+            <div className="max-h-[50vh] overflow-auto text-sm">
+              {conflicts.length ? (
+                conflicts.map((c) => (
+                  <div
+                    key={c.id}
+                    className="py-2 border-t flex items-center justify-between"
+                  >
+                    <div>
+                      <div>
+                        {c.entityType} · {c.operation} · {c.status}
+                      </div>
+                      {c.errorMessage && (
+                        <div className="text-xs text-red-600">
+                          {c.errorMessage}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {c.status !== "synced" && (
+                        <Button
+                          size="sm"
+                          variant="flat"
+                          onPress={async () => {
+                            await db.syncQueue.update(c.id, {
+                              status: "pending",
+                              retryCount: 0,
+                            });
+                            const mgr = getSyncManager();
+                            await mgr.sync();
+                            const rows = await db.syncQueue
+                              .where("status")
+                              .anyOf(["conflict", "failed", "synced"])
+                              .reverse()
+                              .limit(20)
+                              .toArray();
+                            setConflicts(rows);
+                          }}
+                        >
+                          Reintentar
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-neutral-500">Sin elementos</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
