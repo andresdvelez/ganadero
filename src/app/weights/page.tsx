@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc/client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 
 export default function WeightsPage() {
   return (
@@ -95,7 +96,13 @@ function WeightsCreate() {
 }
 
 function WeightsList() {
+  const params = useSearchParams();
+  const router = useRouter();
   const [animalId, setAnimalId] = useState("");
+  useEffect(() => {
+    const aid = params.get("animalId");
+    if (aid) setAnimalId(aid);
+  }, [params]);
   const list = trpc.weights.listWeights.useQuery({
     animalId: animalId || undefined,
     limit: 200,
@@ -162,7 +169,22 @@ function WeightsList() {
                 <div>
                   {new Date(r.weighedAt).toLocaleDateString()} · {r.animalId}
                 </div>
-                <div className="font-medium">{r.weightKg} kg</div>
+                <div className="font-medium flex items-center gap-3">
+                  {r.weightKg} kg
+                  <a
+                    className="text-xs underline"
+                    href={`?animalId=${encodeURIComponent(r.animalId)}`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setAnimalId(r.animalId);
+                      router.push(
+                        `?animalId=${encodeURIComponent(r.animalId)}`
+                      );
+                    }}
+                  >
+                    Filtrar por este animal
+                  </a>
+                </div>
               </div>
             ))}
           </div>
@@ -251,7 +273,13 @@ function CarcassCreate() {
 }
 
 function CarcassList() {
+  const params = useSearchParams();
+  const router = useRouter();
   const [animalId, setAnimalId] = useState("");
+  useEffect(() => {
+    const aid = params.get("animalId");
+    if (aid) setAnimalId(aid);
+  }, [params]);
   const list = trpc.weights.listCarcass.useQuery({
     animalId: animalId || undefined,
     limit: 200,
@@ -321,6 +349,17 @@ function CarcassList() {
                 {r.hotCarcassKg || "-"}/{r.coldCarcassKg || "-"} kg ·{" "}
                 {r.dressingPct ? `${r.dressingPct}%` : "-"}{" "}
                 {r.grade ? `· ${r.grade}` : ""}
+                <a
+                  className="ml-2 text-xs underline"
+                  href={`?animalId=${encodeURIComponent(r.animalId)}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setAnimalId(r.animalId);
+                    router.push(`?animalId=${encodeURIComponent(r.animalId)}`);
+                  }}
+                >
+                  Filtrar por este animal
+                </a>
               </div>
             ))}
           </div>

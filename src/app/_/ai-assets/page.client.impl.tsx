@@ -135,6 +135,7 @@ function SemenTab() {
     canister: "",
   });
   const [moveQty, setMoveQty] = useState(1);
+  const [traceOpenId, setTraceOpenId] = useState<string | null>(null);
   return (
     <div className="grid md:grid-cols-2 gap-4">
       <div className="island p-4">
@@ -340,9 +341,50 @@ function SemenTab() {
                       })
                     }
                   />
+                  <Button
+                    size="sm"
+                    variant="light"
+                    onPress={() => setTraceOpenId(b.id)}
+                  >
+                    Trazabilidad
+                  </Button>
                 </div>
               </div>
             ))}
+            {traceOpenId && (
+              <div className="mt-2 border rounded-md p-3 bg-white">
+                <div className="flex items-center justify-between">
+                  <div className="font-semibold text-sm">
+                    Movimientos del lote
+                  </div>
+                  <Button size="sm" onPress={() => setTraceOpenId(null)}>
+                    Cerrar
+                  </Button>
+                </div>
+                <div className="text-xs text-neutral-500 mt-1">
+                  {list.data?.find((x) => x.id === traceOpenId)?.code}
+                </div>
+                <div className="text-sm divide-y mt-2">
+                  {(
+                    list.data?.find((x) => x.id === traceOpenId)?.movements ||
+                    []
+                  ).map((m: any) => (
+                    <div
+                      key={m.id}
+                      className="py-1 flex items-center justify-between"
+                    >
+                      <div>
+                        {new Date(m.date).toLocaleString()} · {m.type} ·{" "}
+                        {m.quantity}
+                      </div>
+                      <div className="text-xs text-neutral-500">
+                        {m.reason || ""}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="pt-2">
               <Button
                 size="sm"
@@ -404,6 +446,7 @@ function EmbryosTab() {
     canister: "",
   });
   const [moveQty, setMoveQty] = useState(1);
+  const [traceOpenId, setTraceOpenId] = useState<string | null>(null);
   return (
     <div className="grid md:grid-cols-2 gap-4">
       <div className="island p-4">
@@ -609,9 +652,50 @@ function EmbryosTab() {
                       })
                     }
                   />
+                  <Button
+                    size="sm"
+                    variant="light"
+                    onPress={() => setTraceOpenId(b.id)}
+                  >
+                    Trazabilidad
+                  </Button>
                 </div>
               </div>
             ))}
+            {traceOpenId && (
+              <div className="mt-2 border rounded-md p-3 bg-white">
+                <div className="flex items-center justify-between">
+                  <div className="font-semibold text-sm">
+                    Movimientos del lote
+                  </div>
+                  <Button size="sm" onPress={() => setTraceOpenId(null)}>
+                    Cerrar
+                  </Button>
+                </div>
+                <div className="text-xs text-neutral-500 mt-1">
+                  {list.data?.find((x) => x.id === traceOpenId)?.code}
+                </div>
+                <div className="text-sm divide-y mt-2">
+                  {(
+                    list.data?.find((x) => x.id === traceOpenId)?.movements ||
+                    []
+                  ).map((m: any) => (
+                    <div
+                      key={m.id}
+                      className="py-1 flex items-center justify-between"
+                    >
+                      <div>
+                        {new Date(m.date).toLocaleString()} · {m.type} ·{" "}
+                        {m.quantity}
+                      </div>
+                      <div className="text-xs text-neutral-500">
+                        {m.reason || ""}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="pt-2">
               <Button
                 size="sm"

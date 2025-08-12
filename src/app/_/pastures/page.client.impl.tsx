@@ -106,6 +106,39 @@ export default function PasturesClient() {
 
         <div className="mt-6 island p-4">
           <div className="font-semibold mb-2">Calendario PRV (14 días)</div>
+          <div className="text-xs text-neutral-600 mb-2">
+            {(() => {
+              const days = Array.from({ length: 14 }).map((_, i) => {
+                const d = new Date();
+                d.setDate(d.getDate() + i);
+                const dayStr = d.toISOString().slice(0, 10);
+                const occ = (events.data || []).find(
+                  (e: any) =>
+                    new Date(e.date).toISOString().slice(0, 10) === dayStr
+                );
+                const meas = (measurements.data || []).find(
+                  (m: any) =>
+                    new Date(m.date).toISOString().slice(0, 10) === dayStr
+                );
+                return { occ: !!occ, rest: meas?.restDays ?? null };
+              });
+              const occCount = days.filter((d) => d.occ).length;
+              const restVals = days
+                .map((d) => d.rest)
+                .filter((v) => typeof v === "number") as number[];
+              const avgRest = restVals.length
+                ? Math.round(
+                    restVals.reduce((a, b) => a + b, 0) / restVals.length
+                  )
+                : 0;
+              return (
+                <span>
+                  Ocupación: <b>{occCount}</b> días · Descanso promedio:{" "}
+                  <b>{avgRest}</b> días
+                </span>
+              );
+            })()}
+          </div>
           <div className="grid grid-cols-7 gap-2 text-xs">
             {Array.from({ length: 14 }).map((_, i) => {
               const d = new Date();
@@ -114,6 +147,10 @@ export default function PasturesClient() {
               const occ = (events.data || []).find(
                 (e: any) =>
                   new Date(e.date).toISOString().slice(0, 10) === dayStr
+              );
+              const meas = (measurements.data || []).find(
+                (m: any) =>
+                  new Date(m.date).toISOString().slice(0, 10) === dayStr
               );
               return (
                 <div
@@ -130,6 +167,11 @@ export default function PasturesClient() {
                         }`
                       : "Libre"}
                   </div>
+                  {typeof meas?.restDays === "number" && (
+                    <div className="mt-1 text-[10px] text-neutral-500">
+                      Descanso: {meas.restDays} d
+                    </div>
+                  )}
                 </div>
               );
             })}
