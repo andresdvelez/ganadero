@@ -411,7 +411,7 @@ export const aiRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const { userId } = ctx;
       if (!userId) throw new Error("UNAUTHORIZED");
-      const saved = await prisma.aIChoice.create({
+      const saved = await (prisma as any).aIChoice.create({
         data: {
           userId,
           sessionId: input.sessionId,
