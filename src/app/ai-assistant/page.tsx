@@ -161,6 +161,7 @@ export default function AIAssistantPage() {
   const [runningTools, setRunningTools] = useState<
     Array<{ id: string; label: string }>
   >([]);
+  const [period, setPeriod] = useState<{ from?: string; to?: string }>({});
 
   // New TRPC hooks for AI context/memories
   const recordMessage = trpc.ai.recordMessage.useMutation();
@@ -321,6 +322,45 @@ export default function AIAssistantPage() {
     URL.revokeObjectURL(url);
   };
 
+  const downloadPngFromSvg = async (
+    node: SVGSVGElement | null,
+    filename: string
+  ) => {
+    if (!node) return;
+    const serializer = new XMLSerializer();
+    const svgString = serializer.serializeToString(node);
+    const img = new Image();
+    const svgBlob = new Blob([svgString], {
+      type: "image/svg+xml;charset=utf-8",
+    });
+    const url = URL.createObjectURL(svgBlob);
+    await new Promise<void>((resolve) => {
+      img.onload = () => resolve();
+      img.src = url;
+    });
+    const w = Number(node.getAttribute("width") || 600);
+    const h = Number(node.getAttribute("height") || 300);
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(img, 0, 0);
+    URL.revokeObjectURL(url);
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = filename.endsWith(".png") ? filename : `${filename}.png`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    }, "image/png");
+  };
+
   const ChartWidget: React.FC<{ message: Message }> = ({ message }) => {
     const ref = useRef<SVGSVGElement | null>(null);
     if (!message.widget || message.widget.type !== "chart") return null;
@@ -338,6 +378,13 @@ export default function AIAssistantPage() {
             onPress={() => downloadSvg(ref.current, title)}
           >
             Descargar SVG
+          </Button>
+          <Button
+            size="sm"
+            variant="flat"
+            onPress={() => downloadPngFromSvg(ref.current, title)}
+          >
+            Descargar PNG
           </Button>
         </div>
         {chart.kind === "pie" && (
@@ -672,7 +719,13 @@ export default function AIAssistantPage() {
       // Heuristic charts for other modules
       if (chartRequested && /salud/i.test(userMessage.content)) {
         const toolId = `tool-${Date.now()}`;
-        const range = inferDateRange(userMessage.content);
+        const range =
+          period.from || period.to
+            ? {
+                from: period.from ? new Date(period.from) : undefined,
+                to: period.to ? new Date(period.to) : undefined,
+              }
+            : inferDateRange(userMessage.content);
         setRunningTools((prev) => [
           ...prev,
           { id: toolId, label: "Generando gráfica de salud…" },
@@ -733,7 +786,13 @@ export default function AIAssistantPage() {
 
       if (chartRequested && /leche|producci[oó]n/i.test(userMessage.content)) {
         const toolId = `tool-${Date.now()}`;
-        const range = inferDateRange(userMessage.content);
+        const range =
+          period.from || period.to
+            ? {
+                from: period.from ? new Date(period.from) : undefined,
+                to: period.to ? new Date(period.to) : undefined,
+              }
+            : inferDateRange(userMessage.content);
         setRunningTools((prev) => [
           ...prev,
           { id: toolId, label: "Generando gráfica de leche…" },
@@ -798,7 +857,13 @@ export default function AIAssistantPage() {
 
       if (chartRequested && /inventario/i.test(userMessage.content)) {
         const toolId = `tool-${Date.now()}`;
-        const range = inferDateRange(userMessage.content);
+        const range =
+          period.from || period.to
+            ? {
+                from: period.from ? new Date(period.from) : undefined,
+                to: period.to ? new Date(period.to) : undefined,
+              }
+            : inferDateRange(userMessage.content);
         setRunningTools((prev) => [
           ...prev,
           { id: toolId, label: "Generando gráfica de inventario…" },
@@ -868,7 +933,13 @@ export default function AIAssistantPage() {
         /finanzas?|ingresos|egresos/i.test(userMessage.content)
       ) {
         const toolId = `tool-${Date.now()}`;
-        const range = inferDateRange(userMessage.content);
+        const range =
+          period.from || period.to
+            ? {
+                from: period.from ? new Date(period.from) : undefined,
+                to: period.to ? new Date(period.to) : undefined,
+              }
+            : inferDateRange(userMessage.content);
         setRunningTools((prev) => [
           ...prev,
           { id: toolId, label: "Generando gráfica de finanzas…" },
@@ -1837,6 +1908,28 @@ export default function AIAssistantPage() {
         }
       >
         <div className="flex flex-col h-[calc(100vh-4rem)]">
+          <div className="p-3 border-b border-neutral-200 flex items-center gap-3">
+            <div className="text-sm text-neutral-600">Periodo:</div>
+            <input
+              aria-label="Desde"
+              type="date"
+              className="border rounded-md px-2 py-1 text-sm"
+              value={period.from || ""}
+              onChange={(e) =>
+                setPeriod((p) => ({ ...p, from: e.target.value }))
+              }
+            />
+            <input
+              aria-label="Hasta"
+              type="date"
+              className="border rounded-md px-2 py-1 text-sm"
+              value={period.to || ""}
+              onChange={(e) => setPeriod((p) => ({ ...p, to: e.target.value }))}
+            />
+            <div className="text-xs text-neutral-500">
+              Usado por gráficas y listados cuando aplica.
+            </div>
+          </div>
           <div className="flex-1 overflow-y-auto p-0">
             {messages.length > 0 ? (
               <div className="flex h-full">
