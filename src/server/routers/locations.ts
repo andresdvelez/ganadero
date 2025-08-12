@@ -58,15 +58,23 @@ export const locationsRouter = createTRPCRouter({
       return ctx.prisma.location.update({
         where: { id: input.id },
         data: {
-          ...(input.data.name !== undefined ? { name: input.data.name } : {}),
-          ...(input.data.type !== undefined ? { type: input.data.type } : {}),
-          ...(input.data.lat !== undefined ? { lat: input.data.lat } : {}),
-          ...(input.data.lng !== undefined ? { lng: input.data.lng } : {}),
+          ...(input.data.name !== undefined && input.data.name !== null
+            ? { name: input.data.name }
+            : {}),
+          ...(input.data.type !== undefined
+            ? { type: input.data.type ?? null }
+            : {}),
+          ...(input.data.lat !== undefined
+            ? { lat: input.data.lat ?? null }
+            : {}),
+          ...(input.data.lng !== undefined
+            ? { lng: input.data.lng ?? null }
+            : {}),
           ...(input.data.areaHa !== undefined
-            ? { areaHa: input.data.areaHa }
+            ? { areaHa: input.data.areaHa ?? null }
             : {}),
           ...(input.data.notes !== undefined
-            ? { notes: input.data.notes }
+            ? { notes: input.data.notes ?? null }
             : {}),
         },
       });
