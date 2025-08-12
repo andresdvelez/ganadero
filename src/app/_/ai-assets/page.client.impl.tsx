@@ -94,14 +94,24 @@ function SemenTab() {
   const tanks = trpc.aiAssets.listTanks.useQuery();
   const [tankFilter, setTankFilter] = useState<string>("");
   const params = useSearchParams();
-  // Seed tank filter by name
-  const tankName = params.get("tankName");
+  // Seed tank filter by name from URL or localStorage
+  const tankName =
+    params.get("tankName") ||
+    (typeof window !== "undefined"
+      ? localStorage.getItem("aiassets:lastTankName")
+      : null);
   if (tankName && tanks.data && !tankFilter) {
     const found = tanks.data.find(
       (t) => t.name?.toLowerCase() === tankName.toLowerCase()
     );
     if (found) setTankFilter(found.id);
   }
+  // Persist selection when user changes filter
+  const onChangeTank = (id: string) => {
+    setTankFilter(id);
+    const name = tanks.data?.find((t) => t.id === id)?.name;
+    if (name) localStorage.setItem("aiassets:lastTankName", name);
+  };
   const [q, setQ] = useState("");
   const [limit, setLimit] = useState(50);
   const list = trpc.aiAssets.listSemenBatches.useQuery({
@@ -182,7 +192,7 @@ function SemenTab() {
             aria-label="Filtrar por termo"
             className="border rounded-md px-2 py-1 text-xs ml-auto"
             value={tankFilter}
-            onChange={(e) => setTankFilter(e.target.value)}
+            onChange={(e) => onChangeTank(e.target.value)}
           >
             <option value="">Todos</option>
             {tanks.data?.map((t) => (
@@ -322,13 +332,22 @@ function EmbryosTab() {
   const tanks = trpc.aiAssets.listTanks.useQuery();
   const [tankFilter, setTankFilter] = useState<string>("");
   const params = useSearchParams();
-  const tankName = params.get("tankName");
+  const tankName =
+    params.get("tankName") ||
+    (typeof window !== "undefined"
+      ? localStorage.getItem("aiassets:lastTankName")
+      : null);
   if (tankName && tanks.data && !tankFilter) {
     const found = tanks.data.find(
       (t) => t.name?.toLowerCase() === tankName.toLowerCase()
     );
     if (found) setTankFilter(found.id);
   }
+  const onChangeTank = (id: string) => {
+    setTankFilter(id);
+    const name = tanks.data?.find((t) => t.id === id)?.name;
+    if (name) localStorage.setItem("aiassets:lastTankName", name);
+  };
   const [q, setQ] = useState("");
   const [limit, setLimit] = useState(50);
   const list = trpc.aiAssets.listEmbryoBatches.useQuery({
@@ -409,7 +428,7 @@ function EmbryosTab() {
             aria-label="Filtrar por termo"
             className="border rounded-md px-2 py-1 text-xs ml-auto"
             value={tankFilter}
-            onChange={(e) => setTankFilter(e.target.value)}
+            onChange={(e) => onChangeTank(e.target.value)}
           >
             <option value="">Todos</option>
             {tanks.data?.map((t) => (

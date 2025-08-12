@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,27 @@ export function MastitisCases() {
   });
   const [q, setQ] = useState("");
   const [period, setPeriod] = useState<{ from?: string; to?: string }>({});
+
+  // Load saved period
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("mastitis:lastPeriod");
+      if (raw) {
+        const p = JSON.parse(raw) as { from?: string; to?: string };
+        setPeriod({ from: p.from || undefined, to: p.to || undefined });
+      }
+    } catch {}
+  }, []);
+
+  // Persist on change
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "mastitis:lastPeriod",
+        JSON.stringify({ from: period.from || null, to: period.to || null })
+      );
+    } catch {}
+  }, [period.from, period.to]);
 
   const filtered = (list.data || []).filter((c: any) => {
     if (!q.trim()) return true;
@@ -207,6 +228,16 @@ export function MastitisCases() {
                   },
                 })
               );
+              // ensure persisted
+              try {
+                localStorage.setItem(
+                  "mastitis:lastPeriod",
+                  JSON.stringify({
+                    from: period.from || null,
+                    to: period.to || null,
+                  })
+                );
+              } catch {}
             }}
           >
             Abrir en chat

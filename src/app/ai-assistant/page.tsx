@@ -3245,9 +3245,50 @@ export default function AIAssistantPage() {
                                   <Button
                                     size="sm"
                                     variant="flat"
-                                    onPress={() =>
-                                      router.push(String(message.data.href))
-                                    }
+                                    onPress={() => {
+                                      try {
+                                        const url = new URL(
+                                          String(message.data.href),
+                                          window.location.origin
+                                        );
+                                        if (message.module === "ai-assets") {
+                                          const tankName =
+                                            url.searchParams.get("tankName");
+                                          if (tankName)
+                                            localStorage.setItem(
+                                              "aiassets:lastTankName",
+                                              tankName
+                                            );
+                                          addToast({
+                                            variant: "success",
+                                            title: "Abrí IA Assets",
+                                            description: tankName
+                                              ? `Termo: ${tankName}`
+                                              : undefined,
+                                          });
+                                        }
+                                        if (message.module === "mastitis") {
+                                          const from =
+                                            url.searchParams.get("from");
+                                          const to = url.searchParams.get("to");
+                                          if (from || to) {
+                                            localStorage.setItem(
+                                              "mastitis:lastPeriod",
+                                              JSON.stringify({ from, to })
+                                            );
+                                          }
+                                          addToast({
+                                            variant: "success",
+                                            title: "Abrí Mastitis",
+                                            description:
+                                              from || to
+                                                ? `Periodo aplicado`
+                                                : undefined,
+                                          });
+                                        }
+                                      } catch {}
+                                      router.push(String(message.data.href));
+                                    }}
                                   >
                                     Abrir
                                   </Button>
