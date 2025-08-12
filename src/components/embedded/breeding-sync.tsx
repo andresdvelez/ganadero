@@ -8,16 +8,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AnimalPicker } from "@/components/embedded/animal-picker";
 
 export function BreedingSync() {
-  const utils = trpc.useUtils?.() as any;
-  const list = trpc.breedingAdv.listSyncBatches.useQuery({ limit: 100 });
+  const batchesQuery = trpc.breedingAdv.listSyncBatches.useQuery({
+    limit: 100,
+  });
   const createBatch = trpc.breedingAdv.createSyncBatch.useMutation({
-    onSuccess: () => list.refetch(),
+    onSuccess: () => batchesQuery.refetch(),
   });
   const addAnimal = trpc.breedingAdv.addAnimalToBatch.useMutation({
-    onSuccess: () => list.refetch(),
+    onSuccess: () => batchesQuery.refetch(),
   });
   const updateAnimal = trpc.breedingAdv.updateSyncAnimal.useMutation({
-    onSuccess: () => list.refetch(),
+    onSuccess: () => batchesQuery.refetch(),
   });
 
   const [form, setForm] = useState({
@@ -32,9 +33,83 @@ export function BreedingSync() {
     date?: string;
     notes?: string;
   }>({});
+  const [q, setQ] = useState("");
+
+  function toCSV(batches: any[]) {
+    const rows: string[] = [
+      [
+        "batchId",
+        "protocol",
+        "startDate",
+        "animalId",
+        "tag",
+        "name",
+        "status",
+        "date",
+        "notes",
+      ].join(","),
+    ];
+    batches.forEach((b) => {
+      (b.animals || []).forEach((a: any) => {
+        rows.push(
+          [
+            b.id,
+            b.protocol || "",
+            new Date(b.startDate).toISOString().slice(0, 10),
+            a.animal?.id || a.animalId,
+            a.animal?.tagNumber || "",
+            a.animal?.name || "",
+            a.status || "",
+            a.date ? new Date(a.date).toISOString().slice(0, 10) : "",
+            (a.notes || "").replace(/,/g, " "),
+          ].join(",")
+        );
+      });
+    });
+    return rows.join("\n");
+  }
+
+  const filtered = useMemo(() => {
+    const list = batchesQuery.data || [];
+    if (!q.trim()) return list;
+    const s = q.toLowerCase();
+    return list.filter(
+      (b: any) =>
+        (b.protocol || "").toLowerCase().includes(s) ||
+        (b.animals || []).some(
+          (a: any) =>
+            a.animal?.tagNumber?.toLowerCase().includes(s) ||
+            a.animal?.name?.toLowerCase().includes(s)
+        )
+    );
+  }, [batchesQuery.data, q]);
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center gap-2">
+        <Input
+          placeholder="Buscar por protocolo, arete o nombre…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        <Button
+          variant="secondary"
+          onPress={() => {
+            const blob = new Blob([toCSV(filtered)], {
+              type: "text/csv;charset=utf-8;",
+            });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `sync-batches.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+        >
+          Exportar CSV
+        </Button>
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle>Crear lote de sincronización</CardTitle>
@@ -75,7 +150,7 @@ export function BreedingSync() {
       </Card>
 
       <div className="space-y-4">
-        {list.data?.map((b: any) => (
+        {filtered.map((b: any) => (
           <Card key={b.id}>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
@@ -183,7 +258,10 @@ export function BreedingSync() {
                       className="p-2 flex items-center justify-between"
                     >
                       <div className="text-sm">
-                        <div className="font-medium">Animal: {a.animalId}</div>
+                        <div className="font-medium">
+                          Animal: {a.animal?.name || "(sin nombre)"} #
+                          {a.animal?.tagNumber || a.animalId}
+                        </div>
                         <div className="text-neutral-600">
                           Estado: {a.status || "-"}
                         </div>
@@ -227,7 +305,7 @@ export function BreedingSync() {
             </CardContent>
           </Card>
         ))}
-        {list.data?.length === 0 && (
+        {filtered.length === 0 && (
           <div className="text-neutral-600">Sin lotes aún.</div>
         )}
       </div>

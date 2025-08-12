@@ -20,9 +20,68 @@ export function BreedingPalpation() {
     technician: "",
     notes: "",
   });
+  const [q, setQ] = useState("");
+
+  function toCSV(items: any[]) {
+    const header = [
+      "date",
+      "result",
+      "animalId",
+      "tag",
+      "name",
+      "technician",
+      "notes",
+    ].join(",");
+    const rows = items.map((r: any) =>
+      [
+        new Date(r.palpationDate).toISOString().slice(0, 10),
+        r.result,
+        r.animal?.id || r.animalId,
+        r.animal?.tagNumber || "",
+        r.animal?.name || "",
+        r.technician || "",
+        (r.notes || "").replace(/,/g, " "),
+      ].join(",")
+    );
+    return [header, ...rows].join("\n");
+  }
+
+  const filtered = (list.data || []).filter((r: any) => {
+    if (!q.trim()) return true;
+    const s = q.toLowerCase();
+    return (
+      r.result?.toLowerCase().includes(s) ||
+      r.animal?.tagNumber?.toLowerCase().includes(s) ||
+      r.animal?.name?.toLowerCase().includes(s) ||
+      (r.notes || "").toLowerCase().includes(s)
+    );
+  });
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Input
+          placeholder="Buscar por resultado, arete o nombre…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        <Button
+          variant="secondary"
+          onPress={() => {
+            const blob = new Blob([toCSV(filtered)], {
+              type: "text/csv;charset=utf-8;",
+            });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `palpaciones.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+        >
+          Exportar CSV
+        </Button>
+      </div>
       <Card>
         <CardHeader>
           <CardTitle>Registrar palpación</CardTitle>
@@ -84,7 +143,7 @@ export function BreedingPalpation() {
       </Card>
 
       <div className="rounded-lg border divide-y">
-        {list.data?.map((r: any) => (
+        {filtered.map((r: any) => (
           <div
             key={r.id}
             className="p-3 text-sm flex items-center justify-between"
@@ -93,6 +152,10 @@ export function BreedingPalpation() {
               <div className="font-medium">
                 {new Date(r.palpationDate).toLocaleDateString()} — {r.result}
               </div>
+              <div className="text-neutral-600">
+                Animal: {r.animal?.name || "(sin nombre)"} #
+                {r.animal?.tagNumber || r.animalId}
+              </div>
               {r.technician && (
                 <div className="text-neutral-600">Técnico: {r.technician}</div>
               )}
@@ -100,7 +163,7 @@ export function BreedingPalpation() {
             </div>
           </div>
         ))}
-        {!list.data?.length && (
+        {!filtered.length && (
           <div className="p-3 text-sm text-neutral-600">
             Sin palpaciones aún.
           </div>

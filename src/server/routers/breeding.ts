@@ -30,7 +30,13 @@ export const breedingAdvRouter = createTRPCRouter({
         where: { userId: ctx.userId! },
         orderBy: { startDate: "desc" },
         take: input?.limit ?? 50,
-        include: { animals: true },
+        include: {
+          animals: {
+            include: {
+              animal: { select: { id: true, tagNumber: true, name: true } },
+            },
+          },
+        },
       });
     }),
   addAnimalToBatch: protectedProcedure
@@ -44,6 +50,18 @@ export const breedingAdvRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      // Validate animal belongs to user
+      const animal = await ctx.prisma.animal.findFirst({
+        where: { id: input.animalId, user: { clerkId: ctx.userId! } },
+        select: { id: true },
+      });
+      if (!animal) throw new Error("Animal no encontrado o sin permisos");
+      // Validate batch belongs to user
+      const batch = await ctx.prisma.breedingSyncBatch.findFirst({
+        where: { id: input.batchId, userId: ctx.userId! },
+        select: { id: true },
+      });
+      if (!batch) throw new Error("Lote no encontrado o sin permisos");
       return ctx.prisma.breedingSyncAnimal.create({
         data: {
           batchId: input.batchId,
@@ -64,6 +82,12 @@ export const breedingAdvRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      // Ensure the sync animal belongs to a batch of the user
+      const exists = await ctx.prisma.breedingSyncAnimal.findFirst({
+        where: { id: input.id, batch: { userId: ctx.userId! } },
+        select: { id: true },
+      });
+      if (!exists) throw new Error("Sin permisos sobre este registro");
       return ctx.prisma.breedingSyncAnimal.update({
         where: { id: input.id },
         data: {
@@ -90,6 +114,11 @@ export const breedingAdvRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const animal = await ctx.prisma.animal.findFirst({
+        where: { id: input.animalId, user: { clerkId: ctx.userId! } },
+        select: { id: true },
+      });
+      if (!animal) throw new Error("Animal no encontrado o sin permisos");
       return ctx.prisma.palpationRecord.create({
         data: {
           userId: ctx.userId!,
@@ -117,6 +146,9 @@ export const breedingAdvRouter = createTRPCRouter({
         where,
         orderBy: { palpationDate: "desc" },
         take: input?.limit ?? 100,
+        include: {
+          animal: { select: { id: true, name: true, tagNumber: true } },
+        },
       });
     }),
 
@@ -131,6 +163,11 @@ export const breedingAdvRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const animal = await ctx.prisma.animal.findFirst({
+        where: { id: input.animalId, user: { clerkId: ctx.userId! } },
+        select: { id: true },
+      });
+      if (!animal) throw new Error("Animal no encontrado o sin permisos");
       return ctx.prisma.abortionRecord.create({
         data: {
           userId: ctx.userId!,
@@ -157,6 +194,9 @@ export const breedingAdvRouter = createTRPCRouter({
         where,
         orderBy: { date: "desc" },
         take: input?.limit ?? 100,
+        include: {
+          animal: { select: { id: true, name: true, tagNumber: true } },
+        },
       });
     }),
 });

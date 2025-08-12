@@ -17,6 +17,11 @@ export const mastitisRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const animal = await ctx.prisma.animal.findFirst({
+        where: { id: input.animalId, user: { clerkId: ctx.userId! } },
+        select: { id: true },
+      });
+      if (!animal) throw new Error("Animal no encontrado o sin permisos");
       return ctx.prisma.mastitisCase.create({
         data: {
           userId: ctx.userId!,
@@ -50,6 +55,9 @@ export const mastitisRouter = createTRPCRouter({
         where,
         orderBy: { detectedAt: "desc" },
         take: input?.limit ?? 100,
+        include: {
+          animal: { select: { id: true, name: true, tagNumber: true } },
+        },
       });
     }),
   update: protectedProcedure
@@ -64,6 +72,11 @@ export const mastitisRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const exists = await ctx.prisma.mastitisCase.findFirst({
+        where: { id: input.id, userId: ctx.userId! },
+        select: { id: true },
+      });
+      if (!exists) throw new Error("Sin permisos sobre este caso");
       return ctx.prisma.mastitisCase.update({
         where: { id: input.id },
         data: {
