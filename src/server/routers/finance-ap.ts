@@ -157,7 +157,7 @@ export const financeApRouter = createTRPCRouter({
       return payment;
     }),
 
-  // Attachments (demo in-DB via LabExam-like table would be better; here use PurchaseInvoice.notes to store refs or a dedicated table if exists)
+  // Attachments (demo): guardar referencia en notes con metadatos, sin archivo
   attachInvoiceFile: protectedProcedure
     .input(
       z.object({
@@ -168,7 +168,6 @@ export const financeApRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // For demo, append a JSON line to notes with attachment metadata
       const inv = await ctx.prisma.purchaseInvoice.findFirst({
         where: { id: input.invoiceId, userId: ctx.userId! },
         select: { id: true, notes: true },
