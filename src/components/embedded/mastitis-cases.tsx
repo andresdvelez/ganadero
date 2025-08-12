@@ -33,6 +33,7 @@ export function MastitisCases() {
     notes: "",
   });
   const [q, setQ] = useState("");
+  const [period, setPeriod] = useState<{ from?: string; to?: string }>({});
 
   const filtered = (list.data || []).filter((c: any) => {
     if (!q.trim()) return true;
@@ -44,6 +45,12 @@ export function MastitisCases() {
       (c.bacteria || "").toLowerCase().includes(s) ||
       (c.cmtScore || "").toLowerCase().includes(s)
     );
+  });
+  const filteredByDate = filtered.filter((c: any) => {
+    const d = new Date(c.detectedAt);
+    if (period.from && d < new Date(period.from)) return false;
+    if (period.to && d > new Date(period.to)) return false;
+    return true;
   });
 
   function toCSV(items: any[]) {
@@ -79,7 +86,7 @@ export function MastitisCases() {
   // simple time-bucketed KPI: cases per week
   const series = (() => {
     const m = new Map<string, number>();
-    for (const c of filtered) {
+    for (const c of filteredByDate) {
       const d = new Date(c.detectedAt);
       const key = `${d.getFullYear()}-W${Math.ceil(
         ((d.getTime() - new Date(d.getFullYear(), 0, 1).getTime()) / 86400000 +
@@ -100,10 +107,26 @@ export function MastitisCases() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
+        <Input
+          aria-label="Desde"
+          type="date"
+          value={period.from || ""}
+          onChange={(e) =>
+            setPeriod((p) => ({ ...p, from: e.target.value || undefined }))
+          }
+        />
+        <Input
+          aria-label="Hasta"
+          type="date"
+          value={period.to || ""}
+          onChange={(e) =>
+            setPeriod((p) => ({ ...p, to: e.target.value || undefined }))
+          }
+        />
         <Button
           variant="secondary"
           onPress={() => {
-            const blob = new Blob([toCSV(filtered)], {
+            const blob = new Blob([toCSV(filteredByDate)], {
               type: "text/csv;charset=utf-8;",
             });
             const url = URL.createObjectURL(blob);
@@ -277,15 +300,24 @@ export function MastitisCases() {
       </Card>
 
       <div className="rounded-lg border divide-y">
-        {filtered.map((c: any) => (
+        {filteredByDate.map((c: any) => (
           <>
             <div
               key={c.id}
               className="p-3 text-sm flex items-center justify-between"
             >
               <div>
-                <div className="font-medium">
-                  {new Date(c.detectedAt).toLocaleDateString()} — {c.status}
+                <div className="font-medium flex items-center gap-2">
+                  {new Date(c.detectedAt).toLocaleDateString()}
+                  <span
+                    className={`text-[10px] px-2 py-0.5 rounded-full border ${
+                      c.status === "resolved"
+                        ? "bg-green-50 text-green-700 border-green-200"
+                        : "bg-yellow-50 text-yellow-700 border-yellow-200"
+                    }`}
+                  >
+                    {c.status}
+                  </span>
                 </div>
                 <div className="text-neutral-600">
                   Animal: {c.animal?.name || "(sin nombre)"} #
@@ -344,7 +376,7 @@ export function MastitisCases() {
             )}
           </>
         ))}
-        {!filtered.length && (
+        {!filteredByDate.length && (
           <div className="p-3 text-sm text-neutral-600">Sin casos aún.</div>
         )}
       </div>
