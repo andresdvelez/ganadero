@@ -79,6 +79,25 @@ export default function FinancePageClient() {
             <Button>Registrar transacción</Button>
           </Link>
         </div>
+        <div className="flex items-center justify-between">
+          <div className="text-xs text-neutral-500">Inicio / Finanzas</div>
+          <Button
+            size="sm"
+            variant="light"
+            onPress={() => {
+              const params: any = {};
+              if (statusParam) params.status = statusParam;
+              if (supplierIdParam) params.supplierId = supplierIdParam;
+              window.dispatchEvent(
+                new CustomEvent("ai-seed-report", {
+                  detail: { module: "finance", ...params },
+                })
+              );
+            }}
+          >
+            Abrir en chat
+          </Button>
+        </div>
         {/* Resumen por proveedor del resultado actual */}
         <Card>
           <CardHeader>

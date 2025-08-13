@@ -220,8 +220,22 @@ export default function InventoryClient() {
             >
               CSV filtrado
             </Button>
+            <Button
+              size="sm"
+              variant="light"
+              onPress={() => {
+                window.dispatchEvent(
+                  new CustomEvent("ai-seed-report", {
+                    detail: { module: "inventory" },
+                  })
+                );
+              }}
+            >
+              Abrir en chat
+            </Button>
           </div>
         </div>
+        <div className="text-xs text-neutral-500">Inicio / Inventario</div>
         {filtered.length === 0 ? (
           <p className="text-neutral-600">Sin productos.</p>
         ) : (
