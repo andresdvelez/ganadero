@@ -8,6 +8,7 @@ import { BreedingPalpation } from "@/components/embedded/breeding-palpation";
 import { BreedingAbortions } from "@/components/embedded/breeding-abortions";
 import { BreedingKPIs } from "@/components/embedded/breeding-kpis";
 import { BreedingActionLists } from "@/components/embedded/breeding-action-lists";
+import { BreedingQuickEvents } from "@/components/embedded/breeding-quick-events";
 
 export default function BreedingClient() {
   const [tab, setTab] = useState("sync");
@@ -23,6 +24,7 @@ export default function BreedingClient() {
             <TabsTrigger value="abort">Abortos</TabsTrigger>
             <TabsTrigger value="kpi">KPIs</TabsTrigger>
             <TabsTrigger value="actions">Listas de acción</TabsTrigger>
+            <TabsTrigger value="quick">Eventos rápidos</TabsTrigger>
             <TabsTrigger value="protocols">Protocolos IA/MN/TE</TabsTrigger>
           </TabsList>
           <TabsContent value="sync">
@@ -39,6 +41,9 @@ export default function BreedingClient() {
           </TabsContent>
           <TabsContent value="actions">
             <BreedingActionLists />
+          </TabsContent>
+          <TabsContent value="quick">
+            <BreedingQuickEvents />
           </TabsContent>
           <TabsContent value="protocols">
             {/* Placeholder: reutilizamos el flujo de sincronización como base de protocolos */}
