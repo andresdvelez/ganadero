@@ -3520,6 +3520,71 @@ export default function AIAssistantPage() {
                 dataCsv: healthTop.map((r: any) => ({ animalId: r.animalId, costo: r.cost })),
               } as any,
             ]);
+          } else if (d.module === "finance") {
+            // KPIs y por categoría
+            const k = await utils.finance.kpis.fetch({ from: d.from, to: d.to });
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 1).toString(),
+                role: "assistant",
+                content: `Ingresos: ${(k.income || 0).toLocaleString()} · Egresos: ${(k.expense || 0).toLocaleString()} · Margen: ${(k.margin || 0).toLocaleString()}`,
+                timestamp: new Date(),
+                module: "finance",
+              },
+            ]);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "Ingresos/Egresos por categoría.",
+                timestamp: new Date(),
+                module: "finance",
+                widget: {
+                  type: "chart",
+                  title: "Economía: por categoría (margen)",
+                  chart: {
+                    kind: "bar",
+                    data: (k.byCategory || []).map((c: any) => ({ label: c.label, value: c.margin })),
+                  },
+                },
+                dataCsv: (k.byCategory || []).map((c: any) => ({ categoria: c.label, ingresos: c.income, egresos: c.expense, margen: c.margin })),
+              } as any,
+            ]);
+            // Tendencia mensual
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 3).toString(),
+                role: "assistant",
+                content: "Tendencia mensual (ingresos/egresos/margen).",
+                timestamp: new Date(),
+                module: "finance",
+                widget: {
+                  type: "chart",
+                  title: "Economía: tendencia mensual (neto)",
+                  chart: {
+                    kind: "line",
+                    data: (k.monthly || []).map((r: any) => ({ x: r.period, y: r.net })),
+                  },
+                },
+                dataCsv: k.monthly,
+              } as any,
+            ]);
+            // Aging CxP por proveedor
+            const aging = await utils.financeAp.aging.fetch({} as any);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 4).toString(),
+                role: "assistant",
+                content: "Aging CxP por proveedor (CSV disponible).",
+                timestamp: new Date(),
+                module: "finance",
+                dataCsv: aging,
+              } as any,
+            ]);
           }
         } finally {
           setRunningTools((prev) => prev.filter((t) => t.id !== toolId));

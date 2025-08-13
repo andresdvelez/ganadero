@@ -32,11 +32,12 @@ export const financeRouter = createTRPCRouter({
       }
       const txs = await ctx.prisma.financeTransaction.findMany({
         where,
-        select: { type: true, category: true, amount: true },
+        select: { type: true, category: true, amount: true, date: true },
       });
       let income = 0;
       let expense = 0;
       const byCat = new Map<string, { income: number; expense: number }>();
+      const byMonth = new Map<string, { income: number; expense: number }>();
       txs.forEach((t) => {
         if (t.type === "income") income += t.amount || 0;
         else expense += t.amount || 0;
@@ -45,6 +46,15 @@ export const financeRouter = createTRPCRouter({
         if (t.type === "income") agg.income += t.amount || 0;
         else agg.expense += t.amount || 0;
         byCat.set(key, agg);
+        const d = new Date(t.date);
+        const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+          2,
+          "0"
+        )}`;
+        const m = byMonth.get(ym) || { income: 0, expense: 0 };
+        if (t.type === "income") m.income += t.amount || 0;
+        else m.expense += t.amount || 0;
+        byMonth.set(ym, m);
       });
       const byCategory = Array.from(byCat.entries()).map(([label, v]) => ({
         label,
@@ -52,7 +62,15 @@ export const financeRouter = createTRPCRouter({
         expense: v.expense,
         margin: v.income - v.expense,
       }));
-      return { income, expense, margin: income - expense, byCategory };
+      const monthly = Array.from(byMonth.entries())
+        .sort((a, b) => (a[0] > b[0] ? 1 : -1))
+        .map(([period, v]) => ({
+          period,
+          income: v.income,
+          expense: v.expense,
+          net: v.income - v.expense,
+        }));
+      return { income, expense, margin: income - expense, byCategory, monthly };
     }),
 
   create: protectedProcedure

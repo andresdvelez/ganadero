@@ -260,4 +260,50 @@ export const financeApRouter = createTRPCRouter({
         });
       return list;
     }),
+
+  // Aging por proveedor (CxP)
+  aging: protectedProcedure
+    .input(z.object({ asOf: z.string().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const asOf = input?.asOf ? new Date(input.asOf) : new Date();
+      const rows = await ctx.prisma.purchaseInvoice.findMany({
+        where: { userId: ctx.userId!, status: { in: ["open", "paid"] } },
+        select: {
+          id: true,
+          supplierId: true,
+          date: true,
+          total: true,
+          payments: true,
+          supplier: { select: { id: true, name: true } },
+        },
+      });
+      const bySup = new Map<
+        string,
+        { name: string; b0: number; b30: number; b60: number; b90: number }
+      >();
+      rows.forEach((r) => {
+        const paid = (r.payments || []).reduce((s, p) => s + p.amount, 0);
+        const due = Math.max(0, (r.total || 0) - paid);
+        if (due <= 0) return;
+        const days = Math.floor(
+          (asOf.getTime() - new Date(r.date).getTime()) / 86400000
+        );
+        const key = r.supplierId;
+        const name = r.supplier?.name || "(Sin proveedor)";
+        const agg = bySup.get(key) || { name, b0: 0, b30: 0, b60: 0, b90: 0 };
+        if (days <= 30) agg.b0 += due;
+        else if (days <= 60) agg.b30 += due;
+        else if (days <= 90) agg.b60 += due;
+        else agg.b90 += due;
+        bySup.set(key, agg);
+      });
+      return Array.from(bySup.entries()).map(([supplierId, v]) => ({
+        supplierId,
+        supplier: v.name,
+        bucket0_30: v.b0,
+        bucket31_60: v.b30,
+        bucket61_90: v.b60,
+        bucket90_plus: v.b90,
+      }));
+    }),
 });

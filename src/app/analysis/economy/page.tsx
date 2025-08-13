@@ -60,6 +60,7 @@ export default function AnalysisEconomyPage() {
     from: period.from,
     to: period.to,
   });
+  const aging = trpc.financeAp.aging.useQuery({});
 
   const animalsWithMilkCount = useMemo(() => {
     const rows = (milk.data || []).filter((r: any) => {
@@ -82,7 +83,6 @@ export default function AnalysisEconomyPage() {
     const income = fin.data?.income || 0;
     const expense = fin.data?.expense || 0;
     const margin = fin.data?.margin || 0;
-    // Estimación simple: si definimos costo fijo mensual, ventas necesarias = costo fijo + costos variables aprox. (usamos expense) -> punto de equilibrio si income >= fixed + expense
     const requiredIncome = fixedMonthlyCost + expense;
     const achieved = income >= requiredIncome;
     return { requiredIncome, achieved, margin };
@@ -133,6 +133,7 @@ export default function AnalysisEconomyPage() {
                 fin.refetch();
                 repro.refetch();
                 milk.refetch();
+                aging.refetch();
               }}
             >
               Actualizar
@@ -326,6 +327,128 @@ export default function AnalysisEconomyPage() {
                 </div>
               ))}
               {!(fin.data?.byCategory || []).length ? (
+                <div className="text-neutral-500">Sin datos</div>
+              ) : null}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>Tendencia mensual</CardTitle>
+              <Button
+                size="sm"
+                variant="flat"
+                onPress={() =>
+                  dlCsv(
+                    fin.data?.monthly || [],
+                    "economia_tendencia_mensual.csv"
+                  )
+                }
+              >
+                CSV
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <svg width={800} height={280} role="img">
+              <g transform={`translate(${32}, ${24})`}>
+                {(() => {
+                  const rows = fin.data?.monthly || [];
+                  const w = 800 - 64;
+                  const h = 280 - 56;
+                  const max = Math.max(
+                    1,
+                    ...rows.map((d: any) =>
+                      Math.max(d.income, d.expense, d.net)
+                    )
+                  );
+                  const step = rows.length > 1 ? w / (rows.length - 1) : w;
+                  const toPts = (key: "income" | "expense" | "net") =>
+                    rows.map(
+                      (d: any, i: number) =>
+                        [i * step, h - ((d[key] || 0) / max) * (h - 8)] as const
+                    );
+                  const draw = (
+                    pts: ReadonlyArray<readonly [number, number]>,
+                    color: string
+                  ) => {
+                    const path = pts
+                      .map((p, i) =>
+                        i === 0 ? `M ${p[0]} ${p[1]}` : `L ${p[0]} ${p[1]}`
+                      )
+                      .join(" ");
+                    return (
+                      <path
+                        d={path}
+                        fill="none"
+                        stroke={color}
+                        strokeWidth={2}
+                      />
+                    );
+                  };
+                  return (
+                    <>
+                      {draw(toPts("income"), "#16A34A")}
+                      {draw(toPts("expense"), "#DC2626")}
+                      {draw(toPts("net"), "#2563EB")}
+                      {rows.map((d: any, i: number) => (
+                        <text
+                          key={i}
+                          x={i * step}
+                          y={h + 14}
+                          fontSize={11}
+                          textAnchor="middle"
+                          fill="#444"
+                        >
+                          {d.period}
+                        </text>
+                      ))}
+                    </>
+                  );
+                })()}
+              </g>
+            </svg>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>Aging CxP por proveedor</CardTitle>
+              <Button
+                size="sm"
+                variant="flat"
+                onPress={() => dlCsv(aging.data || [], "cxp_aging.csv")}
+              >
+                CSV
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-sm divide-y">
+              {(aging.data || []).map((r: any) => (
+                <div
+                  key={r.supplierId}
+                  className="py-1 grid grid-cols-5 gap-3 items-center"
+                >
+                  <div className="font-medium">{r.supplier}</div>
+                  <div>
+                    0-30: <b>{(r.bucket0_30 || 0).toLocaleString()}</b>
+                  </div>
+                  <div>
+                    31-60: <b>{(r.bucket31_60 || 0).toLocaleString()}</b>
+                  </div>
+                  <div>
+                    61-90: <b>{(r.bucket61_90 || 0).toLocaleString()}</b>
+                  </div>
+                  <div>
+                    {">90"}: <b>{(r.bucket90_plus || 0).toLocaleString()}</b>
+                  </div>
+                </div>
+              ))}
+              {!(aging.data || []).length ? (
                 <div className="text-neutral-500">Sin datos</div>
               ) : null}
             </div>
