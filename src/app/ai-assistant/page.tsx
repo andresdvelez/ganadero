@@ -3447,6 +3447,79 @@ export default function AIAssistantPage() {
                 dataCsv: breakdown,
               } as any,
             ]);
+          } else if (d.module === "selection") {
+            // Top litros por animal (periodo)
+            const milkK = await utils.milk.kpis.fetch({
+              from: d.from,
+              to: d.to,
+              top: 20,
+            });
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 1).toString(),
+                role: "assistant",
+                content: "Top animales por litros.",
+                timestamp: new Date(),
+                module: "selection",
+                widget: {
+                  type: "chart",
+                  title: "Selección: top litros",
+                  chart: {
+                    kind: "bar",
+                    data: (milkK.topLiters || []).map((t: any) => ({
+                      label: t.animal?.tagNumber || t.animalId,
+                      value: t.liters,
+                    })),
+                  },
+                },
+                dataCsv: (milkK.topLiters || []).map((t: any) => ({
+                  animal: `${t.animal?.name || "(sin nombre)"} #${
+                    t.animal?.tagNumber || t.animalId
+                  }`,
+                  litros: t.liters,
+                })),
+              } as any,
+            ]);
+            // Top costo salud por animal (periodo)
+            const healthList = await utils.health.list.fetch({ limit: 500 } as any);
+            const f = d.from ? new Date(d.from) : null;
+            const t = d.to ? new Date(d.to) : null;
+            const filtered = (healthList || []).filter((r: any) => {
+              const dt = new Date(r.performedAt);
+              return (f ? dt >= f : true) && (t ? dt <= t : true);
+            });
+            const map = new Map<string, number>();
+            filtered.forEach((r: any) => {
+              if (!r.animalId) return;
+              map.set(r.animalId, (map.get(r.animalId) || 0) + (r.cost || 0));
+            });
+            const healthTop = Array.from(map.entries())
+              .map(([animalId, cost]) => ({ animalId, cost }))
+              .sort((a, b) => b.cost - a.cost)
+              .slice(0, 20);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "Top costo salud por animal (periodo).",
+                timestamp: new Date(),
+                module: "selection",
+                widget: {
+                  type: "chart",
+                  title: "Selección: top costo salud",
+                  chart: {
+                    kind: "bar",
+                    data: healthTop.map((r: any) => ({
+                      label: r.animalId,
+                      value: r.cost,
+                    })),
+                  },
+                },
+                dataCsv: healthTop.map((r: any) => ({ animalId: r.animalId, costo: r.cost })),
+              } as any,
+            ]);
           }
         } finally {
           setRunningTools((prev) => prev.filter((t) => t.id !== toolId));

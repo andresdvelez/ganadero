@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc/client";
 import { useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,7 @@ export default function AnalysisSelectionPage() {
     }
     return {};
   });
+  const router = useRouter();
   const milk = trpc.milk.kpis.useQuery({
     from: period.from,
     to: period.to,
@@ -112,10 +114,30 @@ export default function AnalysisSelectionPage() {
             >
               Actualizar
             </Button>
+            <Button
+              size="sm"
+              variant="solid"
+              onPress={() => {
+                router.push("/ai-assistant");
+                setTimeout(() => {
+                  window.dispatchEvent(
+                    new CustomEvent("ai-seed-report", {
+                      detail: {
+                        module: "selection",
+                        from: period.from || null,
+                        to: period.to || null,
+                      },
+                    })
+                  );
+                }, 350);
+              }}
+            >
+              Abrir en chat
+            </Button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md-grid-cols-2 gap-3 md:grid-cols-2">
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
