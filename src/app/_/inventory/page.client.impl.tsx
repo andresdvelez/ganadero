@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 export default function InventoryClient() {
   const [products, setProducts] = useState<any[]>([]);
   const [q, setQ] = useState("");
+  const [category, setCategory] = useState<string>("");
   const [activeProductId, setActiveProductId] = useState<string | null>(null);
   const params = useSearchParams();
   const router = useRouter();
@@ -155,15 +156,41 @@ export default function InventoryClient() {
     if (pid) setActiveProductId(pid);
   }, [params]);
 
-  const filtered = useMemo(
-    () =>
-      products.filter((p) =>
-        [p.name, p.code, p.category].some((v: string) =>
-          v?.toLowerCase().includes(q.toLowerCase())
-        )
-      ),
-    [products, q]
-  );
+  const filtered = useMemo(() => {
+    return products.filter((p) => {
+      const txt = [p.name, p.code, p.category].some((v: string) =>
+        v?.toLowerCase().includes(q.toLowerCase())
+      );
+      const catOk = category
+        ? (p.category || "").toLowerCase() === category.toLowerCase()
+        : true;
+      return txt && catOk;
+    });
+  }, [products, q, category]);
+
+  const downloadProductsCsvFiltered = () => {
+    const header = ["code", "name", "unit", "category", "min", "current"];
+    const body = filtered.map((p: any) =>
+      [
+        p.code || "",
+        p.name || "",
+        p.unit || "",
+        p.category || "",
+        p.minStock ?? "",
+        p.currentStock ?? 0,
+      ].join(",")
+    );
+    const csv = [header.join(","), ...body].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "productos_filtrados.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <DashboardLayout>
@@ -177,8 +204,21 @@ export default function InventoryClient() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
+            <input
+              className="px-3 py-2 border rounded-lg"
+              placeholder="Categoría"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            />
             <Button size="sm" variant="flat" onPress={downloadProductsCsv}>
               CSV
+            </Button>
+            <Button
+              size="sm"
+              variant="light"
+              onPress={downloadProductsCsvFiltered}
+            >
+              CSV filtrado
             </Button>
           </div>
         </div>

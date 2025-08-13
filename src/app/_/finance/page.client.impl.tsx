@@ -79,36 +79,96 @@ export default function FinancePageClient() {
             <Button>Registrar transacción</Button>
           </Link>
         </div>
+        {/* Resumen por proveedor del resultado actual */}
         <Card>
           <CardHeader>
-            <CardTitle>Transacciones</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>Totales por proveedor (vista actual)</CardTitle>
+              <Button
+                size="sm"
+                variant="flat"
+                onPress={() => {
+                  const grouped = new Map<
+                    string,
+                    { supplier: string; total: number; count: number }
+                  >();
+                  (invoices.data || []).forEach((inv: any) => {
+                    const key = inv.supplier?.name || "Proveedor";
+                    const g = grouped.get(key) || {
+                      supplier: key,
+                      total: 0,
+                      count: 0,
+                    };
+                    g.total += inv.total || 0;
+                    g.count += 1;
+                    grouped.set(key, g);
+                  });
+                  const rows = Array.from(grouped.values());
+                  const headers = ["supplier", "count", "total"];
+                  const csv = [
+                    headers.join(","),
+                    ...rows.map((r) =>
+                      [r.supplier, r.count, r.total]
+                        .map((v) => JSON.stringify(v))
+                        .join(",")
+                    ),
+                  ].join("\n");
+                  const blob = new Blob([csv], {
+                    type: "text/csv;charset=utf-8",
+                  });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = "totales_por_proveedor.csv";
+                  document.body.appendChild(a);
+                  a.click();
+                  a.remove();
+                  URL.revokeObjectURL(url);
+                }}
+              >
+                CSV
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
-            {items.length === 0 ? (
-              <div className="text-sm text-neutral-500">
-                No hay transacciones todavía.
+            {invoices.data?.length ? (
+              <div className="text-sm divide-y">
+                {(() => {
+                  const grouped = new Map<
+                    string,
+                    { supplier: string; total: number; count: number }
+                  >();
+                  (invoices.data || []).forEach((inv: any) => {
+                    const key = inv.supplier?.name || "Proveedor";
+                    const g = grouped.get(key) || {
+                      supplier: key,
+                      total: 0,
+                      count: 0,
+                    };
+                    g.total += inv.total || 0;
+                    g.count += 1;
+                    grouped.set(key, g);
+                  });
+                  return Array.from(grouped.values())
+                    .sort((a, b) => b.total - a.total)
+                    .map((r) => (
+                      <div
+                        key={r.supplier}
+                        className="py-1 flex items-center justify-between"
+                      >
+                        <div>
+                          {r.supplier} · {r.count} factura(s)
+                        </div>
+                        <div className="font-medium">
+                          ${r.total.toLocaleString("es-CO")}
+                        </div>
+                      </div>
+                    ));
+                })()}
               </div>
             ) : (
-              <div className="divide-y">
-                {items.map((t) => (
-                  <div
-                    key={t.uuid}
-                    className="py-2 flex items-center justify-between"
-                  >
-                    <div className="space-y-0.5">
-                      <div className="text-sm font-medium">
-                        {t.type === "income" ? "Ingreso" : "Egreso"} ·{" "}
-                        {t.category || "General"}
-                      </div>
-                      <div className="text-xs text-neutral-500">
-                        {new Date(t.date).toLocaleDateString()}
-                      </div>
-                    </div>
-                    <div className="text-sm font-semibold">
-                      ${t.amount?.toLocaleString("es-CO")}
-                    </div>
-                  </div>
-                ))}
+              <div className="text-sm text-neutral-500">
+                Sin facturas en la vista actual
               </div>
             )}
           </CardContent>
@@ -204,16 +264,23 @@ function InvoiceRow({
     invoiceId: inv.id,
   });
   const [showAudit, setShowAudit] = useState(false);
-  const parsedNotes = (()=>{
-    const list: { type: 'DEBIT'|'CREDIT'|'ATTACH'; payload: string }[] = [];
-    const lines = String(inv.notes||'').split('\n').filter(Boolean);
-    for(const ln of lines){
-      if(ln.startsWith('ATTACH::')){
-        const parts = ln.split('::');
-        list.push({ type: 'ATTACH', payload: parts[2] || '' });
-      } else if(ln.startsWith('DEBIT::') || ln.startsWith('CREDIT::')){
-        const [kind, , amount, reason] = ln.split('::');
-        list.push({ type: (kind.startsWith('DEBIT')?'DEBIT':'CREDIT'), payload: `$${Number(amount||0).toLocaleString()} ${reason?`· ${reason}`:''}` });
+  const parsedNotes = (() => {
+    const list: { type: "DEBIT" | "CREDIT" | "ATTACH"; payload: string }[] = [];
+    const lines = String(inv.notes || "")
+      .split("\n")
+      .filter(Boolean);
+    for (const ln of lines) {
+      if (ln.startsWith("ATTACH::")) {
+        const parts = ln.split("::");
+        list.push({ type: "ATTACH", payload: parts[2] || "" });
+      } else if (ln.startsWith("DEBIT::") || ln.startsWith("CREDIT::")) {
+        const [kind, , amount, reason] = ln.split("::");
+        list.push({
+          type: kind.startsWith("DEBIT") ? "DEBIT" : "CREDIT",
+          payload: `$${Number(amount || 0).toLocaleString()} ${
+            reason ? `· ${reason}` : ""
+          }`,
+        });
       }
     }
     return list;
@@ -241,8 +308,13 @@ function InvoiceRow({
         >
           Refrescar
         </Button>
-        <Button size="sm" variant="light" className="ml-2" onPress={()=> setShowAudit((v)=>!v)}>
-          {showAudit? 'Ocultar auditoría' : 'Ver auditoría'}
+        <Button
+          size="sm"
+          variant="light"
+          className="ml-2"
+          onPress={() => setShowAudit((v) => !v)}
+        >
+          {showAudit ? "Ocultar auditoría" : "Ver auditoría"}
         </Button>
       </div>
       {attachments.data?.length ? (
@@ -259,10 +331,17 @@ function InvoiceRow({
           <div className="font-medium mb-1">Pagos</div>
           {inv.payments?.length ? (
             <div className="divide-y">
-              {inv.payments.map((p:any)=> (
-                <div key={p.id} className="py-1 flex items-center justify-between">
-                  <div>{new Date(p.date).toLocaleDateString()} · ${p.amount.toLocaleString('es-CO')} {p.method?`· ${p.method}`:''}</div>
-                  <div className="text-neutral-500">{p.notes||''}</div>
+              {inv.payments.map((p: any) => (
+                <div
+                  key={p.id}
+                  className="py-1 flex items-center justify-between"
+                >
+                  <div>
+                    {new Date(p.date).toLocaleDateString()} · $
+                    {p.amount.toLocaleString("es-CO")}{" "}
+                    {p.method ? `· ${p.method}` : ""}
+                  </div>
+                  <div className="text-neutral-500">{p.notes || ""}</div>
                 </div>
               ))}
             </div>
@@ -272,8 +351,17 @@ function InvoiceRow({
           <div className="font-medium mt-2 mb-1">Notas</div>
           {parsedNotes.length ? (
             <div className="flex flex-wrap gap-2">
-              {parsedNotes.map((n,i)=> (
-                <span key={i} className={`px-2 py-1 rounded-full border ${n.type==='DEBIT'?'bg-amber-50 border-amber-200':'bg-slate-50 border-slate-200'}`}>{n.type}: {n.payload}</span>
+              {parsedNotes.map((n, i) => (
+                <span
+                  key={i}
+                  className={`px-2 py-1 rounded-full border ${
+                    n.type === "DEBIT"
+                      ? "bg-amber-50 border-amber-200"
+                      : "bg-slate-50 border-slate-200"
+                  }`}
+                >
+                  {n.type}: {n.payload}
+                </span>
               ))}
             </div>
           ) : (

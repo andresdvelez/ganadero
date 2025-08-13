@@ -70,6 +70,48 @@ export default function PasturesClient() {
         <div className="mt-6 grid md:grid-cols-2 gap-4">
           <div className="island p-4">
             <div className="font-semibold mb-2">Eventos recientes (PRV)</div>
+            <div className="mb-2">
+              <button
+                className="text-xs underline"
+                onClick={() => {
+                  const rows = (events.data || []).map((e: any) => ({
+                    date: new Date(e.date).toISOString(),
+                    pastureId: e.pastureId,
+                    type: e.type,
+                    groupName: e.groupName || "",
+                  }));
+                  const headers = Object.keys(
+                    rows[0] || {
+                      date: "",
+                      pastureId: "",
+                      type: "",
+                      groupName: "",
+                    }
+                  );
+                  const csv = [
+                    headers.join(","),
+                    ...rows.map((r) =>
+                      headers
+                        .map((h) => JSON.stringify((r as any)[h] ?? ""))
+                        .join(",")
+                    ),
+                  ].join("\n");
+                  const blob = new Blob([csv], {
+                    type: "text/csv;charset=utf-8",
+                  });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = "pasturas_eventos.csv";
+                  document.body.appendChild(a);
+                  a.click();
+                  a.remove();
+                  URL.revokeObjectURL(url);
+                }}
+              >
+                Exportar CSV
+              </button>
+            </div>
             {events.data?.length ? (
               <div className="text-sm divide-y">
                 {events.data.map((e) => (
@@ -88,6 +130,48 @@ export default function PasturesClient() {
           </div>
           <div className="island p-4">
             <div className="font-semibold mb-2">Mediciones recientes</div>
+            <div className="mb-2">
+              <button
+                className="text-xs underline"
+                onClick={() => {
+                  const rows = (measurements.data || []).map((m: any) => ({
+                    date: new Date(m.date).toISOString(),
+                    pastureId: m.pastureId,
+                    forageKgDMHa: m.forageKgDMHa ?? "",
+                    restDays: m.restDays ?? "",
+                  }));
+                  const headers = Object.keys(
+                    rows[0] || {
+                      date: "",
+                      pastureId: "",
+                      forageKgDMHa: "",
+                      restDays: "",
+                    }
+                  );
+                  const csv = [
+                    headers.join(","),
+                    ...rows.map((r) =>
+                      headers
+                        .map((h) => JSON.stringify((r as any)[h] ?? ""))
+                        .join(",")
+                    ),
+                  ].join("\n");
+                  const blob = new Blob([csv], {
+                    type: "text/csv;charset=utf-8",
+                  });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = "pasturas_mediciones.csv";
+                  document.body.appendChild(a);
+                  a.click();
+                  a.remove();
+                  URL.revokeObjectURL(url);
+                }}
+              >
+                Exportar CSV
+              </button>
+            </div>
             {measurements.data?.length ? (
               <div className="text-sm divide-y">
                 {measurements.data.map((m) => (
