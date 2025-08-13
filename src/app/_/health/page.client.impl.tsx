@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { translations } from "@/lib/constants/translations";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { db } from "@/lib/dexie";
 import Link from "next/link";
+import { trpc } from "@/lib/trpc/client";
 import {
   Plus,
   Search,
@@ -50,13 +51,16 @@ export default function HealthClient() {
   const [showUpcoming, setShowUpcoming] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [tab, setTab] = useState("all");
+  const [from, setFrom] = useState<string>("");
+  const [to, setTo] = useState<string>("");
+  const kpis = trpc.health.kpis.useQuery({ from: from || undefined, to: to || undefined });
 
   useEffect(() => {
     loadHealthRecords();
   }, []);
   useEffect(() => {
     filterRecords();
-  }, [records, searchTerm, filterType, showUpcoming]);
+  }, [records, searchTerm, filterType, showUpcoming, from, to]);
 
   const loadHealthRecords = async () => {
     try {
@@ -86,6 +90,12 @@ export default function HealthClient() {
           r.medication?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
+    if (from) {
+      filtered = filtered.filter((r) => new Date(r.performedAt) >= new Date(from));
+    }
+    if (to) {
+      filtered = filtered.filter((r) => new Date(r.performedAt) <= new Date(to));
+    }
     if (filterType !== "all") {
       filtered = filtered.filter((r) => r.type === filterType);
     }
@@ -106,6 +116,78 @@ export default function HealthClient() {
     );
     setFilteredRecords(filtered);
   };
+
+  const setQuick = (kind: "today" | "7d" | "30d" | "month") => {
+    const now = new Date();
+    if (kind === "today") {
+      const d = now.toISOString().slice(0, 10);
+      setFrom(d);
+      setTo(d);
+      return;
+    }
+    if (kind === "7d" || kind === "30d") {
+      const days = kind === "7d" ? 7 : 30;
+      const start = new Date(now);
+      start.setDate(now.getDate() - days);
+      setFrom(start.toISOString().slice(0, 10));
+      setTo(now.toISOString().slice(0, 10));
+      return;
+    }
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    setFrom(start.toISOString().slice(0, 10));
+    setTo(end.toISOString().slice(0, 10));
+  };
+
+  const downloadCsv = () => {
+    const header = [
+      "date",
+      "type",
+      "animalName",
+      "description",
+      "medication",
+      "dosage",
+      "veterinarian",
+      "cost",
+      "nextDue",
+      "notes",
+    ];
+    const body = filteredRecords.map((r) =>
+      [
+        new Date(r.performedAt).toISOString(),
+        r.type,
+        r.animalName || "",
+        r.description,
+        r.medication || "",
+        r.dosage || "",
+        r.veterinarian || "",
+        String(r.cost ?? ""),
+        r.nextDueDate ? new Date(r.nextDueDate).toISOString() : "",
+        String(r.notes || "").replace(/,/g, " "),
+      ].join(",")
+    );
+    const csv = [header.join(","), ...body].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "salud.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const costByType = useMemo(() => {
+    const m = new Map<string, number>();
+    const series = (kpis.data?.series || []) as any[];
+    series.forEach((s) => {
+      m.set(s.type, (m.get(s.type) || 0) + (s.cost || 0));
+    });
+    return Array.from(m.entries())
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value);
+  }, [kpis.data]);
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -194,6 +276,47 @@ export default function HealthClient() {
             <MastitisCases />
           </TabsContent>
           <TabsContent value="all">
+            <Card>
+              <CardContent className="p-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <input
+                    type="text"
+                    placeholder="Buscar por animal, descripción o medicamento..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="px-3 py-2 border rounded-lg"
+                  />
+                  <select
+                    value={filterType}
+                    onChange={(e) => setFilterType(e.target.value)}
+                    aria-label="Filtrar por tipo"
+                    className="px-3 py-2 border rounded-lg"
+                  >
+                    <option value="all">Todos</option>
+                    <option value="vaccination">{translations.health.vaccination}</option>
+                    <option value="treatment">{translations.health.treatment}</option>
+                    <option value="deworming">{translations.health.deworming}</option>
+                    <option value="checkup">{translations.health.checkup}</option>
+                  </select>
+                  <input aria-label="Desde" type="date" value={from} onChange={(e)=> setFrom(e.target.value)} className="px-3 py-2 border rounded-lg" />
+                  <input aria-label="Hasta" type="date" value={to} onChange={(e)=> setTo(e.target.value)} className="px-3 py-2 border rounded-lg" />
+                  <Button size="sm" variant="light" onPress={()=> setQuick("today")}>Hoy</Button>
+                  <Button size="sm" variant="light" onPress={()=> setQuick("7d")}>7d</Button>
+                  <Button size="sm" variant="light" onPress={()=> setQuick("30d")}>30d</Button>
+                  <Button size="sm" variant="light" onPress={()=> setQuick("month")}>Mes</Button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant={showUpcoming ? "solid" : "bordered"} onClick={() => setShowUpcoming(!showUpcoming)}>
+                    <Clock className="h-5 w-5 mr-2" /> Próximos 30 días
+                  </Button>
+                  <Button size="sm" variant="flat" onPress={downloadCsv}>CSV</Button>
+                  <Button size="sm" variant="light" onPress={()=> {
+                    window.dispatchEvent(new CustomEvent("ai-seed-report", { detail: { module: "health", from: from||null, to: to||null } }));
+                  }}>Abrir en chat</Button>
+                </div>
+              </CardContent>
+            </Card>
+
             {upcomingAlerts.length > 0 && (
               <Card className="border-yellow-300 bg-yellow-50">
                 <CardHeader>
@@ -229,6 +352,27 @@ export default function HealthClient() {
                 </CardContent>
               </Card>
             )}
+
+            {/* KPIs de costo por tipo */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Costos por tipo (periodo)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {costByType.length ? (
+                  <div className="text-sm divide-y">
+                    {costByType.map((row) => (
+                      <div key={row.label} className="py-1 flex items-center justify-between">
+                        <div>{getTypeLabel(row.label)}</div>
+                        <div className="font-medium">{formatCurrency(row.value)}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-neutral-500">Sin datos en el periodo</div>
+                )}
+              </CardContent>
+            </Card>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <Card>
@@ -288,57 +432,6 @@ export default function HealthClient() {
                 </CardContent>
               </Card>
             </div>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <div className="flex-1">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-ranch-400" />
-                      <input
-                        type="text"
-                        placeholder="Buscar por animal, descripción o medicamento..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border border-ranch-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-ranch-500"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Filter className="h-5 w-5 text-ranch-600" />
-                    <select
-                      value={filterType}
-                      onChange={(e) => setFilterType(e.target.value)}
-                      aria-label="Filtrar por tipo"
-                      className="px-4 py-2 border border-ranch-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-ranch-500"
-                    >
-                      <option value="all">Todos</option>
-                      <option value="vaccination">
-                        {translations.health.vaccination}
-                      </option>
-                      <option value="treatment">
-                        {translations.health.treatment}
-                      </option>
-                      <option value="deworming">
-                        {translations.health.deworming}
-                      </option>
-                      <option value="checkup">
-                        {translations.health.checkup}
-                      </option>
-                    </select>
-                  </div>
-                  <Button
-                    variant={showUpcoming ? "solid" : "bordered"}
-                    onClick={() => setShowUpcoming(!showUpcoming)}
-                    className={
-                      showUpcoming ? "bg-yellow-500 hover:bg-yellow-600" : ""
-                    }
-                  >
-                    <Clock className="h-5 w-5 mr-2" /> Próximos 30 días
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
 
             {isLoading ? (
               <div className="text-center py-12">
