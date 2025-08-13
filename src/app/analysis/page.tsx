@@ -27,6 +27,16 @@ const LINKS = [
     title: "Inventario",
     desc: "Rotación, costos y stock bajo",
   },
+  {
+    href: "/analysis/economy",
+    title: "Economía",
+    desc: "Ingresos/egresos, equilibrio y días abiertos",
+  },
+  {
+    href: "/analysis/selection",
+    title: "Selección/Descarte",
+    desc: "Rankings básicos por litros y costos",
+  }
 ];
 
 export default function AnalysisIndexPage() {
