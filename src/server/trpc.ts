@@ -21,10 +21,20 @@ function decodeJwtNoVerify(
 
 export const createTRPCContext = async (opts: { req: NextRequest }) => {
   if (process.env.ALLOW_DEV_UNAUTH === "1") {
+    // Farm context (dev)
+    const farmIdHeader =
+      opts.req.headers.get("x-farm-id") || opts.req.headers.get("X-FARM-ID");
+    const farmId = farmIdHeader?.trim() || null;
+    if (farmId) {
+      try {
+        await prisma.$executeRaw`SELECT set_config('app.current_farm', ${farmId}, true)`;
+      } catch {}
+    }
     return {
       prisma,
       userId: "dev-user",
       req: opts.req,
+      farmId,
     } as const;
   }
 
@@ -131,10 +141,21 @@ export const createTRPCContext = async (opts: { req: NextRequest }) => {
     }
   }
 
+  // Farm context (header)
+  const farmIdHeader =
+    opts.req.headers.get("x-farm-id") || opts.req.headers.get("X-FARM-ID");
+  const farmId = farmIdHeader?.trim() || null;
+  if (farmId) {
+    try {
+      await prisma.$executeRaw`SELECT set_config('app.current_farm', ${farmId}, true)`;
+    } catch {}
+  }
+
   return {
     prisma,
     userId,
     req: opts.req,
+    farmId,
   } as const;
 };
 

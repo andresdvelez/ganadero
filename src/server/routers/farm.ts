@@ -51,7 +51,8 @@ export const farmRouter = createTRPCRouter({
       const membership = await prisma.organizationMembership.findFirst({
         where: { orgId: input.orgId, userId: me.id },
       });
-      if (!membership) throw new Error("No perteneces a esa organización");
+      if (!membership || (membership as any).role !== "ADMIN")
+        throw new Error("Solo ADMIN puede crear fincas en esta organización");
 
       const u = await prisma.farm.create({
         data: {
@@ -91,7 +92,8 @@ export const farmRouter = createTRPCRouter({
       const membership = await prisma.organizationMembership.findFirst({
         where: { orgId: exists.orgId, userId: me.id },
       });
-      if (!membership) throw new Error("No perteneces a esa organización");
+      if (!membership || (membership as any).role !== "ADMIN")
+        throw new Error("Solo ADMIN puede editar fincas en esta organización");
       return prisma.farm.update({
         where: { id: input.id },
         data: {

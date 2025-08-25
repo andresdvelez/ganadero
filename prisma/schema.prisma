@@ -146,7 +146,8 @@ model Animal {
   nfcId             String?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
-  
+  farmId            String
+
   user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   mother            Animal?           @relation("MotherChildren", fields: [motherId], references: [id])
   father            Animal?           @relation("FatherChildren", fields: [fatherId], references: [id])
@@ -167,10 +168,13 @@ model Animal {
   embryoDonations      EmbryoBatch[]       @relation("EmbryoDonor")
   embryoSireEmbryos    EmbryoBatch[]       @relation("EmbryoSire")
   semenSireBatches     SemenBatch[]        @relation("SemenSire")
-  
+  farm               Farm              @relation(fields: [farmId], references: [id], onDelete: Cascade)
+
   @@index([userId])
   @@index([tagNumber])
   @@index([status])
+  @@index([farmId])
+  @@unique([farmId, tagNumber])
 }
 
 // Health Record model - tracks medical history
@@ -333,13 +337,16 @@ model MilkRecord {
   recordedAt  DateTime
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  farmId      String
 
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   animal      Animal?  @relation(fields: [animalId], references: [id])
+  farm        Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([animalId])
   @@index([recordedAt])
+  @@index([farmId])
 }
 
 // Pastures
@@ -1009,6 +1016,8 @@ model Farm {
 
   organization    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   createdBy       User         @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
+  animals         Animal[]
+  milkRecords     MilkRecord[]
 
   @@index([orgId])
   @@index([code])

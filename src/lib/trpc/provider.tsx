@@ -89,6 +89,10 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
               if (token) {
                 headers.set("authorization", `Bearer ${token}`);
               }
+              try {
+                const farmId = window.localStorage.getItem("ACTIVE_FARM_ID");
+                if (farmId) headers.set("x-farm-id", farmId);
+              } catch {}
               return fetch(url, { ...opts, credentials: "include", headers });
             },
           }),

@@ -5,7 +5,12 @@ import { generateTagNumber } from "@/lib/utils";
 
 export const animalRouter = createTRPCRouter({
   getAll: protectedProcedure.query(async ({ ctx }) => {
-    // Garantiza que exista el usuario (útil en dev con ALLOW_DEV_UNAUTH)
+    if (!ctx.farmId) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Finca activa no seleccionada",
+      });
+    }
     const user = await ctx.prisma.user.upsert({
       where: { clerkId: ctx.userId },
       update: {},
@@ -13,7 +18,12 @@ export const animalRouter = createTRPCRouter({
         clerkId: ctx.userId,
         email: `user_${ctx.userId}@ganado.ai`,
       },
-      include: { animals: { orderBy: { createdAt: "desc" } } },
+      include: {
+        animals: {
+          where: { farmId: ctx.farmId },
+          orderBy: { createdAt: "desc" },
+        },
+      },
     });
     return user.animals;
   }),
@@ -21,10 +31,17 @@ export const animalRouter = createTRPCRouter({
   getById: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
+      if (!ctx.farmId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Finca activa no seleccionada",
+        });
+      }
       const animal = await ctx.prisma.animal.findFirst({
         where: {
           id: input.id,
           user: { clerkId: ctx.userId },
+          farmId: ctx.farmId,
         },
         include: {
           healthRecords: {
@@ -50,8 +67,18 @@ export const animalRouter = createTRPCRouter({
   getTree: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
+      if (!ctx.farmId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Finca activa no seleccionada",
+        });
+      }
       const base = await ctx.prisma.animal.findFirst({
-        where: { id: input.id, user: { clerkId: ctx.userId } },
+        where: {
+          id: input.id,
+          user: { clerkId: ctx.userId },
+          farmId: ctx.farmId,
+        },
         include: {
           mother: true,
           father: true,
@@ -71,8 +98,18 @@ export const animalRouter = createTRPCRouter({
       })
     )
     .query(async ({ ctx, input }) => {
+      if (!ctx.farmId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Finca activa no seleccionada",
+        });
+      }
       const bull = await ctx.prisma.animal.findFirst({
-        where: { id: input.bullId, user: { clerkId: ctx.userId } },
+        where: {
+          id: input.bullId,
+          user: { clerkId: ctx.userId },
+          farmId: ctx.farmId,
+        },
       });
       if (!bull) throw new TRPCError({ code: "NOT_FOUND" });
       const services = await ctx.prisma.breedingRecord.findMany({
@@ -99,6 +136,12 @@ export const animalRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      if (!ctx.farmId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Finca activa no seleccionada",
+        });
+      }
       const user = await ctx.prisma.user.upsert({
         where: { clerkId: ctx.userId },
         update: {},
@@ -113,6 +156,7 @@ export const animalRouter = createTRPCRouter({
           ...input,
           tagNumber: generateTagNumber(),
           userId: user.id,
+          farmId: ctx.farmId,
         },
       });
     }),
@@ -129,12 +173,19 @@ export const animalRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      if (!ctx.farmId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Finca activa no seleccionada",
+        });
+      }
       const { id, ...data } = input;
 
       const animal = await ctx.prisma.animal.findFirst({
         where: {
           id,
           user: { clerkId: ctx.userId },
+          farmId: ctx.farmId,
         },
       });
 
@@ -151,10 +202,17 @@ export const animalRouter = createTRPCRouter({
   delete: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      if (!ctx.farmId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Finca activa no seleccionada",
+        });
+      }
       const animal = await ctx.prisma.animal.findFirst({
         where: {
           id: input.id,
           user: { clerkId: ctx.userId },
+          farmId: ctx.farmId,
         },
       });
 

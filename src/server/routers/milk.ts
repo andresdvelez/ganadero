@@ -12,7 +12,10 @@ export const milkRouter = createTRPCRouter({
         .optional()
     )
     .query(async ({ ctx, input }) => {
-      const where: any = { user: { clerkId: ctx.userId } };
+      if (!ctx.farmId) {
+        throw new Error("Finca activa no seleccionada");
+      }
+      const where: any = { user: { clerkId: ctx.userId }, farmId: ctx.farmId };
       if (input?.animalId) where.animalId = input.animalId;
       return ctx.prisma.milkRecord.findMany({
         where,
@@ -32,7 +35,10 @@ export const milkRouter = createTRPCRouter({
         .optional()
     )
     .query(async ({ ctx, input }) => {
-      const where: any = { user: { clerkId: ctx.userId } };
+      if (!ctx.farmId) {
+        throw new Error("Finca activa no seleccionada");
+      }
+      const where: any = { user: { clerkId: ctx.userId }, farmId: ctx.farmId };
       if (input?.from || input?.to) {
         where.recordedAt = {};
         if (input.from) (where.recordedAt as any).gte = new Date(input.from);
@@ -57,7 +63,7 @@ export const milkRouter = createTRPCRouter({
       avgs.sort((a, b) => b.avgCCS - a.avgCCS);
       const top = avgs.slice(0, input?.top ?? 10);
       const animals = await ctx.prisma.animal.findMany({
-        where: { id: { in: top.map((t) => t.animalId) } },
+        where: { id: { in: top.map((t) => t.animalId) }, farmId: ctx.farmId },
         select: { id: true, name: true, tagNumber: true },
       });
       const amap = new Map(animals.map((a) => [a.id, a] as const));
@@ -82,7 +88,10 @@ export const milkRouter = createTRPCRouter({
         .sort((a, b) => b.liters - a.liters)
         .slice(0, input?.top ?? 10);
       const animals2 = await ctx.prisma.animal.findMany({
-        where: { id: { in: litersTop.map((t) => t.animalId) } },
+        where: {
+          id: { in: litersTop.map((t) => t.animalId) },
+          farmId: ctx.farmId,
+        },
         select: { id: true, name: true, tagNumber: true },
       });
       const amap2 = new Map(animals2.map((a) => [a.id, a] as const));
@@ -111,6 +120,9 @@ export const milkRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      if (!ctx.farmId) {
+        throw new Error("Finca activa no seleccionada");
+      }
       const user = await ctx.prisma.user.upsert({
         where: { clerkId: ctx.userId },
         update: {},
@@ -123,6 +135,7 @@ export const milkRouter = createTRPCRouter({
         data: {
           ...input,
           userId: user.id,
+          farmId: ctx.farmId,
         },
       });
     }),
