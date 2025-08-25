@@ -56,6 +56,7 @@ import {
   addToSyncQueue,
 } from "@/lib/dexie";
 import { addToast } from "@/components/ui/toast";
+import { DashboardSummaries } from "@/components/dashboard/dashboard-summaries";
 
 interface Message {
   id: string;
@@ -1609,16 +1610,17 @@ export default function AIAssistantPage() {
             const payments = (list || []).flatMap((inv: any) =>
               (inv.payments || []).map((p: any) => ({ ...p, inv }))
             );
-            payments.sort((a: any, b: any) =>
-              new Date(b.date).getTime() - new Date(a.date).getTime()
+            payments.sort(
+              (a: any, b: any) =>
+                new Date(b.date).getTime() - new Date(a.date).getTime()
             );
             const payTop = payments.slice(0, 2);
             if (payTop.length) {
               const plines = payTop.map(
                 (p: any) =>
-                  `· Pago ${new Date(p.date).toISOString().slice(0, 10)} · $${
-                    (p.amount || 0).toLocaleString()
-                  } · #${(p.inv?.id || "").slice(0, 6)}`
+                  `· Pago ${new Date(p.date).toISOString().slice(0, 10)} · $${(
+                    p.amount || 0
+                  ).toLocaleString()} · #${(p.inv?.id || "").slice(0, 6)}`
               );
               setMessages((prev) => [
                 ...prev,
@@ -1644,7 +1646,18 @@ export default function AIAssistantPage() {
             data: { href },
           } as any,
         ]);
-        setMessages((prev)=>[...prev, { id: (Date.now()+0.7).toString(), role: "assistant", content: `Ver más…`, timestamp: new Date(), action: "open-link", module: "finance", data: { href } } as any]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 0.7).toString(),
+            role: "assistant",
+            content: `Ver más…`,
+            timestamp: new Date(),
+            action: "open-link",
+            module: "finance",
+            data: { href },
+          } as any,
+        ]);
         setIsLoading(false);
         return;
       }
@@ -1816,24 +1829,37 @@ export default function AIAssistantPage() {
         setMessages((prev) => [
           ...prev,
           {
-            id: (Date.now()).toString(),
+            id: Date.now().toString(),
             role: "assistant",
             content: `Voy a abrir IA Assets para el termo ${tankName}.`,
             timestamp: new Date(),
           } as any,
         ]);
         try {
-          const semen = await utils.aiAssets.listSemenBatches.fetch({ limit: 200 } as any);
-          const emb = await utils.aiAssets.listEmbryoBatches.fetch({ limit: 200 } as any);
+          const semen = await utils.aiAssets.listSemenBatches.fetch({
+            limit: 200,
+          } as any);
+          const emb = await utils.aiAssets.listEmbryoBatches.fetch({
+            limit: 200,
+          } as any);
           const filter = tankName.toLowerCase();
-          const rows = ([...(semen||[]), ...(emb||[])]).filter((b:any)=> (b.tank?.name||"").toLowerCase()===filter);
-          const sorted = rows.sort((a:any,b:any)=> (b.strawCount||0)-(a.strawCount||0)).slice(0,2);
+          const rows = [...(semen || []), ...(emb || [])].filter(
+            (b: any) => (b.tank?.name || "").toLowerCase() === filter
+          );
+          const sorted = rows
+            .sort((a: any, b: any) => (b.strawCount || 0) - (a.strawCount || 0))
+            .slice(0, 2);
           if (sorted.length) {
-            const lines = sorted.map((b:any)=> `- ${b.code||"lote"} · ${b.strawCount||0} pajuelas · ${(b.tank?.name)||""}${b.canister?` (${b.canister})`:""}`);
+            const lines = sorted.map(
+              (b: any) =>
+                `- ${b.code || "lote"} · ${b.strawCount || 0} pajuelas · ${
+                  b.tank?.name || ""
+                }${b.canister ? ` (${b.canister})` : ""}`
+            );
             setMessages((prev) => [
               ...prev,
               {
-                id: (Date.now()+0.5).toString(),
+                id: (Date.now() + 0.5).toString(),
                 role: "assistant",
                 content: `\n${lines.join("\n")}`,
                 timestamp: new Date(),
@@ -3482,7 +3508,9 @@ export default function AIAssistantPage() {
               } as any,
             ]);
             // Top costo salud por animal (periodo)
-            const healthList = await utils.health.list.fetch({ limit: 500 } as any);
+            const healthList = await utils.health.list.fetch({
+              limit: 500,
+            } as any);
             const f = d.from ? new Date(d.from) : null;
             const t = d.to ? new Date(d.to) : null;
             const filtered = (healthList || []).filter((r: any) => {
@@ -3517,18 +3545,30 @@ export default function AIAssistantPage() {
                     })),
                   },
                 },
-                dataCsv: healthTop.map((r: any) => ({ animalId: r.animalId, costo: r.cost })),
+                dataCsv: healthTop.map((r: any) => ({
+                  animalId: r.animalId,
+                  costo: r.cost,
+                })),
               } as any,
             ]);
           } else if (d.module === "finance") {
             // KPIs y por categoría
-            const k = await utils.finance.kpis.fetch({ from: d.from, to: d.to });
+            const k = await utils.finance.kpis.fetch({
+              from: d.from,
+              to: d.to,
+            });
             setMessages((prev) => [
               ...prev,
               {
                 id: (Date.now() + 1).toString(),
                 role: "assistant",
-                content: `Ingresos: ${(k.income || 0).toLocaleString()} · Egresos: ${(k.expense || 0).toLocaleString()} · Margen: ${(k.margin || 0).toLocaleString()}`,
+                content: `Ingresos: ${(
+                  k.income || 0
+                ).toLocaleString()} · Egresos: ${(
+                  k.expense || 0
+                ).toLocaleString()} · Margen: ${(
+                  k.margin || 0
+                ).toLocaleString()}`,
                 timestamp: new Date(),
                 module: "finance",
               },
@@ -3546,10 +3586,18 @@ export default function AIAssistantPage() {
                   title: "Economía: por categoría (margen)",
                   chart: {
                     kind: "bar",
-                    data: (k.byCategory || []).map((c: any) => ({ label: c.label, value: c.margin })),
+                    data: (k.byCategory || []).map((c: any) => ({
+                      label: c.label,
+                      value: c.margin,
+                    })),
                   },
                 },
-                dataCsv: (k.byCategory || []).map((c: any) => ({ categoria: c.label, ingresos: c.income, egresos: c.expense, margen: c.margin })),
+                dataCsv: (k.byCategory || []).map((c: any) => ({
+                  categoria: c.label,
+                  ingresos: c.income,
+                  egresos: c.expense,
+                  margen: c.margin,
+                })),
               } as any,
             ]);
             // Tendencia mensual
@@ -3566,7 +3614,10 @@ export default function AIAssistantPage() {
                   title: "Economía: tendencia mensual (neto)",
                   chart: {
                     kind: "line",
-                    data: (k.monthly || []).map((r: any) => ({ x: r.period, y: r.net })),
+                    data: (k.monthly || []).map((r: any) => ({
+                      x: r.period,
+                      y: r.net,
+                    })),
                   },
                 },
                 dataCsv: k.monthly,
@@ -4715,6 +4766,8 @@ export default function AIAssistantPage() {
                   onToggleWebSearch={setWebSearch}
                   analyser={audioAnalyserRef.current}
                 />
+                {/* Resúmenes operativos: Fincas (UGG, existencias) y Alertas */}
+                <DashboardSummaries />
                 <div className="max-w-4xl mx-auto mt-3 flex gap-2">
                   <Button
                     variant="flat"

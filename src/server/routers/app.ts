@@ -19,6 +19,7 @@ import { financeApRouter } from "./finance-ap";
 import { alertsRouter } from "./alerts";
 import { pasturesAdvRouter } from "./pastures-adv";
 import { aiAssetsRouter } from "./ai-assets";
+import { farmRouter } from "./farm";
 
 export const appRouter = createTRPCRouter({
   animal: animalRouter,
@@ -34,6 +35,7 @@ export const appRouter = createTRPCRouter({
   tasks: tasksRouter,
   sensors: sensorsRouter,
   locations: locationsRouter,
+  farm: farmRouter,
   // Phase 1 advanced routers
   breedingAdv: breedingAdvRouter,
   mastitis: mastitisRouter,

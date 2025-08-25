@@ -211,6 +211,44 @@ export interface OfflineLocation {
   updatedAt: Date;
 }
 
+export interface OfflineFarm {
+  id?: number;
+  uuid: string;
+  userId: string;
+  orgId: string;
+  code: string;
+  name: string;
+  location?: string;
+  ownerName?: string;
+  address?: string;
+  directions?: string;
+  officialNumber?: string;
+  phone?: string;
+  ranchPhone?: string;
+  nit?: string;
+  breederName?: string;
+  startDate?: Date;
+  lastDataEntryAt?: Date;
+  lastVisitAt?: Date;
+  maleCount: number;
+  femaleCount: number;
+  uggValue?: number;
+  uggLots?: number;
+  uggTotal?: number;
+  uggAsOf?: Date;
+  synced: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface OfflineUGGConfig {
+  id?: number;
+  orgId: string;
+  weightMale: number; // ponderador machos
+  weightFemale: number; // ponderador hembras
+  updatedAt: Date;
+}
+
 export interface SyncQueueItem {
   id?: number;
   uuid: string;
@@ -314,6 +352,8 @@ export class GanadoDB extends Dexie {
   financeTransactions!: Table<OfflineFinanceTransaction>;
   sensors!: Table<OfflineSensor>;
   locations!: Table<OfflineLocation>;
+  farms!: Table<OfflineFarm>;
+  uggConfig!: Table<OfflineUGGConfig>;
   syncQueue!: Table<SyncQueueItem>;
   chats!: Table<OfflineChat>;
   chatMessages!: Table<OfflineChatMessage>;
@@ -409,6 +449,15 @@ export class GanadoDB extends Dexie {
     this.version(9)
       .stores({
         syncLogs: "++id, startedAt, endedAt",
+      })
+      .upgrade(() => {});
+
+    // Version 10: farms & UGG config
+    this.version(10)
+      .stores({
+        farms:
+          "++id, uuid, userId, orgId, code, name, synced, updatedAt, uggAsOf",
+        uggConfig: "++id, orgId, updatedAt",
       })
       .upgrade(() => {});
   }

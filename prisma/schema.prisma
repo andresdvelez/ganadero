@@ -69,6 +69,7 @@ model User {
   embryoBatches        EmbryoBatch[]
   embryoMovements      EmbryoMovement[]
   invoiceAttachments   InvoiceAttachment[]
+  farms                 Farm[]
   
   @@index([clerkId])
   @@index([email])
@@ -84,6 +85,7 @@ model Organization {
   createdBy         User                       @relation("OrgCreatedBy", fields: [createdByUserId], references: [id], onDelete: Cascade)
   memberships       OrganizationMembership[]
   devices           Device[]
+  farms             Farm[]
 
   @@index([createdByUserId])
   @@index([name])
@@ -973,4 +975,42 @@ model EmbryoMovement {
   @@index([userId])
   @@index([embryoBatchId])
   @@index([date])
+}
+
+model Farm {
+  id              String   @id @default(cuid())
+  orgId           String
+  createdByUserId String
+  code            String   @db.VarChar(32)
+  name            String
+  location        String?
+  ownerName       String?
+  address         String?
+  directions      String?
+  officialNumber  String?
+  phone           String?
+  ranchPhone      String?
+  nit             String?
+  breederName     String? // Criador
+  startDate       DateTime?
+  lastDataEntryAt DateTime?
+  lastVisitAt     DateTime?
+  // Existencias
+  maleCount       Int      @default(0)
+  femaleCount     Int      @default(0)
+  // U.G.G (Unidad Global de Ganado)
+  uggValue        Float?   // UGG calculada para la finca
+  uggLots         Float?   // UGG por lotes (si aplica)
+  uggTotal        Float?   // Total UGG mostrado en pantalla
+  uggAsOf         DateTime?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdBy       User         @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([code])
+  @@unique([orgId, code])
 }

@@ -1,12 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import AIAssistantPage from "@/app/ai-assistant/page";
 
-export default function HomePage() {
-  const router = useRouter();
-  useEffect(() => {
-    router.replace("/ai-assistant");
-  }, [router]);
-  return null;
+export default function Page() {
+  return <AIAssistantPage />;
 }
