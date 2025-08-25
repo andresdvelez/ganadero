@@ -93,9 +93,7 @@ export function DashboardSummaries() {
       </Card>
       <Card className="p-4">
         <div className="text-xs text-neutral-500">Alertas abiertas</div>
-        <div className="text-2xl font-semibold">
-          {alerts.data?.items?.length || 0}
-        </div>
+        <div className="text-2xl font-semibold">{alerts.data?.length || 0}</div>
         <div className="mt-2 flex gap-2">
           <Button asChild size="sm" variant="flat">
             <a href="/alerts">Ver alertas</a>
