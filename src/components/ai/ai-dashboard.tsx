@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AIInputBar } from "./ai-input-bar";
+import { DashboardSummaries } from "@/components/dashboard/dashboard-summaries";
+import Link from "next/link";
 
 export function AIAssistantDashboard({
   value,
@@ -99,6 +101,10 @@ export function AIAssistantDashboard({
           onToggleWebSearch={onToggleWebSearch}
           analyser={analyser}
         />
+        {/* Resúmenes bajo el input en el hero */}
+        <div className="mt-10">
+          <DashboardSummaries />
+        </div>
 
         {/* Action chips under the left edge */}
         <div className="absolute left-3 -bottom-8 flex items-center gap-3 pointer-events-none">
@@ -157,20 +163,25 @@ export function AIAssistantDashboard({
       {/* Category cards */}
       <div className="mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 w-full max-w-6xl">
         {categories.map(({ id, title, icon: Icon }) => (
-          <div
+          <Link
             key={id}
-            className={cn(
-              "rounded-[26px] bg-white border border-neutral-200 shadow-sm p-6",
-              "flex flex-col items-start gap-4"
-            )}
+            href={id === "admin" ? "/admin" : "#"}
+            className="block"
           >
-            <div className="w-14 h-14 rounded-full grid place-items-center bg-neutral-100">
-              <Icon className="w-5 h-5 text-neutral-700" />
+            <div
+              className={cn(
+                "rounded-[26px] bg-white border border-neutral-200 shadow-sm p-6",
+                "flex flex-col items-start gap-4"
+              )}
+            >
+              <div className="w-14 h-14 rounded-full grid place-items-center bg-neutral-100">
+                <Icon className="w-5 h-5 text-neutral-700" />
+              </div>
+              <div className="text-neutral-800 text-[17px] font-medium leading-tight">
+                {title}
+              </div>
             </div>
-            <div className="text-neutral-800 text-[17px] font-medium leading-tight">
-              {title}
-            </div>
-          </div>
+          </Link>
         ))}
       </div>
 
