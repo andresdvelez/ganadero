@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { addToast } from "@/components/ui/toast";
 import { HeroModal } from "@/components/ui/hero-modal";
+import Link from "next/link";
 
 function exportCSV(rows: any[], filename: string) {
   if (!rows.length) return;
@@ -45,23 +46,8 @@ function AdminImpl() {
     { enabled: !!orgId, refetchInterval: 60000 }
   );
 
-  if (orgs.isLoading) return null;
-  if (myRole !== "ADMIN") {
-    return (
-      <div className="p-6">
-        <Card className="p-4">
-          <div className="text-sm text-neutral-700">
-            Solo administradores pueden gestionar fincas.
-          </div>
-          <div className="mt-3">
-            <Button asChild>
-              <a href="/">Volver al inicio</a>
-            </Button>
-          </div>
-        </Card>
-      </div>
-    );
-  }
+  const isLoadingOrg = orgs.isLoading;
+  const isNotAdmin = myRole !== "ADMIN";
 
   const [activeFarmId, setActiveFarmId] = useState<string | null>(null);
   const [period, setPeriod] = useState<{ from: string; to: string }>(() => {
@@ -208,6 +194,24 @@ function AdminImpl() {
     } else {
       await createFarm.mutateAsync(form);
     }
+  }
+
+  if (isLoadingOrg) return null;
+  if (isNotAdmin) {
+    return (
+      <div className="p-6">
+        <Card className="p-4">
+          <div className="text-sm text-neutral-700">
+            Solo administradores pueden gestionar fincas.
+          </div>
+          <div className="mt-3">
+            <Button asChild>
+              <Link href="/">Volver al inicio</Link>
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
   }
 
   return (
@@ -363,7 +367,7 @@ function AdminImpl() {
                           Calcular UGG
                         </Button>
                         <Button size="sm" variant="flat" asChild>
-                          <a href="/analysis">Ir a análisis</a>
+                          <Link href="/analysis">Ir a análisis</Link>
                         </Button>
                       </div>
                     </td>
