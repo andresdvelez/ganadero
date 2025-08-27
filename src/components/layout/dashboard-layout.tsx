@@ -1,14 +1,15 @@
 "use client";
 
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { UserButton } from "@clerk/nextjs";
-import { useEffect, useState } from "react";
 import { getSyncManager } from "@/services/sync/sync-manager";
 import { db } from "@/lib/dexie";
 import { Button } from "@/components/ui/button";
 import { addToast } from "@/components/ui/toast";
+import { trpc } from "@/lib/trpc/client";
+import { Select, SelectItem } from "@/components/ui/select";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -73,6 +74,8 @@ export function DashboardLayout({
         <div className="flex items-center gap-2">
           <Image src="/logo.png" alt="Ganado AI" width={28} height={28} />
           <div className="font-semibold">Ganado AI</div>
+          {/* Selector de finca (solo ADMIN) */}
+          <FarmSelector />
         </div>
         <nav className="flex items-center gap-3">
           {hasConflicts && (
@@ -225,6 +228,79 @@ export function DashboardLayout({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function FarmSelector() {
+  const orgs = trpc.org.myOrganizations.useQuery();
+  const orgId = useMemo(() => orgs.data?.[0]?.id ?? "", [orgs.data]);
+  const myRole = useMemo(() => orgs.data?.[0]?.role ?? null, [orgs.data]);
+  const farmsQ = trpc.farm.list.useQuery({ orgId }, { enabled: !!orgId });
+
+  const [activeFarmId, setActiveFarmId] = useState<string | null>(null);
+
+  // Cargar selección guardada
+  useEffect(() => {
+    try {
+      const s = window.localStorage.getItem("ACTIVE_FARM_ID");
+      if (s) setActiveFarmId(s);
+    } catch {}
+  }, []);
+
+  // Si no hay selección, tomar la primera finca
+  useEffect(() => {
+    if (!activeFarmId && farmsQ.data && farmsQ.data.length > 0) {
+      setActiveFarmId(farmsQ.data[0]!.id);
+      try {
+        window.localStorage.setItem("ACTIVE_FARM_ID", farmsQ.data[0]!.id);
+      } catch {}
+    }
+  }, [activeFarmId, farmsQ.data]);
+
+  if (myRole !== "ADMIN") return null;
+
+  const farms = farmsQ.data || [];
+  const selectedKeys = activeFarmId
+    ? new Set([activeFarmId])
+    : new Set<string>();
+
+  return (
+    <div className="ml-3 hidden sm:block">
+      <Select
+        aria-label="Seleccionar finca activa"
+        size="sm"
+        className="min-w-[220px]"
+        selectedKeys={selectedKeys as any}
+        placeholder={farms.length ? "Finca activa" : "Sin fincas"}
+        onSelectionChange={(keys) => {
+          const id = Array.from(keys as Set<string>)[0] || "";
+          const nextId = id || null;
+          setActiveFarmId(nextId);
+          try {
+            if (nextId) window.localStorage.setItem("ACTIVE_FARM_ID", nextId);
+            else window.localStorage.removeItem("ACTIVE_FARM_ID");
+          } catch {}
+          const chosen = farms.find((f) => f.id === nextId);
+          if (chosen) {
+            addToast({
+              variant: "info",
+              title: "Finca activa",
+              description: `${chosen.code} — ${chosen.name}`,
+            });
+          }
+        }}
+      >
+        {farms.map((f) => (
+          <SelectItem
+            key={f.id}
+            value={f.id}
+            textValue={`${f.code} — ${f.name}`}
+          >
+            {f.code} — {f.name}
+          </SelectItem>
+        ))}
+      </Select>
     </div>
   );
 }
