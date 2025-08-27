@@ -22,30 +22,63 @@ export function DashboardSummaries() {
 
   const farms = trpc.farm.list.useQuery(
     { orgId },
-    { enabled: !!orgId, refetchInterval: 60000 }
+    {
+      enabled: !!orgId,
+      refetchInterval: 60000,
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
   );
   const alerts = trpc.alerts.listInstances.useQuery(
     { status: "open", limit: 5 },
-    { refetchInterval: 30000, enabled: !!orgId }
+    {
+      refetchInterval: 30000,
+      enabled: !!orgId,
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
   );
 
   const animals = trpc.animal.getAll.useQuery(undefined, {
     refetchInterval: 60000,
     enabled: !!activeFarmId, // requiere farmId en header
+    retry: false,
+    refetchOnWindowFocus: false,
   });
 
-  // Litros del mes (inicio mes -> ahora)
-  const now = new Date();
-  const fromMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  // Estabilizar rango del mes actual para evitar cambiar en cada render
+  const [range, setRange] = useState<{ fromIso: string; toIso: string }>(() => {
+    const now = new Date();
+    const fromMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    return { fromIso: fromMonth.toISOString(), toIso: now.toISOString() };
+  });
+  // Opcional: refrescar cada minuto para mantener "to" razonablemente actualizado
+  useEffect(() => {
+    const t = setInterval(() => {
+      const now = new Date();
+      setRange((prev) => ({ ...prev, toIso: now.toISOString() }));
+    }, 60000);
+    return () => clearInterval(t);
+  }, []);
+
   const milkKpis = trpc.milk.kpis.useQuery(
-    { from: fromMonth.toISOString(), to: now.toISOString(), top: 5 },
-    { refetchInterval: 60000, enabled: !!activeFarmId }
+    { from: range.fromIso, to: range.toIso, top: 5 },
+    {
+      refetchInterval: 60000,
+      enabled: !!activeFarmId,
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
   );
 
-  // Partos del mes: (aproximado)
   const birthsThisMonth = trpc.breedingAdv.actionLists.useQuery(
-    { refDate: now.toISOString() },
-    { refetchInterval: 60000, enabled: !!activeFarmId }
+    { refDate: range.toIso },
+    {
+      refetchInterval: 60000,
+      enabled: !!activeFarmId,
+      retry: false,
+      refetchOnWindowFocus: false,
+    }
   );
 
   if (!orgId) return null;
@@ -123,7 +156,7 @@ export function DashboardSummaries() {
           {Number(litersMonth || 0).toFixed(1)}
         </div>
         <div className="text-xs text-neutral-500 mt-1">
-          Desde {fromMonth.toLocaleDateString()}
+          Desde {new Date(range.fromIso).toLocaleDateString()}
         </div>
       </Card>
       <Card className="p-4">
