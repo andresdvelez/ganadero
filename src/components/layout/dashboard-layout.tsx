@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { addToast } from "@/components/ui/toast";
 import { trpc } from "@/lib/trpc/client";
 import { Select, SelectItem } from "@/components/ui/select";
+import { HeroModal } from "@/components/ui/hero-modal";
+import { Input } from "@/components/ui/input";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -239,6 +241,30 @@ function FarmSelector() {
   const farmsQ = trpc.farm.list.useQuery({ orgId }, { enabled: !!orgId });
 
   const [activeFarmId, setActiveFarmId] = useState<string | null>(null);
+  const [openCreate, setOpenCreate] = useState(false);
+  const [prompted, setPrompted] = useState(false);
+  const [form, setForm] = useState<{ code: string; name: string }>({
+    code: "",
+    name: "",
+  });
+  const createFarm = trpc.farm.create.useMutation({
+    onSuccess(f) {
+      addToast({ variant: "success", title: "Finca creada" });
+      try {
+        window.localStorage.setItem("ACTIVE_FARM_ID", f.id);
+      } catch {}
+      setActiveFarmId(f.id);
+      farmsQ.refetch();
+      setOpenCreate(false);
+    },
+    onError(e) {
+      addToast({
+        variant: "error",
+        title: "No se pudo crear",
+        description: e.message,
+      });
+    },
+  });
 
   // Cargar selección guardada
   useEffect(() => {
@@ -256,6 +282,16 @@ function FarmSelector() {
         window.localStorage.setItem("ACTIVE_FARM_ID", farmsQ.data[0]!.id);
       } catch {}
     }
+    // Si no hay fincas y es ADMIN, abrir modal de creación una sola vez
+    if (
+      !prompted &&
+      myRole === "ADMIN" &&
+      farmsQ.data &&
+      farmsQ.data.length === 0
+    ) {
+      setPrompted(true);
+      setOpenCreate(true);
+    }
   }, [activeFarmId, farmsQ.data]);
 
   if (myRole !== "ADMIN") return null;
@@ -266,7 +302,7 @@ function FarmSelector() {
     : new Set<string>();
 
   return (
-    <div className="ml-3 hidden sm:block">
+    <div className="ml-3 hidden sm:flex items-center gap-2">
       <Select
         aria-label="Seleccionar finca activa"
         size="sm"
@@ -297,6 +333,54 @@ function FarmSelector() {
           </SelectItem>
         ))}
       </Select>
+      <Button size="sm" variant="light" onPress={() => setOpenCreate(true)}>
+        Crear finca
+      </Button>
+
+      <HeroModal
+        open={openCreate}
+        onClose={() => setOpenCreate(false)}
+        title="Crear finca"
+      >
+        <div className="grid grid-cols-1 gap-3">
+          <Input
+            label="Código"
+            value={form.code}
+            onChange={(e) =>
+              setForm({ ...form, code: (e.target as HTMLInputElement).value })
+            }
+          />
+          <Input
+            label="Nombre"
+            value={form.name}
+            onChange={(e) =>
+              setForm({ ...form, name: (e.target as HTMLInputElement).value })
+            }
+          />
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="bordered" onPress={() => setOpenCreate(false)}>
+            Cancelar
+          </Button>
+          <Button
+            color="primary"
+            isLoading={createFarm.isPending}
+            onPress={() => {
+              if (!orgId) return;
+              if (!form.code || !form.name) {
+                addToast({
+                  variant: "warning",
+                  title: "Completa código y nombre",
+                });
+                return;
+              }
+              createFarm.mutate({ orgId, code: form.code, name: form.name });
+            }}
+          >
+            Guardar
+          </Button>
+        </div>
+      </HeroModal>
     </div>
   );
 }
