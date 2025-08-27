@@ -42,14 +42,8 @@ export function OnboardingGate() {
       // Do not redirect while validating
       if (checking) return;
 
-      // Handle onboarding page specifically: leave when org exists
+      // Handle onboarding page specifically: do NOT redirect automatically on org presence
       if (pathname === "/onboarding") {
-        if (!isLoaded || !isSignedIn) return;
-        if (typeof navigator !== "undefined" && !navigator.onLine) return;
-        const hasOrg = !!orgs && orgs.length > 0;
-        if (hasOrg) {
-          router.replace("/");
-        }
         return;
       }
 

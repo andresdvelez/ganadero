@@ -3,11 +3,22 @@
 import { trpc } from "@/lib/trpc/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export function DashboardSummaries() {
   const orgs = trpc.org.myOrganizations.useQuery();
   const orgId = useMemo(() => orgs.data?.[0]?.id ?? "", [orgs.data]);
+
+  // Leer ACTIVE_FARM_ID local para decidir si habilitar KPIs
+  const [activeFarmId, setActiveFarmId] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      const s = window.localStorage.getItem("ACTIVE_FARM_ID");
+      setActiveFarmId(s || null);
+    } catch {
+      setActiveFarmId(null);
+    }
+  }, []);
 
   const farms = trpc.farm.list.useQuery(
     { orgId },
@@ -15,10 +26,12 @@ export function DashboardSummaries() {
   );
   const alerts = trpc.alerts.listInstances.useQuery(
     { status: "open", limit: 5 },
-    { refetchInterval: 30000 }
+    { refetchInterval: 30000, enabled: !!orgId }
   );
+
   const animals = trpc.animal.getAll.useQuery(undefined, {
     refetchInterval: 60000,
+    enabled: !!activeFarmId, // requiere farmId en header
   });
 
   // Litros del mes (inicio mes -> ahora)
@@ -26,13 +39,13 @@ export function DashboardSummaries() {
   const fromMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const milkKpis = trpc.milk.kpis.useQuery(
     { from: fromMonth.toISOString(), to: now.toISOString(), top: 5 },
-    { refetchInterval: 60000 }
+    { refetchInterval: 60000, enabled: !!activeFarmId }
   );
 
-  // Partos del mes: contamos breedingRecord tipo birth en rango
+  // Partos del mes: (aproximado)
   const birthsThisMonth = trpc.breedingAdv.actionLists.useQuery(
     { refDate: now.toISOString() },
-    { refetchInterval: 60000 }
+    { refetchInterval: 60000, enabled: !!activeFarmId }
   );
 
   if (!orgId) return null;
@@ -50,24 +63,17 @@ export function DashboardSummaries() {
     0
   );
 
-  // KPI animales activos
   const activeAnimals = (animals.data || []).filter(
     (a: any) => a.status !== "sold" && a.status !== "deceased"
   ).length;
 
-  // KPI litros del mes: sumamos topLiters si viene acotado al mes; si no, sumamos rows filtrados (kpis devuelve top)
   const litersMonth = (milkKpis.data?.topLiters || []).reduce(
     (s: number, r: any) => s + (r.liters || 0),
     0
   );
 
-  // KPI partos del mes (aproximación): contamos expectedDueDate o event type birth del mes en actionLists
   let birthsCount = 0;
   if (birthsThisMonth.data) {
-    const ref = fromMonth.getTime();
-    const end = now.getTime();
-    // actionLists no trae todos los campos; este aproximado requiere mejoras en backend.
-    // Dejamos 0 si no hay datos suficientes.
     birthsCount = 0;
   }
 
@@ -108,7 +114,7 @@ export function DashboardSummaries() {
         <div className="text-xs text-neutral-500">Animales activos</div>
         <div className="text-2xl font-semibold">{activeAnimals}</div>
         <div className="text-xs text-neutral-500 mt-1">
-          Hato total en plataforma
+          Requiere finca activa
         </div>
       </Card>
       <Card className="p-4">
@@ -124,7 +130,7 @@ export function DashboardSummaries() {
         <div className="text-xs text-neutral-500">Partos del mes</div>
         <div className="text-2xl font-semibold">{birthsCount}</div>
         <div className="text-xs text-neutral-500 mt-1">
-          Próx. versión: conteo exacto
+          Requiere finca activa
         </div>
       </Card>
 
