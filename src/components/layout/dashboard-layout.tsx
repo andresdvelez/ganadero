@@ -292,11 +292,7 @@ function FarmSelector() {
         }}
       >
         {farms.map((f) => (
-          <SelectItem
-            key={f.id}
-            value={f.id}
-            textValue={`${f.code} — ${f.name}`}
-          >
+          <SelectItem key={f.id} textValue={`${f.code} — ${f.name}`}>
             {f.code} — {f.name}
           </SelectItem>
         ))}
