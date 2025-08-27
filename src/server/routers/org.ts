@@ -38,8 +38,15 @@ export const orgRouter = createTRPCRouter({
             emailFromPrimary || fallbackEmail || `user_${clerkId}@ganado.ai`;
           const fullName =
             [user.firstName, user.lastName].filter(Boolean).join(" ") || null;
-          me = await prisma.user.create({
-            data: {
+
+          // Upsert por email: si existe, enlazar clerkId
+          me = await prisma.user.upsert({
+            where: { email },
+            update: {
+              clerkId,
+              name: fullName ?? undefined,
+            },
+            create: {
               clerkId,
               email,
               name: fullName,

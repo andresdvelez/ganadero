@@ -128,8 +128,14 @@ export const createTRPCContext = async (opts: { req: NextRequest }) => {
         const fullName =
           [user.firstName, user.lastName].filter(Boolean).join(" ") || null;
 
-        await prisma.user.create({
-          data: {
+        // Upsert por email: si existe, enlazar clerkId
+        await prisma.user.upsert({
+          where: { email },
+          update: {
+            clerkId: userId,
+            name: fullName ?? undefined,
+          },
+          create: {
             clerkId: userId,
             email,
             name: fullName,
