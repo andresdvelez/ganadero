@@ -26,8 +26,8 @@ export const orgRouter = createTRPCRouter({
       let me = await prisma.user.findUnique({ where: { clerkId } });
       if (!me) {
         try {
-          const client = await clerkClient();
-          const user = await client.users.getUser(clerkId);
+          // clerkClient es un cliente ya configurado; no se invoca como función
+          const user = await clerkClient.users.getUser(clerkId);
           const primaryEmailId = user.primaryEmailAddressId;
           const emailFromPrimary = user.emailAddresses?.find(
             (e) => e.id === primaryEmailId
@@ -44,8 +44,13 @@ export const orgRouter = createTRPCRouter({
               name: fullName,
             },
           });
-        } catch {
-          throw new Error("Usuario no encontrado");
+        } catch (e: any) {
+          // Guía de error más clara para depurar
+          const hint =
+            (e && (e.message || e.toString())) || "Fallo al consultar Clerk";
+          throw new Error(
+            `Usuario no encontrado (auth). Verifica sesión de Clerk o token. Detalle: ${hint}`
+          );
         }
       }
       const org = await prisma.organization.create({
