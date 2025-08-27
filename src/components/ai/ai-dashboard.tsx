@@ -82,82 +82,60 @@ export function AIAssistantDashboard({
       </div>
 
       {/* Big input bar with inner light field */}
-      <div
-        className={cn(
-          "relative w-full max-w-4xl",
-          overlayActive && "opacity-60"
-        )}
-      >
-        <AIInputBar
-          value={value}
-          onChange={onChange}
-          onSend={onSend}
-          onMic={onMic}
-          isListening={isListening}
-          elapsedMs={listenElapsedMs}
-          disabled={overlayActive}
-          levels={levels}
-          webSearch={webSearch}
-          onToggleWebSearch={onToggleWebSearch}
-          analyser={analyser}
-        />
+      <div className={cn("w-full max-w-4xl", overlayActive && "opacity-60")}>
+        {/* Contenedor relativo SOLO para el input y sus chips */}
+        <div className="relative">
+          <AIInputBar
+            value={value}
+            onChange={onChange}
+            onSend={onSend}
+            onMic={onMic}
+            isListening={isListening}
+            elapsedMs={listenElapsedMs}
+            disabled={overlayActive}
+            levels={levels}
+            webSearch={webSearch}
+            onToggleWebSearch={onToggleWebSearch}
+            analyser={analyser}
+          />
+
+          {/* Action chips pegados al borde inferior del input */}
+          <div className="absolute left-3 -bottom-8 flex items-center gap-3 pointer-events-none">
+            <Button
+              isIconOnly
+              variant="solid"
+              className="h-12 w-12 rounded-full bg-white text-neutral-700 shadow-[0_10px_20px_rgba(0,0,0,0.08)] border border-neutral-200 pointer-events-auto"
+              aria-label="Adjuntar"
+              disabled={overlayActive}
+            >
+              <Paperclip className="h-4 w-4" />
+            </Button>
+            {/* Removed Modules launcher button */}
+            <Button
+              isIconOnly
+              variant="solid"
+              className="h-12 w-12 rounded-full bg-white text-neutral-700 shadow-[0_10px_20px_rgba(0,0,0,0.08)] border border-neutral-200 pointer-events-auto"
+              aria-label="Imagen"
+              disabled={overlayActive}
+            >
+              <ImageIcon className="h-4 w-4" />
+            </Button>
+            <Button
+              isIconOnly
+              variant="solid"
+              className="h-12 w-12 rounded-full bg-white text-neutral-700 shadow-[0_10px_20px_rgba(0,0,0,0.08)] border border-neutral-200 pointer-events-auto"
+              aria-label="Plantillas"
+              disabled={overlayActive}
+            >
+              <MessageSquare className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
         {/* Resúmenes bajo el input en el hero */}
         <div className="mt-10">
           <DashboardSummaries />
         </div>
-
-        {/* Action chips under the left edge */}
-        <div className="absolute left-3 -bottom-8 flex items-center gap-3 pointer-events-none">
-          <Button
-            isIconOnly
-            variant="solid"
-            className="h-12 w-12 rounded-full bg-white text-neutral-700 shadow-[0_10px_20px_rgba(0,0,0,0.08)] border border-neutral-200 pointer-events-auto"
-            aria-label="Adjuntar"
-            disabled={overlayActive}
-          >
-            <Paperclip className="h-4 w-4" />
-          </Button>
-          {/* Removed Modules launcher button */}
-          <Button
-            isIconOnly
-            variant="solid"
-            className="h-12 w-12 rounded-full bg-white text-neutral-700 shadow-[0_10px_20px_rgba(0,0,0,0.08)] border border-neutral-200 pointer-events-auto"
-            aria-label="Imagen"
-            disabled={overlayActive}
-          >
-            <ImageIcon className="h-4 w-4" />
-          </Button>
-          <Button
-            isIconOnly
-            variant="solid"
-            className="h-12 w-12 rounded-full bg-white text-neutral-700 shadow-[0_10px_20px_rgba(0,0,0,0.08)] border border-neutral-200 pointer-events-auto"
-            aria-label="Plantillas"
-            disabled={overlayActive}
-          >
-            <MessageSquare className="h-4 w-4" />
-          </Button>
-        </div>
-
-        {overlayActive && (
-          <div className="absolute inset-0 grid place-items-center">
-            <div className="px-4 py-3 rounded-2xl bg-white/90 backdrop-blur border border-neutral-200 shadow-sm text-center">
-              <p className="text-sm text-neutral-700 mb-2">
-                No tienes un modelo de IA local. Descárgalo para usar el
-                asistente sin conexión.
-              </p>
-              <Button
-                onPress={modelOverlay?.onDownload}
-                isLoading={modelOverlay?.isLoading}
-                className="rounded-full bg-violet-600 text-white hover:bg-violet-700"
-              >
-                Descargar modelo
-              </Button>
-              {debugText && (
-                <p className="mt-2 text-[11px] text-neutral-500">{debugText}</p>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Category cards */}
