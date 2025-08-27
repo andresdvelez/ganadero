@@ -104,10 +104,21 @@ function AdminImpl() {
       setOpen(false);
     },
     onError(e) {
+      const msg = e.message || "";
+      let description = msg;
+      if (
+        /does not exist/i.test(msg) ||
+        /relation .* does not exist/i.test(msg)
+      ) {
+        description =
+          "Faltan migraciones en la base de datos. Aplica 'prisma migrate deploy' o 'prisma db push' y reintenta.";
+      } else if (/Unique constraint|P2002/i.test(msg)) {
+        description = "El código de finca ya está en uso en esta organización.";
+      }
       addToast({
         variant: "error",
         title: "No se pudo crear",
-        description: e.message,
+        description,
       });
     },
   });
@@ -387,6 +398,8 @@ function AdminImpl() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Input
             label="Código"
+            placeholder="Ej: F001"
+            description="Identificador corto y único dentro de la organización"
             value={form.code}
             onChange={(e) =>
               setForm({ ...form, code: (e.target as HTMLInputElement).value })
@@ -394,6 +407,7 @@ function AdminImpl() {
           />
           <Input
             label="Nombre"
+            placeholder="Ej: Hacienda La Esmeralda"
             value={form.name}
             onChange={(e) =>
               setForm({ ...form, name: (e.target as HTMLInputElement).value })
