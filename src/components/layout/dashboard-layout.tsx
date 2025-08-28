@@ -339,6 +339,7 @@ function DevicesManager({ onClose }: { onClose: () => void }) {
 
   const [linkPassA, setLinkPassA] = useState("");
   const [linkPassB, setLinkPassB] = useState("");
+  const [linkName, setLinkName] = useState("");
 
   if (devicesQ.isLoading) return <div className="text-sm">Cargando…</div>;
   const list = devicesQ.data || [];
@@ -348,7 +349,13 @@ function DevicesManager({ onClose }: { onClose: () => void }) {
       {list.findIndex((d) => d.deviceId === currentId) === -1 && (
         <div className="rounded-lg border p-3 bg-white">
           <div className="text-sm font-medium mb-2">Vincular este equipo</div>
-          <div className="grid sm:grid-cols-2 gap-2 mb-2">
+          <div className="grid sm:grid-cols-3 gap-2 mb-2">
+            <Input
+              label="Nombre del dispositivo"
+              placeholder="Ej. Mac oficina"
+              value={linkName}
+              onChange={(e) => setLinkName((e.target as HTMLInputElement).value)}
+            />
             <Input
               type="password"
               label="Clave local (opcional)"
@@ -391,12 +398,12 @@ function DevicesManager({ onClose }: { onClose: () => void }) {
                 await bindDeviceLocally({
                   deviceId: currentId,
                   clerkId: user.id,
-                  name: "Este equipo",
+                  name: linkName || "Este equipo",
                   platform: typeof navigator !== "undefined" ? navigator.platform : "web",
                 });
                 await registerDevice.mutateAsync({
                   deviceId: currentId,
-                  name: "Este equipo",
+                  name: linkName || "Este equipo",
                   platform: typeof navigator !== "undefined" ? navigator.platform : "web",
                 });
                 if (linkPassA && linkPassA.length >= 6) {
@@ -405,6 +412,7 @@ function DevicesManager({ onClose }: { onClose: () => void }) {
                 setCurrentHasLocal(true);
                 setLinkPassA("");
                 setLinkPassB("");
+                setLinkName("");
                 addToast({ variant: "success", title: "Equipo vinculado" });
               }}
             >

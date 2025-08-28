@@ -46,6 +46,9 @@
   <body>
     <div class="center">
       <div>
+        <div style="margin-bottom:12px">
+          <img src="logo.png" alt="Ganado AI" width="72" height="72" />
+        </div>
         <div style="font-size: 18px; font-weight: 600; margin-bottom: 4px">
           Cargando Ganado AI…
         </div>
@@ -55,16 +58,37 @@
         <div class="actions">
           <button class="btn" onclick="location.reload()">Reintentar</button>
           <button
-            class="btn primary"
-            onclick="window.location.replace('https://ganadero-nine.vercel.app/_/offline')"
+            class="btn"
+            onclick="window.location.replace('http://127.0.0.1:4317/device-unlock')"
           >
-            Abrir ayuda offline
+            Desbloquear dispositivo (local)
+          </button>
+          <button
+            class="btn primary"
+            onclick="window.location.replace('http://127.0.0.1:4317/offline')"
+          >
+            Abrir ayuda offline (local)
           </button>
         </div>
       </div>
     </div>
     <script>
-      // El contenido real será servido por http://localhost:PORT lanzado por Tauri
+      // Intento de redirección automática al servidor local si está disponible
+      (function () {
+        const tryPorts = [4317, 3000, 3001, 5173];
+        let idx = 0;
+        function tick() {
+          if (idx >= tryPorts.length) return;
+          const p = tryPorts[idx++];
+          fetch(`http://127.0.0.1:${p}/manifest.json`, { mode: 'no-cors' })
+            .then(() => {
+              // Navegar al desbloqueo para uso sin Internet
+              window.location.replace(`http://127.0.0.1:${p}/device-unlock`);
+            })
+            .catch(() => setTimeout(tick, 500));
+        }
+        setTimeout(tick, 600);
+      })();
     </script>
   </body>
 </html>
