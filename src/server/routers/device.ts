@@ -119,6 +119,17 @@ export const deviceRouter = createTRPCRouter({
       return { ok: true };
     }),
 
+  delete: protectedProcedure
+    .input(z.object({ deviceId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const me = await prisma.user.findUnique({ where: { clerkId: ctx.userId! } });
+      if (!me) throw new Error("Usuario no encontrado");
+      const dev = await prisma.device.findUnique({ where: { deviceId: input.deviceId } });
+      if (!dev || dev.userId !== me.id) throw new Error("Dispositivo no encontrado");
+      await prisma.device.delete({ where: { deviceId: input.deviceId } });
+      return { ok: true };
+    }),
+
   rebind: protectedProcedure
     .input(
       z.object({

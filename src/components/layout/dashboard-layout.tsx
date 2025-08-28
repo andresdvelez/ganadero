@@ -168,12 +168,21 @@ export function DashboardLayout({
           >
             Sincronizar ahora
           </Button>
-          <button
-            className="text-sm text-neutral-600 hover:text-neutral-900"
-            onClick={() => setOfflineModalOpen(true)}
-          >
-            Offline
-          </button>
+          {(() => {
+            const isDesktop =
+              typeof window !== "undefined" &&
+              (Boolean((window as any).__TAURI__) ||
+                (typeof navigator !== "undefined" && /Tauri/i.test(navigator.userAgent)));
+            if (!isDesktop) return null;
+            return (
+              <button
+                className="text-sm text-neutral-600 hover:text-neutral-900"
+                onClick={() => setOfflineModalOpen(true)}
+              >
+                Offline
+              </button>
+            );
+          })()}
           {hasClerk && <UserButton />}
         </nav>
       </header>
@@ -302,6 +311,15 @@ function DevicesManager({ onClose }: { onClose: () => void }) {
     },
     onError(e) {
       addToast({ variant: "error", title: "No se pudo vincular", description: e.message });
+    },
+  });
+  const deleteDevice = trpc.device.delete.useMutation({
+    onSuccess() {
+      utils.device.myDevices.invalidate();
+      addToast({ variant: "success", title: "Dispositivo eliminado de la cuenta" });
+    },
+    onError(e) {
+      addToast({ variant: "error", title: "No se pudo eliminar", description: e.message });
     },
   });
 
@@ -456,6 +474,11 @@ function DevicesManager({ onClose }: { onClose: () => void }) {
                     }
                   }}>Desvincular este equipo</Button>
                 )}
+                {/* Eliminar de la cuenta (no depende de ser el equipo actual) */}
+                <Button size="sm" color="danger" variant="flat" onPress={async () => {
+                  if (!confirm("¿Eliminar este dispositivo de la cuenta?")) return;
+                  await deleteDevice.mutateAsync({ deviceId: d.deviceId });
+                }}>Eliminar de la cuenta</Button>
               </div>
             </div>
           ))}
