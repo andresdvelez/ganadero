@@ -85,6 +85,27 @@ export function DashboardLayout({
           <FarmSelector />
         </div>
         <nav className="flex items-center gap-3">
+          {/* Descargas de app de escritorio */}
+          {(() => {
+            const macUrl =
+              process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_URL || "/download";
+            const winUrl =
+              process.env.NEXT_PUBLIC_DESKTOP_WIN_DOWNLOAD_URL || "/download";
+            return (
+              <>
+                <Button asChild size="sm" variant="light">
+                  <a href={macUrl} target="_blank" rel="noreferrer">
+                    Descargar macOS
+                  </a>
+                </Button>
+                <Button asChild size="sm" variant="light">
+                  <a href={winUrl} target="_blank" rel="noreferrer">
+                    Descargar Windows
+                  </a>
+                </Button>
+              </>
+            );
+          })()}
           {hasConflicts && (
             <div className="flex items-center gap-2">
               <div
