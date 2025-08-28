@@ -275,6 +275,14 @@ function DevicesManager({ onClose }: { onClose: () => void }) {
       utils.device.myDevices.invalidate();
     },
   });
+  const registerDevice = trpc.device.register.useMutation({
+    onSuccess() {
+      utils.device.myDevices.invalidate();
+    },
+    onError(e) {
+      addToast({ variant: "error", title: "No se pudo vincular", description: e.message });
+    },
+  });
 
   const [editing, setEditing] = useState<{ deviceId: string; code: string; passA: string; passB: string } | null>(null);
   const currentId = robustDeviceId();
@@ -287,10 +295,82 @@ function DevicesManager({ onClose }: { onClose: () => void }) {
     })();
   }, []);
 
+  const [linkPassA, setLinkPassA] = useState("");
+  const [linkPassB, setLinkPassB] = useState("");
+
   if (devicesQ.isLoading) return <div className="text-sm">Cargando…</div>;
   const list = devicesQ.data || [];
   return (
     <div className="space-y-3">
+      {/* Bloque para vincular el equipo actual si aún no está en la lista */}
+      {list.findIndex((d) => d.deviceId === currentId) === -1 && (
+        <div className="rounded-lg border p-3 bg-white">
+          <div className="text-sm font-medium mb-2">Vincular este equipo</div>
+          <div className="grid sm:grid-cols-2 gap-2 mb-2">
+            <Input
+              type="password"
+              label="Clave local (opcional)"
+              placeholder="••••••"
+              value={linkPassA}
+              onChange={(e) => setLinkPassA((e.target as HTMLInputElement).value)}
+            />
+            <Input
+              type="password"
+              label="Confirmar clave"
+              placeholder="••••••"
+              value={linkPassB}
+              onChange={(e) => setLinkPassB((e.target as HTMLInputElement).value)}
+            />
+          </div>
+          <div className="flex justify-end">
+            <Button
+              color="primary"
+              isLoading={registerDevice.isPending}
+              onPress={async () => {
+                if (!user) return addToast({ variant: "warning", title: "Inicia sesión" });
+                // Guardar identidad local si se ingresó clave
+                if (linkPassA || linkPassB) {
+                  if (linkPassA.length < 6) {
+                    addToast({ variant: "warning", title: "La clave debe tener al menos 6 caracteres" });
+                    return;
+                  }
+                  if (linkPassA !== linkPassB) {
+                    addToast({ variant: "warning", title: "Las claves no coinciden" });
+                    return;
+                  }
+                  await provisionFromClerk({
+                    clerkId: user.id,
+                    email: user.primaryEmailAddress?.emailAddress,
+                    name: user.fullName ?? undefined,
+                    avatarUrl: user.imageUrl,
+                    passcode: linkPassA,
+                  });
+                }
+                await bindDeviceLocally({
+                  deviceId: currentId,
+                  clerkId: user.id,
+                  name: "Este equipo",
+                  platform: typeof navigator !== "undefined" ? navigator.platform : "web",
+                });
+                await registerDevice.mutateAsync({
+                  deviceId: currentId,
+                  name: "Este equipo",
+                  platform: typeof navigator !== "undefined" ? navigator.platform : "web",
+                });
+                if (linkPassA && linkPassA.length >= 6) {
+                  try { await setPassStatus.mutateAsync({ deviceId: currentId, hasPasscode: true }); } catch {}
+                }
+                setCurrentHasLocal(true);
+                setLinkPassA("");
+                setLinkPassB("");
+                addToast({ variant: "success", title: "Equipo vinculado" });
+              }}
+            >
+              Vincular este equipo
+            </Button>
+          </div>
+        </div>
+      )}
       {list.length === 0 ? (
         <div className="text-neutral-500">No hay dispositivos vinculados.</div>
       ) : (
@@ -298,7 +378,12 @@ function DevicesManager({ onClose }: { onClose: () => void }) {
           {list.map((d) => (
             <div key={d.deviceId} className="py-3 flex items-start justify-between gap-4">
               <div>
-                <div className="font-medium">{d.name || d.deviceId}</div>
+                <div className="font-medium flex items-center gap-2">
+                  <span>{d.name || d.deviceId}</span>
+                  {currentId === d.deviceId && (
+                    <span className="px-2 py-0.5 text-[10px] rounded-full bg-neutral-100 border text-neutral-600">Este equipo</span>
+                  )}
+                </div>
                 <div className="text-xs text-neutral-600">{d.platform || ""}</div>
                 <div className="text-xs mt-1">
                   Estado: {d.hasPasscode || (currentId === d.deviceId && currentHasLocal) ? "Con clave local" : "Sin clave local"}
