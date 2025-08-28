@@ -72,44 +72,34 @@ export function debounce<T extends (...args: any[]) => any>(
 export function robustDeviceId(): string {
   // SSR-safe: si no hay window, devolver un id efímero
   if (typeof window === "undefined") {
-    return `web-${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+    return `ssr-${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
   }
   try {
-    const nav = typeof navigator !== "undefined" ? navigator : ({} as any);
-    const scr = typeof screen !== "undefined" ? screen : ({} as any);
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
-    const data = [
-      nav.userAgent,
-      nav.platform,
-      (nav as any).hardwareConcurrency || "",
-      scr.width,
-      scr.height,
-      scr.colorDepth,
-      tz,
-      (window as any).devicePixelRatio || "",
-    ].join("::");
-    const enc = new TextEncoder().encode(data);
-    const hashBuffer = (window.crypto as any).subtle.digest("SHA-256", enc);
     const ls = (window as any).localStorage as Storage | undefined;
-    const cached = ls?.getItem("_device_id");
-    if (cached) return cached;
-    const temp = Math.random().toString(36).slice(2) + Date.now().toString(36);
-    ls?.setItem("_device_id", temp);
-    Promise.resolve(hashBuffer)
-      .then((buf: ArrayBuffer) => {
-        const arr = Array.from(new Uint8Array(buf));
-        const hex = arr.map((b) => b.toString(16).padStart(2, "0")).join("");
-        ls?.setItem("_device_id", hex);
-      })
-      .catch(() => {});
-    return temp;
-  } catch {
-    const ls = (window as any).localStorage as Storage | undefined;
-    let id = ls?.getItem("_device_id") || "";
-    if (!id) {
-      id = Math.random().toString(36).slice(2) + Date.now().toString(36);
-      ls?.setItem("_device_id", id);
+    // Compat: si ya existe un id nuevo, úsalo
+    let id = ls?.getItem("_device_uid");
+    if (id) return id;
+    // Compat con versiones anteriores
+    const legacy = ls?.getItem("_device_id");
+    if (legacy && legacy.length > 0 && legacy.length < 128) {
+      // Promover el legacy a uid para mantener consistencia local
+      ls?.setItem("_device_uid", legacy);
+      return legacy;
     }
+    // Generar UUID v4 aleatorio y persistente (mejor para evitar colisiones entre equipos similares)
+    const bytes = new Uint8Array(16);
+    (window.crypto || ({} as any).crypto)?.getRandomValues?.(bytes);
+    // formato v4
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    id = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+    ls?.setItem("_device_uid", id);
     return id;
+  } catch {
+    // Fallback aleatorio si algo falla con crypto/localStorage
+    return `rnd-${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
   }
 }
