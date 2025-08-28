@@ -292,7 +292,7 @@ function FarmSelector() {
       setPrompted(true);
       setOpenCreate(true);
     }
-  }, [activeFarmId, farmsQ.data]);
+  }, [activeFarmId, farmsQ.data, myRole, prompted]);
 
   if (myRole !== "ADMIN") return null;
 
@@ -325,6 +325,11 @@ function FarmSelector() {
               description: `${chosen.code} — ${chosen.name}`,
             });
           }
+          // Invalida queries para que el header x-farm-id se aplique en siguientes requests
+          try {
+            const ev = new Event("farm:changed");
+            window.dispatchEvent(ev);
+          } catch {}
         }}
       >
         {farms.map((f) => (

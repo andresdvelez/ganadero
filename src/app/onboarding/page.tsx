@@ -21,6 +21,12 @@ export default function OnboardingPage() {
   });
 
   const hasOrg = !!orgs && orgs.length > 0;
+  const firstOrgId = useMemo(() => orgs?.[0]?.id ?? null, [orgs]);
+
+  const farmsQ = trpc.farm.list.useQuery(
+    { orgId: firstOrgId || "" },
+    { enabled: !!firstOrgId }
+  );
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -33,6 +39,15 @@ export default function OnboardingPage() {
     <div className="min-h-screen flex items-center justify-center p-6">
       <div className="w-full max-w-lg space-y-6">
         <OrgStep onCreated={() => utils.org.myOrganizations.invalidate()} />
+        {hasOrg && (
+          <CreateFarmStep
+            orgId={firstOrgId || ""}
+            hasAnyFarm={(farmsQ.data?.length || 0) > 0}
+            onCreated={async () => {
+              await utils.farm.list.invalidate();
+            }}
+          />
+        )}
         {hasOrg && <LinkDeviceStep />}
       </div>
     </div>
@@ -88,6 +103,104 @@ function OrgStep({ onCreated }: { onCreated: () => void }) {
             </Button>
           </form>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function CreateFarmStep({
+  orgId,
+  hasAnyFarm,
+  onCreated,
+}: {
+  orgId: string;
+  hasAnyFarm: boolean;
+  onCreated: () => void | Promise<void>;
+}) {
+  const [form, setForm] = useState({ code: "", name: "" });
+  const router = useRouter();
+  const createFarm = trpc.farm.create.useMutation({
+    async onSuccess(f) {
+      addToast({ variant: "success", title: "Finca creada" });
+      try {
+        window.localStorage.setItem("ACTIVE_FARM_ID", f.id);
+      } catch {}
+      await onCreated();
+      // Ir al dashboard principal para que el header cargue la finca
+      router.replace("/");
+    },
+    onError(e) {
+      addToast({
+        variant: "error",
+        title: "No se pudo crear",
+        description: e.message,
+      });
+    },
+  });
+
+  if (hasAnyFarm) {
+    return (
+      <Card>
+        <CardContent>
+          <h2 className="text-lg font-semibold mb-2">2) Finca</h2>
+          <p className="text-neutral-600">Ya tienes al menos una finca.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardContent>
+        <h2 className="text-lg font-semibold mb-2">
+          2) Crear tu primera finca
+        </h2>
+        <form
+          className="space-y-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!form.code || !form.name) {
+              addToast({
+                variant: "warning",
+                title: "Completa código y nombre",
+              });
+              return;
+            }
+            createFarm.mutate({
+              orgId,
+              code: form.code,
+              name: form.name,
+            } as any);
+          }}
+        >
+          <Input
+            label="Código"
+            placeholder="LD-001"
+            value={form.code}
+            onChange={(e) =>
+              setForm({ ...form, code: (e.target as HTMLInputElement).value })
+            }
+            required
+          />
+          <Input
+            label="Nombre"
+            placeholder="Hacienda La Esmeralda"
+            value={form.name}
+            onChange={(e) =>
+              setForm({ ...form, name: (e.target as HTMLInputElement).value })
+            }
+            required
+          />
+          <div className="flex justify-end">
+            <Button
+              color="primary"
+              type="submit"
+              isLoading={createFarm.isPending}
+            >
+              Crear finca
+            </Button>
+          </div>
+        </form>
       </CardContent>
     </Card>
   );
