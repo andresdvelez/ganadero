@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev -p 3001 --turbopack",
     "prebuild": "node ./scripts/prepare-node-sidecar.mjs",
-    "build": "prisma generate && (prisma migrate deploy || (sleep 5 && prisma migrate deploy) || prisma db push) && next build && node ./scripts/standalone-postbuild.mjs",
+    "build": "prisma generate && (PRISMA_MIGRATE_ADVISORY_LOCK_TIMEOUT=60000 prisma migrate deploy || (sleep 5 && PRISMA_MIGRATE_ADVISORY_LOCK_TIMEOUT=60000 prisma migrate deploy)) && next build && node ./scripts/standalone-postbuild.mjs",
     "build:tauri": "next build && node ./scripts/standalone-postbuild.mjs",
     "start": "next start",
     "lint": "next lint",
