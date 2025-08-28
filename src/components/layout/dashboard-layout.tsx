@@ -12,7 +12,7 @@ import { Select, SelectItem } from "@/components/ui/select";
 import { HeroModal } from "@/components/ui/hero-modal";
 import { Input } from "@/components/ui/input";
 import { useUser } from "@clerk/nextjs";
-import { provisionFromClerk, bindDeviceLocally, hasOfflineIdentity } from "@/lib/auth/offline-auth";
+import { provisionFromClerk, bindDeviceLocally, hasOfflineIdentity, lock } from "@/lib/auth/offline-auth";
 import { robustDeviceId } from "@/lib/utils";
 import { db } from "@/lib/dexie";
 
@@ -306,12 +306,15 @@ function DevicesManager({ onClose }: { onClose: () => void }) {
   });
 
   const [editing, setEditing] = useState<{ deviceId: string; code: string; passA: string; passB: string } | null>(null);
-  const currentId = robustDeviceId();
+  const [currentId, setCurrentId] = useState<string>("");
   const [currentHasLocal, setCurrentHasLocal] = useState(false);
   useEffect(() => {
     (async () => {
       try {
         setCurrentHasLocal(await hasOfflineIdentity());
+      } catch {}
+      try {
+        setCurrentId(robustDeviceId());
       } catch {}
     })();
   }, []);
@@ -435,8 +438,18 @@ function DevicesManager({ onClose }: { onClose: () => void }) {
                 {currentId === d.deviceId && (
                   <Button size="sm" color="danger" variant="light" onPress={async () => {
                     try {
+                      // Limpiar datos locales: binding, identidad y el identificador persistente
                       await db.deviceInfo.where({ deviceId: currentId }).delete();
                       await db.identities.clear();
+                      try {
+                        window.localStorage.removeItem("_device_uid");
+                        window.localStorage.removeItem("_device_id"); // legacy
+                      } catch {}
+                      try { lock(); } catch {}
+                      setCurrentHasLocal(false);
+                      // Recalcular el currentId para que deje de marcar "Este equipo"
+                      try { setCurrentId(robustDeviceId()); } catch {}
+                      await utils.device.myDevices.invalidate();
                       addToast({ variant: "success", title: "Equipo desvinculado localmente" });
                     } catch (e: any) {
                       addToast({ variant: "error", title: "No se pudo desvincular", description: e?.message });
