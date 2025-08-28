@@ -4,6 +4,1581 @@ export const dynamic = "force-dynamic";
 
 import { useState, useRef, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
+import { translations } from "@/lib/constants/translations";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { getAIClient, setAIClientHost } from "@/services/ai/ollama-client";
+import {
+  ArrowUp,
+  Mic,
+  MicOff,
+  Loader2,
+  Bot,
+  User,
+  X,
+  Check,
+  Edit3,
+  Flag,
+  Repeat2,
+  PauseCircle,
+  PlayCircle,
+  MoreHorizontal,
+  Copy,
+  Reply,
+} from "lucide-react";
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  Button as HeroUIButton,
+} from "@heroui/react";
+import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
+import { moduleRegistry } from "@/modules";
+import { trpc } from "@/lib/trpc/client";
+import { AnimalNewEmbedded } from "@/components/embedded/animal-new-embedded";
+import { AIAssistantDashboard } from "@/components/ai/ai-dashboard";
+import { AIInputBar } from "@/components/ai/ai-input-bar";
+import { AISidebar } from "@/components/ai/ai-sidebar";
+import { ModuleLauncher } from "@/components/modules/module-launcher";
+import { HealthNewEmbedded } from "@/components/embedded/health-new-embedded";
+import { MilkNewEmbedded } from "@/components/embedded/milk-new-embedded";
+import { HeroModal } from "@/components/ui/hero-modal";
+import { HeroDrawer } from "@/components/ui/hero-drawer";
+import { InventoryProductNew } from "@/components/embedded/inventory-product-new";
+import { InventoryMovementNew } from "@/components/embedded/inventory-movement-new";
+import {
+  db,
+  generateUUID,
+  OfflineChat,
+  OfflineChatMessage,
+  addToSyncQueue,
+} from "@/lib/dexie";
+import { addToast } from "@/components/ui/toast";
+import { DashboardSummaries } from "@/components/dashboard/dashboard-summaries";
+
+interface Message {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: Date;
+  module?: string;
+  action?: string;
+  data?: any;
+  widget?:
+    | {
+        type: "chart";
+        title: string;
+        chart:
+          | {
+              kind: "pie";
+              data: Array<{ label: string; value: number; color?: string }>;
+            }
+          | {
+              kind: "bar";
+              data: Array<{ label: string; value: number }>;
+              max?: number;
+            }
+          | { kind: "line"; data: Array<{ x: string; y: number }> };
+      }
+    | undefined;
+  lowStock?: Array<{
+    productId: string;
+    name: string;
+    code?: string | null;
+    current: number;
+    min: number;
+  }>;
+  invoiceSummary?: {
+    invoiceId: string;
+    productId: string;
+    qty: number;
+    unitCost?: number;
+  };
+}
+
+export default function AIAssistantPage() {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [chatUuid, setChatUuid] = useState<string | null>(null);
+  const [chatList, setChatList] = useState<OfflineChat[]>([]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const aiClient = getAIClient();
+  const router = useRouter();
+  const routeIntent = trpc.ai.routeIntent.useMutation();
+  const checkLocal = trpc.ai.checkLocalModel.useMutation();
+  const ensureLocal = trpc.ai.ensureLocalModel.useMutation();
+  const cloud = trpc.ai.checkCloudAvailable.useQuery();
+  const cloudAvailable = !!cloud.data?.available;
+  const [localModelAvailable, setLocalModelAvailable] = useState<
+    boolean | null
+  >(null);
+  const [isTauri, setIsTauri] = useState(false);
+  const [dlProgress, setDlProgress] = useState<{
+    downloaded: number;
+    total: number;
+  } | null>(null);
+  const [llamaRunning, setLlamaRunning] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [inlineTool, setInlineTool] = useState<{
+    type: "animals.create" | "health.create" | "milk.create";
+    props?: any;
+  } | null>(null);
+  const [drawerTool, setDrawerTool] = useState<{
+    type: "inventory.create" | "inventory.movement";
+    props?: any;
+  } | null>(null);
+  const [voiceTranscript, setVoiceTranscript] = useState<string | null>(null);
+  const [listenStartedAt, setListenStartedAt] = useState<number | null>(null);
+  const [listenElapsedMs, setListenElapsedMs] = useState<number>(0);
+  const [levels, setLevels] = useState<number[] | undefined>(undefined);
+  const [webSearch, setWebSearch] = useState<boolean>(false);
+  const [modulesOpen, setModulesOpen] = useState(false);
+  const audioAnalyserRef = useRef<AnalyserNode | null>(null);
+  const audioStreamRef = useRef<MediaStream | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const [isPaused, setIsPaused] = useState(false);
+  const [editFromMessageId, setEditFromMessageId] = useState<string | null>(
+    null
+  );
+  const [checkpoints, setCheckpoints] = useState<
+    Array<{ messageId: string; createdAt: Date; label?: string }>
+  >([]);
+  const pastureList = trpc.pasture.getAll.useQuery(undefined, {
+    enabled: false,
+  });
+  const longPressTimerRef = useRef<number | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    open: boolean;
+    x: number;
+    y: number;
+    messageId: string | null;
+  }>({ open: false, x: 0, y: 0, messageId: null });
+  const [checkpointsOpen, setCheckpointsOpen] = useState(false);
+  const [pendingCandidates, setPendingCandidates] = useState<{
+    modules: Array<{ id: string; score: number }>;
+    originalText: string;
+  } | null>(null);
+  const [pendingAction, setPendingAction] = useState<null | {
+    kind: "navigate" | "open-inline" | "open-drawer";
+    summary: string;
+    payload: any;
+  }>(null);
+  const [candidatePreviews, setCandidatePreviews] = useState<
+    Record<string, { content: string }>
+  >({});
+  const [isGeneratingPreviews, setIsGeneratingPreviews] = useState(false);
+  const [runningTools, setRunningTools] = useState<
+    Array<{ id: string; label: string }>
+  >([]);
+  const [period, setPeriod] = useState<{ from?: string; to?: string }>({});
+  const [postMovementCreate, setPostMovementCreate] = useState<null | {
+    kind: "create-invoice";
+    context: { productId: string; suggestedQty?: number };
+  }>(null);
+  const [attachTargetInvoiceId, setAttachTargetInvoiceId] = useState<
+    string | null
+  >(null);
+  const attachInputRef = useRef<HTMLInputElement | null>(null);
+
+  // New TRPC hooks for AI context/memories
+  const recordMessage = trpc.ai.recordMessage.useMutation();
+  const utils = trpc.useUtils();
+  const confirmMemories = trpc.ai.confirmMemories.useMutation();
+  const summarizeSession = trpc.ai.summarizeSession.useMutation();
+  const recordChoice = trpc.ai.recordChoice.useMutation();
+  const createApInvoice = trpc.financeAp.createInvoice.useMutation();
+  const updateProductCost = trpc.inventory.updateProductCost.useMutation();
+  const alertsCountQuery = trpc.alerts.listInstances.useQuery(
+    { status: "open", limit: 10 },
+    { refetchInterval: 30000 }
+  );
+  const alertsEvaluate = trpc.alerts.evaluateAll.useMutation();
+  const listSessions = trpc.ai.listSessions.useQuery(
+    { limit: 20 },
+    { refetchInterval: 60000 }
+  );
+  // We'll fetch messages with utils.ai.listMessages when needed
+
+  const MODEL_URL =
+    process.env.NEXT_PUBLIC_MODEL_DOWNLOAD_URL ||
+    "https://huggingface.co/ganado/ollama/resolve/main/DeepSeek-R1-Distill-Qwen-1.5B-Q8_0.gguf?download=true";
+  const MODEL_SHA = process.env.NEXT_PUBLIC_MODEL_SHA256 || null;
+  const LLAMA_PORT = Number(process.env.NEXT_PUBLIC_LLAMA_PORT || 11434);
+  const PREFERRED_MODEL =
+    process.env.NEXT_PUBLIC_OLLAMA_MODEL || "deepseek-r1-qwen-1_5b:latest";
+
+  useEffect(() => {
+    setIsTauri(typeof window !== "undefined" && !!(window as any).__TAURI__);
+    (async () => {
+      try {
+        const items = await db.chats
+          .orderBy("updatedAt")
+          .reverse()
+          .limit(20)
+          .toArray();
+        setChatList(items);
+      } catch {}
+    })();
+
+    const onNewChat = () => {
+      setChatUuid(null);
+      setMessages([]);
+      setInput("");
+    };
+    const onOpenChat = async (e: any) => {
+      const uuid = e?.detail?.uuid as string;
+      if (!uuid) return;
+      setChatUuid(uuid);
+      // Try server first
+      try {
+        const serverMsgs = await utils.ai.listMessages.fetch({
+          sessionId: uuid,
+          limit: 500,
+        });
+        if (serverMsgs?.length) {
+          setMessages(
+            serverMsgs.map((m: any, i: number) => ({
+              id: `${Date.now()}-${i}`,
+              role: m.role,
+              content: m.content,
+              timestamp: new Date(m.createdAt),
+            })) as Message[]
+          );
+          return;
+        }
+      } catch {}
+      // Fallback to local
+      try {
+        const msgs = await db.chatMessages
+          .where({ chatUuid: uuid })
+          .sortBy("createdAt");
+        setMessages(
+          msgs.map((m) => ({
+            id: String(m.id),
+            role: m.role,
+            content: m.content,
+            timestamp: new Date(m.createdAt),
+          })) as Message[]
+        );
+      } catch {}
+    };
+    window.addEventListener("ai-new-chat", onNewChat as any);
+    window.addEventListener("ai-open-chat", onOpenChat as any);
+
+    try {
+      const isTauriEnv =
+        typeof window !== "undefined" && !!(window as any).__TAURI__;
+      if (isTauriEnv) setAIClientHost(`http://127.0.0.1:${LLAMA_PORT}`);
+    } catch {}
+
+    (async () => {
+      try {
+        const available = await aiClient.checkLocalAvailability();
+        setLocalModelAvailable((prev) => (prev === true ? true : !!available));
+      } catch {
+        setLocalModelAvailable((prev) => (prev === true ? true : false));
+      }
+    })();
+
+    return () => {
+      window.removeEventListener("ai-new-chat", onNewChat as any);
+      window.removeEventListener("ai-open-chat", onOpenChat as any);
+      // auto summarize on unmount if there is a session
+      if (chatUuid && messages.length >= 10) {
+        summarizeSession.mutate({
+          sessionId: chatUuid,
+          take: Math.min(50, messages.length),
+        });
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await checkLocal.mutateAsync();
+        setLocalModelAvailable((prev) =>
+          prev === true ? true : !!res.available
+        );
+      } catch {
+        setLocalModelAvailable((prev) => (prev === true ? true : false));
+      }
+    })();
+  }, []);
+
+  // Listen to sidebar event to open modules
+  useEffect(() => {
+    const handler = () => setModulesOpen(true);
+    window.addEventListener("open-modules", handler as any);
+    return () => window.removeEventListener("open-modules", handler as any);
+  }, []);
+
+  const scrollToBottom = () =>
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  useEffect(scrollToBottom, [messages, inlineTool]);
+
+  // ticking timer for mic UI
+  useEffect(() => {
+    if (!isListening || !listenStartedAt) return;
+    const id = setInterval(() => {
+      setListenElapsedMs(Date.now() - listenStartedAt);
+    }, 200);
+    return () => clearInterval(id);
+  }, [isListening, listenStartedAt]);
+
+  // analyser loop for waveform
+  useEffect(() => {
+    if (!isListening || !audioAnalyserRef.current) return;
+    const analyser = audioAnalyserRef.current;
+    const fft = 256;
+    analyser.fftSize = fft;
+    const bufferLen = analyser.frequencyBinCount;
+    const data = new Uint8Array(bufferLen);
+    const render = () => {
+      analyser.getByteTimeDomainData(data);
+      // Convert to normalized levels across the bar count
+      const bars = 64;
+      const step = Math.floor(bufferLen / bars);
+      const arr: number[] = [];
+      for (let i = 0; i < bars; i++) {
+        let sum = 0;
+        for (let j = 0; j < step; j++)
+          sum += Math.abs(data[i * step + j] - 128);
+        const avg = sum / step; // 0..128
+        arr.push(Math.min(1, avg / 64));
+      }
+      setLevels(arr);
+      rafRef.current = requestAnimationFrame(render);
+    };
+    rafRef.current = requestAnimationFrame(render);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [isListening]);
+
+  // Utilities: chart render + download
+  const downloadSvg = (node: SVGSVGElement | null, filename: string) => {
+    if (!node) return;
+    const serializer = new XMLSerializer();
+    const source = serializer.serializeToString(node);
+    const blob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename.endsWith(".svg") ? filename : `${filename}.svg`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadPngFromSvg = async (
+    node: SVGSVGElement | null,
+    filename: string
+  ) => {
+    if (!node) return;
+    const serializer = new XMLSerializer();
+    const svgString = serializer.serializeToString(node);
+    const img = new Image();
+    const svgBlob = new Blob([svgString], {
+      type: "image/svg+xml;charset=utf-8",
+    });
+    const url = URL.createObjectURL(svgBlob);
+    await new Promise<void>((resolve) => {
+      img.onload = () => resolve();
+      img.src = url;
+    });
+    const w = Number(node.getAttribute("width") || 600);
+    const h = Number(node.getAttribute("height") || 300);
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(img, 0, 0);
+    URL.revokeObjectURL(url);
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = filename.endsWith(".png") ? filename : `${filename}.png`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    }, "image/png");
+  };
+
+  const downloadCsv = (rows: Array<Record<string, any>>, filename: string) => {
+    if (!rows.length) return;
+    const headers = Object.keys(rows[0]);
+    const csv = [
+      headers.join(","),
+      ...rows.map((r) =>
+        headers.map((h) => JSON.stringify(r[h] ?? "")).join(",")
+      ),
+    ].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename.endsWith(".csv") ? filename : `${filename}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const ChartWidget: React.FC<{ message: Message }> = ({ message }) => {
+    const ref = useRef<SVGSVGElement | null>(null);
+    if (!message.widget || message.widget.type !== "chart") return null;
+    const w = 520;
+    const h = 240;
+    const padding = 28;
+    const { chart, title } = message.widget;
+    return (
+      <Card className="mt-2 p-3">
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-sm font-medium">{title}</div>
+          <Button
+            size="sm"
+            variant="flat"
+            onPress={() => downloadSvg(ref.current, title)}
+          >
+            Descargar SVG
+          </Button>
+          <Button
+            size="sm"
+            variant="flat"
+            onPress={() => downloadPngFromSvg(ref.current, title)}
+          >
+            Descargar PNG
+          </Button>
+          {Array.isArray((message as any).dataCsv) &&
+            (message as any).dataCsv.length > 0 && (
+              <Button
+                size="sm"
+                variant="flat"
+                onPress={() =>
+                  downloadCsv((message as any).dataCsv, `${title}`)
+                }
+              >
+                Exportar CSV
+              </Button>
+            )}
+          <Button
+            size="sm"
+            variant="flat"
+            onPress={async () => {
+              try {
+                await addToSyncQueue(
+                  "create",
+                  "ai_memory",
+                  generateUUID(),
+                  {
+                    content: `saved_panel:${
+                      message.module || "analysis"
+                    }:${title}`,
+                    createdAt: new Date().toISOString(),
+                  },
+                  "dev-user"
+                );
+                setMessages((prev) => [
+                  ...prev,
+                  {
+                    id: (Date.now() + 6).toString(),
+                    role: "assistant",
+                    content: "Panel guardado para usar luego en /analysis.",
+                    timestamp: new Date(),
+                  },
+                ]);
+              } catch {}
+            }}
+          >
+            Guardar como panel
+          </Button>
+          {(message as any).data?.href && (
+            <Button
+              size="sm"
+              variant="flat"
+              onPress={() => router.push(String((message as any).data.href))}
+            >
+              Abrir en módulo
+            </Button>
+          )}
+        </div>
+        {chart.kind === "pie" && (
+          <svg ref={ref} width={w} height={h} role="img">
+            <g transform={`translate(${w / 2}, ${h / 2})`}>
+              {(() => {
+                const total =
+                  chart.data.reduce((s, d) => s + Math.max(0, d.value), 0) || 1;
+                let start = -Math.PI / 2;
+                const radius = Math.min(w, h) / 2 - 10;
+                return chart.data.map((d, i) => {
+                  const angle = (Math.max(0, d.value) / total) * Math.PI * 2;
+                  const end = start + angle;
+                  const x1 = Math.cos(start) * radius;
+                  const y1 = Math.sin(start) * radius;
+                  const x2 = Math.cos(end) * radius;
+                  const y2 = Math.sin(end) * radius;
+                  const large = angle > Math.PI ? 1 : 0;
+                  const color =
+                    d.color ||
+                    ["#6D28D9", "#F59E0B", "#10B981", "#EF4444", "#3B82F6"][
+                      i % 5
+                    ];
+                  const path = `M 0 0 L ${x1} ${y1} A ${radius} ${radius} 0 ${large} 1 ${x2} ${y2} Z`;
+                  const mid = start + angle / 2;
+                  const lx = Math.cos(mid) * (radius + 14);
+                  const ly = Math.sin(mid) * (radius + 14);
+                  start = end;
+                  return (
+                    <g key={i}>
+                      <path d={path} fill={color} opacity={0.9} />
+                      <text
+                        x={lx}
+                        y={ly}
+                        fontSize={11}
+                        textAnchor="middle"
+                        fill="#111"
+                      >
+                        {d.label} (
+                        {Math.round((Math.max(0, d.value) / total) * 100)}%)
+                      </text>
+                    </g>
+                  );
+                });
+              })()}
+            </g>
+          </svg>
+        )}
+        {chart.kind === "bar" && (
+          <svg ref={ref} width={w} height={h} role="img">
+            <g transform={`translate(${padding}, ${padding})`}>
+              {(() => {
+                const innerW = w - padding * 2;
+                const innerH = h - padding * 2;
+                const max =
+                  chart.max || Math.max(1, ...chart.data.map((d) => d.value));
+                const bw = innerW / chart.data.length;
+                return (
+                  <>
+                    <line
+                      x1={0}
+                      y1={innerH}
+                      x2={innerW}
+                      y2={innerH}
+                      stroke="#ddd"
+                    />
+                    {chart.data.map((d, i) => {
+                      const bh = (d.value / max) * (innerH - 12);
+                      const x = i * bw + 6;
+                      const y = innerH - bh;
+                      return (
+                        <g key={i}>
+                          <rect
+                            x={x}
+                            y={y}
+                            width={bw - 12}
+                            height={bh}
+                            fill="#6D28D9"
+                            opacity={0.9}
+                            rx={4}
+                          />
+                          <text
+                            x={x + (bw - 12) / 2}
+                            y={innerH + 12}
+                            fontSize={11}
+                            textAnchor="middle"
+                            fill="#444"
+                          >
+                            {d.label}
+                          </text>
+                        </g>
+                      );
+                    })}
+                  </>
+                );
+              })()}
+            </g>
+          </svg>
+        )}
+        {chart.kind === "line" && (
+          <svg ref={ref} width={w} height={h} role="img">
+            <g transform={`translate(${padding}, ${padding})`}>
+              {(() => {
+                const innerW = w - padding * 2;
+                const innerH = h - padding * 2;
+                const max = Math.max(1, ...chart.data.map((d) => d.y));
+                const step = innerW / Math.max(1, chart.data.length - 1);
+                const points = chart.data.map(
+                  (d, i) =>
+                    [i * step, innerH - (d.y / max) * (innerH - 8)] as const
+                );
+                const dAttr = points
+                  .map((p, i) =>
+                    i === 0 ? `M ${p[0]} ${p[1]}` : `L ${p[0]} ${p[1]}`
+                  )
+                  .join(" ");
+                return (
+                  <>
+                    <path
+                      d={dAttr}
+                      fill="none"
+                      stroke="#6D28D9"
+                      strokeWidth={2}
+                    />
+                    {points.map((p, i) => (
+                      <circle
+                        key={i}
+                        cx={p[0]}
+                        cy={p[1]}
+                        r={3}
+                        fill="#6D28D9"
+                      />
+                    ))}
+                    {chart.data.map((d, i) => (
+                      <text
+                        key={i}
+                        x={i * step}
+                        y={innerH + 12}
+                        fontSize={11}
+                        textAnchor="middle"
+                        fill="#444"
+                      >
+                        {d.x}
+                      </text>
+                    ))}
+                  </>
+                );
+              })()}
+            </g>
+          </svg>
+        )}
+      </Card>
+    );
+  };
+
+  // Simple date range inference from natural text (es)
+  const inferDateRange = (text: string): { from?: Date; to?: Date } => {
+    const now = new Date();
+    const lower = text.toLowerCase();
+    if (/hoy\b/.test(lower)) {
+      const from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      return { from, to: now };
+    }
+    if (/este mes|mes actual/.test(lower)) {
+      const from = new Date(now.getFullYear(), now.getMonth(), 1);
+      return { from, to: now };
+    }
+    const m = lower.match(/últimos?\s+(\d+)\s+d[ií]as/);
+    if (m) {
+      const n = Math.max(1, parseInt(m[1] || "7", 10));
+      const from = new Date(now.getTime() - n * 24 * 60 * 60 * 1000);
+      return { from, to: now };
+    }
+    return {};
+  };
+
+  const handleSend = async (overrideText?: string) => {
+    if (isPaused) {
+      addToast({
+        variant: "warning",
+        title: "Chat en pausa",
+        description: "Reanuda para enviar mensajes.",
+      });
+      return;
+    }
+    const textToSend = (overrideText ?? input).trim();
+    if (!textToSend || isLoading) return;
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: "user",
+      content: textToSend,
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [userMessage]);
+    setInput(overrideText ? "" : "");
+    setIsLoading(true);
+    setCheckpoints((prev) => [
+      ...prev,
+      {
+        messageId: userMessage.id,
+        createdAt: new Date(),
+        label: textToSend.slice(0, 40),
+      },
+    ]);
+
+    try {
+      // Ensure chat exists
+      let currentChatUuid = chatUuid;
+      if (!currentChatUuid) {
+        currentChatUuid = generateUUID();
+        const title = textToSend.slice(0, 60);
+        await db.chats.add({
+          uuid: currentChatUuid,
+          userId: "dev-user",
+          title,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        } as OfflineChat);
+        setChatUuid(currentChatUuid);
+        setChatList(
+          await db.chats.orderBy("updatedAt").reverse().limit(20).toArray()
+        );
+      }
+
+      // Persist user message locally and queue
+      await db.chatMessages.add({
+        chatUuid: currentChatUuid!,
+        role: "user",
+        content: textToSend,
+        createdAt: new Date(),
+      } as OfflineChatMessage);
+      await addToSyncQueue(
+        "create",
+        "ai_conversation",
+        `${currentChatUuid}-user-${Date.now()}`,
+        {
+          sessionId: currentChatUuid,
+          role: "user",
+          content: textToSend,
+          createdAt: new Date().toISOString(),
+        },
+        "dev-user"
+      );
+
+      // Call server: record + get context with query for memory ranking
+      try {
+        const recorded = await recordMessage.mutateAsync({
+          sessionId: currentChatUuid!,
+          role: "user",
+          content: textToSend,
+        });
+        if (recorded?.suggestedMemories?.length) {
+          const id = addToast({
+            variant: "info",
+            title: "Preferencias detectadas",
+            description: recorded.suggestedMemories
+              .map((m: any) => `• ${m.content}`)
+              .join("\n"),
+            durationMs: 8000,
+          });
+          // Optionally we could render a UI accept button; here we auto-confirm important ones later
+        }
+      } catch {}
+
+      // Heuristic: if user asked explicitly for a chart of tasks, generate pie by status
+      const chartRequested =
+        /(graf(ica|ico|íca|íco)|chart|gráfica|gráfico)/i.test(
+          userMessage.content
+        );
+      if (chartRequested && /tareas?/i.test(userMessage.content)) {
+        const toolId = `tool-${Date.now()}`;
+        setRunningTools((prev) => [
+          ...prev,
+          { id: toolId, label: "Generando gráfica de tareas…" },
+        ]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: "Preparando una gráfica de tareas por estado…",
+            timestamp: new Date(),
+          },
+        ]);
+        (async () => {
+          try {
+            const tasks = await utils.tasks.getAll.fetch();
+            const counts: Record<string, number> = {
+              open: 0,
+              in_progress: 0,
+              done: 0,
+            };
+            tasks.forEach((t: any) => {
+              counts[t.status] = (counts[t.status] || 0) + 1;
+            });
+            const chartMsg: Message = {
+              id: (Date.now() + 2).toString(),
+              role: "assistant",
+              content: "Aquí está la distribución de tareas por estado.",
+              timestamp: new Date(),
+              widget: {
+                type: "chart",
+                title: "Tareas por estado",
+                chart: {
+                  kind: "pie",
+                  data: [
+                    { label: "Abiertas", value: counts.open || 0 },
+                    { label: "En progreso", value: counts.in_progress || 0 },
+                    { label: "Completadas", value: counts.done || 0 },
+                  ],
+                },
+              },
+            };
+            setMessages((prev) => [...prev, chartMsg]);
+          } catch {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "No pude construir la gráfica ahora mismo.",
+                timestamp: new Date(),
+              },
+            ]);
+          } finally {
+            setRunningTools((prev) => prev.filter((t) => t.id !== toolId));
+          }
+        })();
+      }
+
+      // Heuristic charts for other modules
+      if (chartRequested && /salud/i.test(userMessage.content)) {
+        const toolId = `tool-${Date.now()}`;
+        const range =
+          period.from || period.to
+            ? {
+                from: period.from ? new Date(period.from) : undefined,
+                to: period.to ? new Date(period.to) : undefined,
+              }
+            : inferDateRange(userMessage.content);
+        setRunningTools((prev) => [
+          ...prev,
+          { id: toolId, label: "Generando gráfica de salud…" },
+        ]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: "Preparando costos de salud por tipo y mes…",
+            timestamp: new Date(),
+          },
+        ]);
+        (async () => {
+          try {
+            const k = await utils.health.kpis.fetch({
+              from: range.from?.toISOString(),
+              to: range.to?.toISOString(),
+            });
+            // Acumular costos por tipo (último mes o rango seleccionado) y exportable
+            const sumByType = new Map<string, number>();
+            (k.series || []).forEach((row: any) => {
+              sumByType.set(
+                row.type,
+                (sumByType.get(row.type) || 0) + (row.cost || 0)
+              );
+            });
+            const data = Array.from(sumByType.entries()).map(
+              ([label, value]) => ({ label, value })
+            );
+            const chartMsg: Message = {
+              id: (Date.now() + 2).toString(),
+              role: "assistant",
+              content: "Costo de salud por tipo.",
+              timestamp: new Date(),
+              widget: {
+                type: "chart",
+                title: "Salud: costo por tipo",
+                chart: { kind: "bar", data },
+              },
+              dataCsv: k.series,
+            } as any;
+            setMessages((prev) => [...prev, chartMsg]);
+          } catch {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "No pude construir la gráfica de salud.",
+                timestamp: new Date(),
+              },
+            ]);
+          } finally {
+            setRunningTools((prev) => prev.filter((t) => t.id !== toolId));
+          }
+        })();
+      }
+
+      if (chartRequested && /leche|producci[oó]n/i.test(userMessage.content)) {
+        const toolId = `tool-${Date.now()}`;
+        const range =
+          period.from || period.to
+            ? {
+                from: period.from ? new Date(period.from) : undefined,
+                to: period.to ? new Date(period.to) : undefined,
+              }
+            : inferDateRange(userMessage.content);
+        setRunningTools((prev) => [
+          ...prev,
+          { id: toolId, label: "Generando gráfica de leche…" },
+        ]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: "Preparando una gráfica de litros por día…",
+            timestamp: new Date(),
+          },
+        ]);
+        (async () => {
+          try {
+            const list = await utils.milk.list.fetch({ limit: 100 });
+            const filtered = list.filter((r: any) => {
+              const d = new Date(r.recordedAt);
+              return (
+                (range.from ? d >= range.from : true) &&
+                (range.to ? d <= range.to : true)
+              );
+            });
+            const map = new Map<string, number>();
+            filtered.forEach((r: any) => {
+              const d = new Date(r.recordedAt);
+              const key = `${d.getFullYear()}-${(d.getMonth() + 1)
+                .toString()
+                .padStart(2, "0")}-${d.getDate().toString().padStart(2, "0")}`;
+              map.set(key, (map.get(key) || 0) + (r.liters || 0));
+            });
+            const data = Array.from(map.entries())
+              .sort(([a], [b]) => (a < b ? -1 : 1))
+              .map(([x, y]) => ({ x, y }));
+            const chartMsg: Message = {
+              id: (Date.now() + 2).toString(),
+              role: "assistant",
+              content: "Serie de producción de leche por día.",
+              timestamp: new Date(),
+              widget: {
+                type: "chart",
+                title: "Leche por día",
+                chart: { kind: "line", data },
+              },
+            };
+            setMessages((prev) => [...prev, chartMsg]);
+
+            // KPIs: herd avg CCS and top liters (CSV)
+            const k = await utils.milk.kpis.fetch({
+              from: range.from?.toISOString(),
+              to: range.to?.toISOString(),
+              top: 10,
+            });
+            const herdMsg: Message = {
+              id: (Date.now() + 3).toString(),
+              role: "assistant",
+              content: `CCS promedio del rebaño: ${Math.round(
+                k.herdAvgCCS || 0
+              ).toLocaleString()}`,
+              timestamp: new Date(),
+            };
+            setMessages((prev) => [...prev, herdMsg]);
+            const topLitersCsv = (k.topLiters || []).map((t: any) => ({
+              animal: `${t.animal?.name || "(sin nombre)"} #${
+                t.animal?.tagNumber || t.animalId
+              }`,
+              liters: t.liters,
+            }));
+            const topMsg: Message = {
+              id: (Date.now() + 4).toString(),
+              role: "assistant",
+              content: "Top animales por litros en el periodo.",
+              timestamp: new Date(),
+              widget: {
+                type: "chart",
+                title: "Top litros por animal",
+                chart: {
+                  kind: "bar",
+                  data: (k.topLiters || []).map((t: any) => ({
+                    label: t.animal?.tagNumber || t.animalId,
+                    value: t.liters,
+                  })),
+                },
+              },
+              dataCsv: topLitersCsv,
+            } as any;
+            setMessages((prev) => [...prev, topMsg]);
+          } catch {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "No pude construir la gráfica de leche.",
+                timestamp: new Date(),
+              },
+            ]);
+          } finally {
+            setRunningTools((prev) => prev.filter((t) => t.id !== toolId));
+          }
+        })();
+      }
+
+      if (chartRequested && /inventario/i.test(userMessage.content)) {
+        const toolId = `tool-${Date.now()}`;
+        const range =
+          period.from || period.to
+            ? {
+                from: period.from ? new Date(period.from) : undefined,
+                to: period.to ? new Date(period.to) : undefined,
+              }
+            : inferDateRange(userMessage.content);
+        setRunningTools((prev) => [
+          ...prev,
+          { id: toolId, label: "Generando gráfica de inventario…" },
+        ]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: "Preparando movimientos de stock por tipo…",
+            timestamp: new Date(),
+          },
+        ]);
+        (async () => {
+          try {
+            const moves = await utils.inventory.listMovements.fetch({
+              limit: 100,
+            });
+            const filtered = moves.filter((r: any) => {
+              const d = new Date(r.occurredAt);
+              return (
+                (range.from ? d >= range.from : true) &&
+                (range.to ? d <= range.to : true)
+              );
+            });
+            const counts: Record<string, number> = { in: 0, out: 0, adjust: 0 };
+            filtered.forEach(
+              (m: any) => (counts[m.type] = (counts[m.type] || 0) + 1)
+            );
+            const chartMsg: Message = {
+              id: (Date.now() + 2).toString(),
+              role: "assistant",
+              content: "Movimientos de stock por tipo.",
+              timestamp: new Date(),
+              widget: {
+                type: "chart",
+                title: "Inventario: movimientos",
+                chart: {
+                  kind: "bar",
+                  data: [
+                    { label: "Entradas", value: counts.in || 0 },
+                    { label: "Salidas", value: counts.out || 0 },
+                    { label: "Ajustes", value: counts.adjust || 0 },
+                  ],
+                },
+              },
+            };
+            setMessages((prev) => [...prev, chartMsg]);
+
+            // Low stock dashboard
+            const k = await utils.inventory.kpis.fetch({
+              from: range.from?.toISOString(),
+              to: range.to?.toISOString(),
+              topLow: 10,
+            });
+            const lowArr = (k.lowStock || []).map((r: any) => ({
+              productId: r.product.id,
+              name: r.product.name,
+              code: r.product.code,
+              current: r.current,
+              min: r.min,
+            }));
+            const lowMsg: Message = {
+              id: (Date.now() + 3).toString(),
+              role: "assistant",
+              content: lowArr.length
+                ? "Productos con stock bajo:"
+                : "No hay productos con stock bajo.",
+              timestamp: new Date(),
+              lowStock: lowArr,
+            };
+            setMessages((prev) => [...prev, lowMsg]);
+          } catch {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "No pude construir la gráfica de inventario.",
+                timestamp: new Date(),
+              },
+            ]);
+          } finally {
+            setRunningTools((prev) => prev.filter((t) => t.id !== toolId));
+          }
+        })();
+      }
+
+      if (
+        chartRequested &&
+        /finanzas?|ingresos|egresos/i.test(userMessage.content)
+      ) {
+        const toolId = `tool-${Date.now()}`;
+        const range =
+          period.from || period.to
+            ? {
+                from: period.from ? new Date(period.from) : undefined,
+                to: period.to ? new Date(period.to) : undefined,
+              }
+            : inferDateRange(userMessage.content);
+        setRunningTools((prev) => [
+          ...prev,
+          { id: toolId, label: "Generando gráfica de finanzas…" },
+        ]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: "Preparando resumen de ingresos vs egresos…",
+            timestamp: new Date(),
+          },
+        ]);
+        (async () => {
+          try {
+            const k = await utils.finance.kpis.fetch({
+              from: range.from?.toISOString(),
+              to: range.to?.toISOString(),
+            });
+            const pieMsg: Message = {
+              id: (Date.now() + 2).toString(),
+              role: "assistant",
+              content: "Totales de ingresos vs egresos en el periodo.",
+              timestamp: new Date(),
+              widget: {
+                type: "chart",
+                title: "Finanzas: Ingresos vs Egresos",
+                chart: {
+                  kind: "pie",
+                  data: [
+                    { label: "Ingresos", value: k.income },
+                    { label: "Egresos", value: k.expense },
+                  ],
+                },
+              },
+            };
+            setMessages((prev) => [...prev, pieMsg]);
+            const barMsg: Message = {
+              id: (Date.now() + 3).toString(),
+              role: "assistant",
+              content: "Margen por categoría.",
+              timestamp: new Date(),
+              widget: {
+                type: "chart",
+                title: "Finanzas: Margen por categoría",
+                chart: {
+                  kind: "bar",
+                  data: (k.byCategory || []).map((c: any) => ({
+                    label: c.label,
+                    value: c.margin,
+                  })),
+                },
+              },
+            };
+            setMessages((prev) => [...prev, barMsg]);
+          } catch {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "No pude construir la gráfica de finanzas.",
+                timestamp: new Date(),
+              },
+            ]);
+          } finally {
+            setRunningTools((prev) => prev.filter((t) => t.id !== toolId));
+          }
+        })();
+      }
+
+      if (
+        chartRequested &&
+        /reproducci[oó]n|pren[eé]z|iep/i.test(userMessage.content)
+      ) {
+        const toolId = `tool-${Date.now()}`;
+        const range =
+          period.from || period.to
+            ? {
+                from: period.from ? new Date(period.from) : undefined,
+                to: period.to ? new Date(period.to) : undefined,
+              }
+            : inferDateRange(userMessage.content);
+        setRunningTools((prev) => [
+          ...prev,
+          { id: toolId, label: "Generando KPIs de reproducción…" },
+        ]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content:
+              "Preparando tasa de concepción por mes e IEP por categoría…",
+            timestamp: new Date(),
+          },
+        ]);
+        (async () => {
+          try {
+            const k = await utils.breedingAdv.kpis.fetch({
+              from: range.from?.toISOString(),
+              to: range.to?.toISOString(),
+            });
+            const lineMsg: Message = {
+              id: (Date.now() + 2).toString(),
+              role: "assistant",
+              content: "Concepciones confirmadas por mes.",
+              timestamp: new Date(),
+              widget: {
+                type: "chart",
+                title: "Reproducción: concepciones/mes",
+                chart: {
+                  kind: "line",
+                  data: (k.trend || []).map((t: any) => ({
+                    x: t.period,
+                    y: t.value,
+                  })),
+                },
+              },
+              dataCsv: k.trend,
+            } as any;
+            const barMsg: Message = {
+              id: (Date.now() + 3).toString(),
+              role: "assistant",
+              content: "IEP promedio por categoría.",
+              timestamp: new Date(),
+              widget: {
+                type: "chart",
+                title: "Reproducción: IEP por categoría",
+                chart: {
+                  kind: "bar",
+                  data: (k.iepByCategory || []).map((c: any) => ({
+                    label: c.label,
+                    value: c.avgIEP,
+                  })),
+                },
+              },
+              dataCsv: k.iepByCategory,
+            } as any;
+            setMessages((prev) => [...prev, lineMsg, barMsg]);
+          } catch {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "No pude construir las gráficas de reproducción.",
+                timestamp: new Date(),
+              },
+            ]);
+          } finally {
+            setRunningTools((prev) => prev.filter((t) => t.id !== toolId));
+          }
+        })();
+      }
+
+      if (chartRequested && /mastitis|ccs/i.test(userMessage.content)) {
+        const toolId = `tool-${Date.now()}`;
+        const range =
+          period.from || period.to
+            ? {
+                from: period.from ? new Date(period.from) : undefined,
+                to: period.to ? new Date(period.to) : undefined,
+              }
+            : inferDateRange(userMessage.content);
+        setRunningTools((prev) => [
+          ...prev,
+          { id: toolId, label: "Generando gráficas de mastitis…" },
+        ]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content:
+              "Preparando casos por semana y distribución por cuadrante…",
+            timestamp: new Date(),
+          },
+        ]);
+        (async () => {
+          try {
+            const list = await utils.mastitis.list.fetch({ limit: 200 });
+            const filtered = list.filter((c: any) => {
+              const d = new Date(c.detectedAt);
+              return (
+                (range.from ? d >= (range.from as Date) : true) &&
+                (range.to ? d <= (range.to as Date) : true)
+              );
+            });
+            // weekly aggregation
+            const weekly = new Map<string, number>();
+            filtered.forEach((c: any) => {
+              const d = new Date(c.detectedAt);
+              const first = new Date(d.getFullYear(), 0, 1);
+              const week = Math.ceil(
+                ((d.getTime() - first.getTime()) / 86400000 +
+                  first.getDay() +
+                  1) /
+                  7
+              );
+              const key = `${d.getFullYear()}-W${week}`;
+              weekly.set(key, (weekly.get(key) || 0) + 1);
+            });
+            const weeklyData = Array.from(weekly.entries())
+              .sort(([a], [b]) => (a < b ? -1 : 1))
+              .map(([x, y]) => ({ x, y }));
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "Casos por semana en el periodo.",
+                timestamp: new Date(),
+                widget: {
+                  type: "chart",
+                  title: "Mastitis: casos por semana",
+                  chart: { kind: "line", data: weeklyData },
+                },
+                dataCsv: weeklyData,
+              } as any,
+            ]);
+            // quadrant distribution
+            const counts: Record<string, number> = {
+              LF: 0,
+              LR: 0,
+              RF: 0,
+              RR: 0,
+              Otros: 0,
+            };
+            filtered.forEach((c: any) => {
+              const q = String(c.quarter || "").toUpperCase();
+              if (q === "LF" || q === "LR" || q === "RF" || q === "RR")
+                counts[q] = (counts[q] || 0) + 1;
+              else counts["Otros"] = (counts["Otros"] || 0) + 1;
+            });
+            const barData = [
+              { label: "LF", value: counts.LF || 0 },
+              { label: "LR", value: counts.LR || 0 },
+              { label: "RF", value: counts.RF || 0 },
+              { label: "RR", value: counts.RR || 0 },
+              { label: "Otros", value: counts.Otros || 0 },
+            ];
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 3).toString(),
+                role: "assistant",
+                content: "Distribución por cuadrante.",
+                timestamp: new Date(),
+                widget: {
+                  type: "chart",
+                  title: "Mastitis: por cuadrante",
+                  chart: { kind: "bar", data: barData },
+                },
+                dataCsv: barData,
+              } as any,
+            ]);
+            // Deep link to open Mastitis with current period
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 4).toString(),
+                role: "assistant",
+                content: `Abrir Mastitis con periodo: ${
+                  (range.from || "") && (range.to || "")
+                    ? `${(range.from as Date).toISOString().slice(0, 10)} → ${(
+                        range.to as Date
+                      )
+                        .toISOString()
+                        .slice(0, 10)}`
+                    : "actual"
+                }`,
+                timestamp: new Date(),
+              } as any,
+            ]);
+          } catch {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "No pude construir las gráficas de mastitis.",
+                timestamp: new Date(),
+              },
+            ]);
+          } finally {
+            setRunningTools((prev) => prev.filter((t) => t.id !== toolId));
+          }
+        })();
+      }
+
+      if (
+        chartRequested &&
+        /(semen|semén|embriones|termos|tanques|\bia\b)/i.test(
+          userMessage.content
+        )
+      ) {
+        const toolId = `tool-${Date.now()}`;
+        setRunningTools((prev) => [
+          ...prev,
+          { id: toolId, label: "Generando inventario de IA por termo…" },
+        ]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: "Preparando resumen de pajuelas por termo…",
+            timestamp: new Date(),
+          },
+        ]);
+        (async () => {
+          try {
+            const semen = await utils.aiAssets.listSemenBatches.fetch({
+              limit: 200,
+            } as any);
+            const embryos = await utils.aiAssets.listEmbryoBatches.fetch({
+              limit: 200,
+            } as any);
+            const semenMap = new Map<string, number>();
+            (semen || []).forEach((b: any) => {
+              const key = b.tank?.name || "Sin termo";
+              semenMap.set(key, (semenMap.get(key) || 0) + (b.strawCount || 0));
+            });
+            const embMap = new Map<string, number>();
+            (embryos || []).forEach((b: any) => {
+              const key = b.tank?.name || "Sin termo";
+              embMap.set(key, (embMap.get(key) || 0) + (b.strawCount || 0));
+            });
+            const semenData = Array.from(semenMap.entries()).map(
+              ([label, value]) => ({ label, value })
+            );
+            const embData = Array.from(embMap.entries()).map(
+              ([label, value]) => ({ label, value })
+            );
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "Semen por termo (pajuelas).",
+                timestamp: new Date(),
+                widget: {
+                  type: "chart",
+                  title: "Semen por termo",
+                  chart: { kind: "bar", data: semenData },
+                },
+                dataCsv: semenData,
+              } as any,
+            ]);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 3).toString(),
+                role: "assistant",
+                content: "Embriones por termo (pajuelas).",
+                timestamp: new Date(),
+                widget: {
+                  type: "chart",
+                  title: "Embriones por termo",
+                  chart: { kind: "bar", data: embData },
+                },
+                dataCsv: embData,
+              } as any,
+            ]);
+            // Deep links to open modules with context
+            const topTank = semenData
+              .concat(embData)
+              .sort((a, b) => b.value - a.value)[0]?.label;
+            if (topTank) {
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: (Date.now() + 4).toString(),
+                  role: "assistant",
+                  content: `Abrir IA Assets con termo: ${topTank}`,
+                  action: "open-link",
+                  module: "ai-assets",
+                  data: {
+                    href: `/ai-assets?tankName=${encodeURIComponent(
+                      topTank || ""
+                    )}`,
+                  },
+                  timestamp: new Date(),
+                } as any,
+              ]);
+            }
+          } catch {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content: "No pude construir el resumen de IA por termo.",
+                timestamp: new Date(),
+              },
+            ]);
+          } finally {
+            setRunningTools((prev) => prev.filter((t) => t.id !== toolId));
+          }
+        })();
+      }
+
+      // Quick actions: AP filters and Inventory Kardex by product
+      const apMatch = userMessage.content.match(
+        /\b(cxp|cuentas\s*por\s*pagar|facturas)\b.*(abiertas|pagadas|anuladas)?/i
+      );
+      if (apMatch) {
+        const statusMap: Record<string, string> = {
+          abiertas: "open",
+          pagadas: "paid",
+          anuladas: "cancelled",
+        };
+        const status = apMatch[2]
+          ? statusMap[apMatch[2].toLowerCase()]
+          : undefined;
+        const supplier =
+          userMessage.content.match(
+            /proveedor\s*[:#]?\s*([A-Za-z0-9_-]+)/i
+          )?.[1] || undefined;
+        const href = `/finance${
+          status || supplier
+            ? `?${new URLSearchParams({
+                status: status || "",
+                supplierId: supplier || "",
+              }).toString()}`
+            : ""
+        }`;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            role: "assistant",
+            content: `Voy a abrir CxP${status ? ` (${status})` : ""}${
+              supplier ? ` para proveedor ${supplier}` : ""
+            }.`,
+            timestamp: new Date(),
+          } as any,
+        ]);
+        try {
+          const list = await utils.financeAp.listInvoices.fetch({
+"use client";
+
+export const dynamic = "force-dynamic";
+
+import { useState, useRef, useEffect } from "react";
+import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { TRPCProvider } from "@/lib/trpc/provider";
 import { translations } from "@/lib/constants/translations";
 import { Button } from "@/components/ui/button";

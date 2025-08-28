@@ -29,11 +29,10 @@ function exportCSV(rows: any[], filename: string) {
 
 export default function AdminPage() {
   return (
-    <TRPCProvider>
-      <DashboardLayout>
-        <AdminImpl />
-      </DashboardLayout>
-    </TRPCProvider>
+    // Quitar TRPCProvider duplicado: el provider global ya envuelve la app
+    <DashboardLayout>
+      <AdminImpl />
+    </DashboardLayout>
   );
 }
 

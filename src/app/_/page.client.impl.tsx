@@ -12,9 +12,8 @@ import { useUser } from "@clerk/nextjs";
 
 export default function HomeClientImpl() {
   return (
-    <TRPCProvider>
-      <FarmsPanel />
-    </TRPCProvider>
+    // Eliminado TRPCProvider redundante: ya existe a nivel global en Providers
+    <FarmsPanel />
   );
 }
 

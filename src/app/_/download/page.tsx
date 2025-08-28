@@ -107,94 +107,90 @@ export default function DownloadPage() {
   };
 
   return (
-    <TRPCProvider>
-      <DashboardLayout>
-        <div className="p-6">
-          <div className="max-w-3xl mx-auto space-y-6">
-            <Card>
-              <CardContent>
-                <h1 className="text-2xl font-semibold mb-2">Descargas</h1>
-                <p className="text-neutral-600 mb-4">
-                  Instala la app de escritorio y el modelo de IA local para usar
-                  la plataforma sin Internet.
-                </p>
-                <div className="grid sm:grid-cols-3 gap-3">
-                  <Button asChild>
-                    <a href={desktopUrl} download>
-                      macOS (.dmg)
-                    </a>
-                  </Button>
-                  <Button asChild>
-                    <a href={desktopWinUrl} download>
-                      Windows (.exe)
-                    </a>
-                  </Button>
-                  <Button asChild>
-                    <a href={desktopLinuxUrl} download>
-                      Linux (.AppImage)
-                    </a>
-                  </Button>
-                </div>
-                <div className="mt-6">
-                  <Button asChild color="secondary">
-                    <a href={modelUrl}>Descargar modelo IA local</a>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent>
-                <h2 className="text-lg font-semibold mb-2">
-                  Vincular este dispositivo
-                </h2>
-                <p className="text-neutral-600 mb-4">
-                  Asocia este equipo a tu cuenta. Si aún no tienes passcode
-                  local, te lo pediremos ahora.
-                </p>
-                <Button isLoading={registerDevice.isPending} onPress={onBind}>
-                  Vincular ahora
+    <DashboardLayout>
+      <div className="p-6">
+        <div className="max-w-3xl mx-auto space-y-6">
+          <Card>
+            <CardContent>
+              <h1 className="text-2xl font-semibold mb-2">Descargas</h1>
+              <p className="text-neutral-600 mb-4">
+                Instala la app de escritorio y el modelo de IA local para usar
+                la plataforma sin Internet.
+              </p>
+              <div className="grid sm:grid-cols-3 gap-3">
+                <Button asChild>
+                  <a href={desktopUrl} download>
+                    macOS (.dmg)
+                  </a>
                 </Button>
+                <Button asChild>
+                  <a href={desktopWinUrl} download>
+                    Windows (.exe)
+                  </a>
+                </Button>
+                <Button asChild>
+                  <a href={desktopLinuxUrl} download>
+                    Linux (.AppImage)
+                  </a>
+                </Button>
+              </div>
+              <div className="mt-6">
+                <Button asChild color="secondary">
+                  <a href={modelUrl}>Descargar modelo IA local</a>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
-                {showPasscode && (
-                  <div className="mt-4 space-y-3">
-                    <Input
-                      type="password"
-                      label="Passcode"
-                      value={passcode}
-                      onChange={(e) =>
-                        setPasscode((e.target as HTMLInputElement).value)
-                      }
-                    />
-                    <Input
-                      type="password"
-                      label="Confirmar passcode"
-                      value={confirm}
-                      onChange={(e) =>
-                        setConfirm((e.target as HTMLInputElement).value)
-                      }
-                    />
-                    {error && (
-                      <div className="text-red-600 text-sm">{error}</div>
-                    )}
-                    <div className="flex gap-2">
-                      <Button color="primary" onPress={onSavePasscode}>
-                        Guardar y continuar
-                      </Button>
-                      <Button
-                        variant="bordered"
-                        onPress={() => setShowPasscode(false)}
-                      >
-                        Cancelar
-                      </Button>
-                    </div>
+          <Card>
+            <CardContent>
+              <h2 className="text-lg font-semibold mb-2">
+                Vincular este dispositivo
+              </h2>
+              <p className="text-neutral-600 mb-4">
+                Asocia este equipo a tu cuenta. Si aún no tienes passcode local,
+                te lo pediremos ahora.
+              </p>
+              <Button isLoading={registerDevice.isPending} onPress={onBind}>
+                Vincular ahora
+              </Button>
+
+              {showPasscode && (
+                <div className="mt-4 space-y-3">
+                  <Input
+                    type="password"
+                    label="Passcode"
+                    value={passcode}
+                    onChange={(e) =>
+                      setPasscode((e.target as HTMLInputElement).value)
+                    }
+                  />
+                  <Input
+                    type="password"
+                    label="Confirmar passcode"
+                    value={confirm}
+                    onChange={(e) =>
+                      setConfirm((e.target as HTMLInputElement).value)
+                    }
+                  />
+                  {error && <div className="text-red-600 text-sm">{error}</div>}
+                  <div className="flex gap-2">
+                    <Button color="primary" onPress={onSavePasscode}>
+                      Guardar y continuar
+                    </Button>
+                    <Button
+                      variant="bordered"
+                      onPress={() => setShowPasscode(false)}
+                    >
+                      Cancelar
+                    </Button>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
-      </DashboardLayout>
-    </TRPCProvider>
+      </div>
+    </DashboardLayout>
   );
 }
