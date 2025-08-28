@@ -13,6 +13,7 @@ export default function DeviceUnlockPage() {
   const [passcode, setPasscode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [needsSetup, setNeedsSetup] = useState(false);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,13 +22,13 @@ export default function DeviceUnlockPage() {
     try {
       const exists = await hasOfflineIdentity();
       if (!exists) {
-        setError(
-          "Este dispositivo no está configurado para acceso offline. Conéctate y realiza la configuración inicial."
-        );
+        setNeedsSetup(true);
+        setError("Este dispositivo no está configurado para acceso offline.");
         addToast({
           variant: "warning",
           title: "Dispositivo sin configurar",
-          description: "Configura el passcode desde la descarga.",
+          description:
+            "Conéctate a Internet y vincula este equipo desde el menú Offline.",
         });
         setLoading(false);
         return;
@@ -70,6 +71,12 @@ export default function DeviceUnlockPage() {
               {error && (
                 <div className="text-red-600 text-sm" role="alert">
                   {error}
+                  {needsSetup && (
+                    <div className="mt-2 text-neutral-700">
+                      Conéctate a Internet y, en el menú superior, abre <b>Offline</b> → <b>Vincular este equipo</b> para crear tu clave local.
+                      También puedes ir a <a className="underline" href="/download" target="_blank" rel="noreferrer">Descargar app</a> y seguir el asistente.
+                    </div>
+                  )}
                 </div>
               )}
               <Button
