@@ -14,6 +14,21 @@ export default function DeviceUnlockPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [needsSetup, setNeedsSetup] = useState(false);
+  const [ready, setReady] = useState(false);
+
+  // Si estamos offline y ya hay identidad local, enfocarse en el input y permitir usar inmediatamente
+  // Si no hay identidad, redirigir a /offline para guía
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const exists = await hasOfflineIdentity();
+        if (!exists) {
+          setNeedsSetup(true);
+        }
+      } catch {}
+      setReady(true);
+    })();
+  }, []);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,6 +63,7 @@ export default function DeviceUnlockPage() {
     }
   };
 
+  if (!ready) return null;
   return (
     <div className="min-h-screen flex items-center justify-center p-6">
       <div className="w-full max-w-sm">

@@ -238,10 +238,11 @@ fn main() {
         tauri::async_runtime::spawn(async move {
           sleep(std::time::Duration::from_millis(600)).await;
           if started {
-            let _ = w.eval(&format!("window.location.replace('http://127.0.0.1:{}')", port));
+            // Cargar directamente el flujo offline-local (desbloqueo) para funcionar sin Internet
+            let _ = w.eval(&format!("window.location.replace('http://127.0.0.1:{}/device-unlock')", port));
           } else {
             // Fallback remoto si no hay Node en el sistema
-            let _ = w.eval("window.location.replace('https://ganadero-nine.vercel.app')");
+            let _ = w.eval("window.location.replace('https://ganadero-nine.vercel.app/offline')");
           }
         });
 
