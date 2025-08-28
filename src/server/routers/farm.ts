@@ -54,30 +54,43 @@ export const farmRouter = createTRPCRouter({
       if (!membership || (membership as any).role !== "ADMIN")
         throw new Error("Solo ADMIN puede crear fincas en esta organización");
 
-      const u = await prisma.farm.create({
-        data: {
-          orgId: input.orgId,
-          createdByUserId: me.id,
-          code: input.code,
-          name: input.name,
-          location: input.location,
-          ownerName: input.ownerName,
-          address: input.address,
-          directions: input.directions,
-          officialNumber: input.officialNumber,
-          phone: input.phone,
-          ranchPhone: input.ranchPhone,
-          nit: input.nit,
-          breederName: input.breederName,
-          startDate: input.startDate,
-          lastDataEntryAt: input.lastDataEntryAt,
-          lastVisitAt: input.lastVisitAt,
-          maleCount: input.maleCount ?? 0,
-          femaleCount: input.femaleCount ?? 0,
-          uggAsOf: input.uggAsOf,
-        },
-      });
-      return u;
+      try {
+        const u = await prisma.farm.create({
+          data: {
+            orgId: input.orgId,
+            createdByUserId: me.id,
+            code: input.code,
+            name: input.name,
+            location: input.location,
+            ownerName: input.ownerName,
+            address: input.address,
+            directions: input.directions,
+            officialNumber: input.officialNumber,
+            phone: input.phone,
+            ranchPhone: input.ranchPhone,
+            nit: input.nit,
+            breederName: input.breederName,
+            startDate: input.startDate,
+            lastDataEntryAt: input.lastDataEntryAt,
+            lastVisitAt: input.lastVisitAt,
+            maleCount: input.maleCount ?? 0,
+            femaleCount: input.femaleCount ?? 0,
+            uggAsOf: input.uggAsOf,
+          },
+        });
+        return u;
+      } catch (e: any) {
+        const msg = e?.message || "";
+        if (
+          /does not exist/i.test(msg) ||
+          /relation .* does not exist/i.test(msg)
+        ) {
+          throw new Error(
+            "Faltan migraciones en la base de datos. Ejecuta 'prisma migrate deploy' (o 'prisma db push') y reintenta."
+          );
+        }
+        throw e;
+      }
     }),
 
   update: protectedProcedure
