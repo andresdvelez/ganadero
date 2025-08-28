@@ -5,13 +5,16 @@ import Link from "next/link";
 import Image from "next/image";
 import { UserButton } from "@clerk/nextjs";
 import { getSyncManager } from "@/services/sync/sync-manager";
-import { db } from "@/lib/dexie";
 import { Button } from "@/components/ui/button";
 import { addToast } from "@/components/ui/toast";
 import { trpc } from "@/lib/trpc/client";
 import { Select, SelectItem } from "@/components/ui/select";
 import { HeroModal } from "@/components/ui/hero-modal";
 import { Input } from "@/components/ui/input";
+import { useUser } from "@clerk/nextjs";
+import { provisionFromClerk, bindDeviceLocally, hasOfflineIdentity } from "@/lib/auth/offline-auth";
+import { robustDeviceId } from "@/lib/utils";
+import { db } from "@/lib/dexie";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -31,6 +34,8 @@ export function DashboardLayout({
     pending: number;
   }>({ online: true, syncing: false, pending: 0 });
   const [conflictsOpen, setConflictsOpen] = useState(false);
+  const [offlineModalOpen, setOfflineModalOpen] = useState(false);
+  const devicesQ = trpc.device.myDevices.useQuery();
   const [conflicts, setConflicts] = useState<any[]>([]);
   const [hasConflicts, setHasConflicts] = useState(false);
   useEffect(() => {
@@ -142,12 +147,12 @@ export function DashboardLayout({
           >
             Sincronizar ahora
           </Button>
-          <Link
-            href="/offline-setup"
+          <button
             className="text-sm text-neutral-600 hover:text-neutral-900"
+            onClick={() => setOfflineModalOpen(true)}
           >
             Offline
-          </Link>
+          </button>
           {hasClerk && <UserButton />}
         </nav>
       </header>
@@ -227,6 +232,135 @@ export function DashboardLayout({
                 <div className="text-neutral-500">Sin elementos</div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {offlineModalOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/30">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="font-semibold">Dispositivos y acceso offline</div>
+              <button className="text-sm" onClick={() => setOfflineModalOpen(false)}>Cerrar</button>
+            </div>
+            <div className="text-sm text-neutral-600 mb-3">
+              Administra los dispositivos vinculados a tu cuenta y el estado de su clave local.
+            </div>
+            <DevicesManager onClose={() => setOfflineModalOpen(false)} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DevicesManager({ onClose }: { onClose: () => void }) {
+  const { user } = useUser();
+  const utils = trpc.useUtils();
+  const devicesQ = trpc.device.myDevices.useQuery();
+  const setPassStatus = trpc.device.setPasscodeStatus.useMutation({
+    onSuccess() {
+      utils.device.myDevices.invalidate();
+    },
+  });
+  const reqReset = trpc.device.requestPasscodeReset.useMutation({
+    onSuccess(res) {
+      addToast({ variant: "success", title: "Código enviado", description: `Código: ${res.code}` });
+      utils.device.myDevices.invalidate();
+    },
+  });
+  const applyReset = trpc.device.resetPasscode.useMutation({
+    onSuccess() {
+      addToast({ variant: "success", title: "Clave actualizada" });
+      utils.device.myDevices.invalidate();
+    },
+  });
+
+  const [editing, setEditing] = useState<{ deviceId: string; code: string; passA: string; passB: string } | null>(null);
+  const currentId = robustDeviceId();
+  const [currentHasLocal, setCurrentHasLocal] = useState(false);
+  useEffect(() => {
+    (async () => {
+      try {
+        setCurrentHasLocal(await hasOfflineIdentity());
+      } catch {}
+    })();
+  }, []);
+
+  if (devicesQ.isLoading) return <div className="text-sm">Cargando…</div>;
+  const list = devicesQ.data || [];
+  return (
+    <div className="space-y-3">
+      {list.length === 0 ? (
+        <div className="text-neutral-500">No hay dispositivos vinculados.</div>
+      ) : (
+        <div className="divide-y">
+          {list.map((d) => (
+            <div key={d.deviceId} className="py-3 flex items-start justify-between gap-4">
+              <div>
+                <div className="font-medium">{d.name || d.deviceId}</div>
+                <div className="text-xs text-neutral-600">{d.platform || ""}</div>
+                <div className="text-xs mt-1">
+                  Estado: {d.hasPasscode || (currentId === d.deviceId && currentHasLocal) ? "Con clave local" : "Sin clave local"}
+                  {d.resetPending ? " · reset pendiente" : ""}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="flat" onPress={() => setEditing({ deviceId: d.deviceId, code: "", passA: "", passB: "" })}>Editar clave</Button>
+                <Button size="sm" variant="light" onPress={async () => {
+                  if (currentId === d.deviceId && user) {
+                    // provisionar directamente para este equipo
+                    const pass = prompt("Nueva clave (mín. 6)") || "";
+                    if (pass.length < 6) return;
+                    await provisionFromClerk({
+                      clerkId: user.id,
+                      email: user.primaryEmailAddress?.emailAddress,
+                      name: user.fullName ?? undefined,
+                      avatarUrl: user.imageUrl,
+                      passcode: pass,
+                    });
+                    addToast({ variant: "success", title: "Clave guardada en este equipo" });
+                    try { await setPassStatus.mutateAsync({ deviceId: currentId, hasPasscode: true }); } catch {}
+                    await utils.device.myDevices.invalidate();
+                  } else {
+                    await reqReset.mutateAsync({ deviceId: d.deviceId });
+                  }
+                }}>Recuperar / Reset</Button>
+                {currentId === d.deviceId && (
+                  <Button size="sm" color="danger" variant="light" onPress={async () => {
+                    try {
+                      await db.deviceInfo.where({ deviceId: currentId }).delete();
+                      await db.identities.clear();
+                      addToast({ variant: "success", title: "Equipo desvinculado localmente" });
+                    } catch (e: any) {
+                      addToast({ variant: "error", title: "No se pudo desvincular", description: e?.message });
+                    }
+                  }}>Desvincular este equipo</Button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {editing && (
+        <div className="border rounded-lg p-3 space-y-2">
+          <div className="text-sm font-medium">Actualizar clave</div>
+          <Input label="Código de 6 dígitos (correo)" value={editing.code} onChange={(e) => setEditing({ ...editing, code: (e.target as HTMLInputElement).value })} />
+          <div className="grid sm:grid-cols-2 gap-2">
+            <Input type="password" label="Nueva clave" value={editing.passA} onChange={(e) => setEditing({ ...editing, passA: (e.target as HTMLInputElement).value })} />
+            <Input type="password" label="Confirmar clave" value={editing.passB} onChange={(e) => setEditing({ ...editing, passB: (e.target as HTMLInputElement).value })} />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="bordered" onPress={() => setEditing(null)}>Cancelar</Button>
+            <Button color="primary" isLoading={applyReset.isPending} onPress={async () => {
+              if (editing.passA.length < 6 || editing.passA !== editing.passB) {
+                addToast({ variant: "warning", title: "Valida la nueva clave" });
+                return;
+              }
+              await applyReset.mutateAsync({ deviceId: editing.deviceId, code: editing.code });
+              setEditing(null);
+            }}>Guardar</Button>
           </div>
         </div>
       )}

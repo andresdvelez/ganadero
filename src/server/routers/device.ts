@@ -59,8 +59,65 @@ export const deviceRouter = createTRPCRouter({
       name: d.name,
       platform: d.platform,
       orgId: d.orgId,
+      hasPasscode: (d as any).hasPasscode ?? false,
+      resetPending: Boolean(d.resetCode && d.resetCodeExpiresAt && d.resetCodeExpiresAt > new Date()),
     }));
   }),
+
+  setPasscodeStatus: protectedProcedure
+    .input(
+      z.object({
+        deviceId: z.string(),
+        hasPasscode: z.boolean(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const me = await prisma.user.findUnique({ where: { clerkId: ctx.userId! } });
+      if (!me) throw new Error("Usuario no encontrado");
+      await prisma.device.update({
+        where: { deviceId: input.deviceId },
+        data: { hasPasscode: input.hasPasscode },
+      });
+      return { ok: true };
+    }),
+
+  requestPasscodeReset: protectedProcedure
+    .input(z.object({ deviceId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const me = await prisma.user.findUnique({ where: { clerkId: ctx.userId! } });
+      if (!me) throw new Error("Usuario no encontrado");
+      const dev = await prisma.device.findUnique({ where: { deviceId: input.deviceId } });
+      if (!dev || dev.userId !== me.id) throw new Error("Dispositivo no encontrado");
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      const expires = new Date(Date.now() + 15 * 60 * 1000);
+      await prisma.device.update({
+        where: { deviceId: input.deviceId },
+        data: { resetCode: code, resetCodeExpiresAt: expires },
+      });
+      // TODO: Enviar email real. En dev, devolver el código para test manual
+      return { ok: true, code };
+    }),
+
+  resetPasscode: protectedProcedure
+    .input(
+      z.object({ deviceId: z.string(), code: z.string().length(6) })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const me = await prisma.user.findUnique({ where: { clerkId: ctx.userId! } });
+      if (!me) throw new Error("Usuario no encontrado");
+      const dev = await prisma.device.findUnique({ where: { deviceId: input.deviceId } });
+      if (!dev || dev.userId !== me.id) throw new Error("Dispositivo no encontrado");
+      const valid =
+        dev.resetCode === input.code &&
+        !!dev.resetCodeExpiresAt &&
+        dev.resetCodeExpiresAt > new Date();
+      if (!valid) throw new Error("Código inválido o expirado");
+      await prisma.device.update({
+        where: { deviceId: input.deviceId },
+        data: { hasPasscode: true, resetCode: null, resetCodeExpiresAt: null },
+      } as any);
+      return { ok: true };
+    }),
 
   rebind: protectedProcedure
     .input(

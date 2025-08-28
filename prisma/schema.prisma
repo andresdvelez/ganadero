@@ -114,6 +114,9 @@ model Device {
   platform    String?
   userId      String
   orgId       String?
+  hasPasscode Boolean  @default(false)
+  resetCode   String?
+  resetCodeExpiresAt DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
