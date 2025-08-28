@@ -7,10 +7,10 @@
 
 */
 -- AlterTable
-ALTER TABLE "public"."Animal" ADD COLUMN     "farmId" TEXT NOT NULL;
+ALTER TABLE "public"."Animal" ADD COLUMN     "farmId" TEXT;
 
 -- AlterTable
-ALTER TABLE "public"."MilkRecord" ADD COLUMN     "farmId" TEXT NOT NULL;
+ALTER TABLE "public"."MilkRecord" ADD COLUMN     "farmId" TEXT;
 
 -- CreateTable
 CREATE TABLE "public"."Farm" (
@@ -61,14 +61,45 @@ CREATE UNIQUE INDEX "Animal_farmId_tagNumber_key" ON "public"."Animal"("farmId",
 -- CreateIndex
 CREATE INDEX "MilkRecord_farmId_idx" ON "public"."MilkRecord"("farmId");
 
--- AddForeignKey
-ALTER TABLE "public"."Animal" ADD CONSTRAINT "Animal_farmId_fkey" FOREIGN KEY ("farmId") REFERENCES "public"."Farm"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "public"."MilkRecord" ADD CONSTRAINT "MilkRecord_farmId_fkey" FOREIGN KEY ("farmId") REFERENCES "public"."Farm"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
+-- Foreign keys for Farm
 ALTER TABLE "public"."Farm" ADD CONSTRAINT "Farm_orgId_fkey" FOREIGN KEY ("orgId") REFERENCES "public"."Organization"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "public"."Farm" ADD CONSTRAINT "Farm_createdByUserId_fkey" FOREIGN KEY ("createdByUserId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- Backfill: create a default Farm per existing user/org if needed, and attach existing rows
+DO $$
+DECLARE
+  rec RECORD;
+  default_farm_id TEXT;
+  org_for_user TEXT;
+BEGIN
+  -- Create a fallback farm per user (without org tie if unknown)
+  FOR rec IN SELECT DISTINCT "userId" FROM "public"."Animal" WHERE "farmId" IS NULL LOOP
+    -- try find an org for user
+    SELECT "organizationId" INTO org_for_user FROM "public"."OrganizationMembership" WHERE "userId" = rec."userId" LIMIT 1;
+    default_farm_id := gen_random_uuid();
+    INSERT INTO "public"."Farm" ("id","orgId","createdByUserId","code","name","createdAt","updatedAt")
+    VALUES (default_farm_id, COALESCE(org_for_user, 'orphan-org'), rec."userId", 'DF-'||substr(default_farm_id,1,6), 'Finca por defecto', now(), now())
+    ON CONFLICT DO NOTHING;
+    UPDATE "public"."Animal" SET "farmId" = default_farm_id WHERE "userId" = rec."userId" AND "farmId" IS NULL;
+  END LOOP;
+
+  -- For milk records without farmId, inherit from animal if available; otherwise assign any default farm for the same user
+  UPDATE "public"."MilkRecord" mr
+  SET "farmId" = a."farmId"
+  FROM "public"."Animal" a
+  WHERE mr."animalId" = a."id" AND mr."farmId" IS NULL;
+
+  FOR rec IN SELECT DISTINCT "userId" FROM "public"."MilkRecord" WHERE "farmId" IS NULL LOOP
+    SELECT f."id" INTO default_farm_id FROM "public"."Farm" f JOIN "public"."User" u ON f."createdByUserId" = u."id" WHERE u."id" = rec."userId" LIMIT 1;
+    IF default_farm_id IS NOT NULL THEN
+      UPDATE "public"."MilkRecord" SET "farmId" = default_farm_id WHERE "userId" = rec."userId" AND "farmId" IS NULL;
+    END IF;
+  END LOOP;
+END$$;
+
+-- Now enforce NOT NULL and add FKs
+ALTER TABLE "public"."Animal" ALTER COLUMN "farmId" SET NOT NULL;
+ALTER TABLE "public"."MilkRecord" ALTER COLUMN "farmId" SET NOT NULL;
+
+ALTER TABLE "public"."Animal" ADD CONSTRAINT "Animal_farmId_fkey" FOREIGN KEY ("farmId") REFERENCES "public"."Farm"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "public"."MilkRecord" ADD CONSTRAINT "MilkRecord_farmId_fkey" FOREIGN KEY ("farmId") REFERENCES "public"."Farm"("id") ON DELETE CASCADE ON UPDATE CASCADE;
