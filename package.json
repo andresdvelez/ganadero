@@ -5,14 +5,15 @@
   "scripts": {
     "dev": "next dev -p 3001 --turbopack",
     "prebuild": "node ./scripts/prepare-node-sidecar.mjs",
-    "build": "prisma generate && prisma migrate deploy || prisma db push && next build && node ./scripts/standalone-postbuild.mjs",
+    "build": "prisma generate && (prisma migrate deploy || (sleep 5 && prisma migrate deploy) || prisma db push) && next build && node ./scripts/standalone-postbuild.mjs",
     "build:tauri": "next build && node ./scripts/standalone-postbuild.mjs",
     "start": "next start",
     "lint": "next lint",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "icons:gen": "node ./scripts/generate-placeholder-icon.mjs",
-    "seed": "prisma db push && prisma db seed"
+    "seed": "prisma db push && prisma db seed",
+    "postinstall": "prisma generate"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
