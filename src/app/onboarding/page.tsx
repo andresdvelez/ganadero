@@ -172,8 +172,9 @@ export default function OnboardingPage() {
       } catch {}
       await utils.farm.list.invalidate();
 
-      // Si el usuario ya decidió vincular antes y aún no hay org asociada en el device, lo puede repetir con org
-      if (deviceLinked && registerDevice.isSuccess && !registerDevice.data?.orgId) {
+      // Si el usuario ya vinculó el dispositivo antes de crear la organización,
+      // repetir registro para asociar la org recien creada
+      if (deviceLinked) {
         try {
           await registerDevice.mutateAsync({ deviceId, orgId });
         } catch {}
