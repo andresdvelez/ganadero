@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { unlock, hasOfflineIdentity } from "@/lib/auth/offline-auth";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,7 +18,7 @@ export default function DeviceUnlockPage() {
 
   // Si estamos offline y ya hay identidad local, enfocarse en el input y permitir usar inmediatamente
   // Si no hay identidad, redirigir a /offline para guía
-  React.useEffect(() => {
+  useEffect(() => {
     (async () => {
       try {
         const exists = await hasOfflineIdentity();
