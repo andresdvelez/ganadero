@@ -238,11 +238,19 @@ fn main() {
         tauri::async_runtime::spawn(async move {
           sleep(std::time::Duration::from_millis(600)).await;
           if started {
-            // Cargar directamente el flujo offline-local (desbloqueo) para funcionar sin Internet
-            let _ = w.eval(&format!("window.location.replace('http://127.0.0.1:{}/device-unlock')", port));
+            // Decidir destino en el webview según conectividad real del navegador
+            let js = format!(
+              "(function(){{
+                 var online = navigator.onLine;
+                 var dest = online ? 'http://127.0.0.1:{p}/' : 'http://127.0.0.1:{p}/device-unlock';
+                 window.location.replace(dest);
+               }})();",
+              p = port
+            );
+            let _ = w.eval(&js);
           } else {
             // Fallback remoto si no hay Node en el sistema
-            let _ = w.eval("window.location.replace('https://ganadero-nine.vercel.app/offline')");
+            let _ = w.eval("(function(){var online=navigator.onLine; var dest = online ? 'https://ganadero-nine.vercel.app' : 'https://ganadero-nine.vercel.app/offline'; window.location.replace(dest);})();");
           }
         });
 

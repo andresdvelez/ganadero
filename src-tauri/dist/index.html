@@ -65,8 +65,9 @@
           const p = tryPorts[idx++];
           fetch(`http://127.0.0.1:${p}/manifest.json`, { mode: 'no-cors' })
             .then(() => {
-              // Navegar al desbloqueo para uso sin Internet
-              window.location.replace(`http://127.0.0.1:${p}/device-unlock`);
+              const online = navigator.onLine;
+              const dest = online ? `http://127.0.0.1:${p}/` : `http://127.0.0.1:${p}/device-unlock`;
+              window.location.replace(dest);
             })
             .catch(() => setTimeout(tick, 500));
         }
