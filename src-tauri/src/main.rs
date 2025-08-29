@@ -3,6 +3,7 @@
 use std::fs::{create_dir_all, File};
 use std::io::{BufWriter, Write};
 use std::process::{Child, Command, Stdio};
+use std::net::TcpStream;
 use tauri::Manager;
 use tokio::time::sleep;
 
@@ -164,6 +165,11 @@ fn main() {
 
       let mut started = false;
       if let Some(srv) = server_js {
+        // Si el puerto ya está ocupado (posible instancia previa), considerarlo disponible
+        let prebound = TcpStream::connect(("127.0.0.1", port)).is_ok();
+        if prebound {
+          started = true;
+        } else {
         // Preferir sidecar node si existe
         let node_path = app
           .path_resolver()
@@ -194,7 +200,7 @@ fn main() {
                 let mut guard = SERVER_CHILD.lock().await;
                 *guard = Some(child);
               });
-              started = true;
+              // No marcar started aún; esperaremos readiness del puerto
             }
             Err(_e) => {
               // Segundo intento: usar 'node' del sistema
@@ -210,7 +216,7 @@ fn main() {
                   let mut guard = SERVER_CHILD.lock().await;
                   *guard = Some(child);
                 });
-                started = true;
+                // Esperar readiness del puerto
               }
             }
           }
@@ -228,21 +234,38 @@ fn main() {
               let mut guard = SERVER_CHILD.lock().await;
               *guard = Some(child);
             });
-            started = true;
+            // Esperar readiness del puerto
           }
+        }
         }
       }
 
       if let Some(win) = app.get_window("main") {
         let w = win.clone();
         tauri::async_runtime::spawn(async move {
-          sleep(std::time::Duration::from_millis(600)).await;
-          if started {
-            // Cargar siempre la app local; si no hay identidad, el propio front redirige al unlock
-            let _ = w.eval(&format!("window.location.replace('http://127.0.0.1:{}/')", port));
+          // Esperar hasta 15s a que el puerto esté listo; si ya estaba prebound, esto saldrá rápido
+          let mut attempts: u32 = 0;
+          let max_attempts: u32 = 30; // 30 * 500ms = 15s
+          let mut ready = started;
+          while attempts < max_attempts {
+            if TcpStream::connect(("127.0.0.1", port)).is_ok() {
+              ready = true;
+              break;
+            }
+            attempts += 1;
+            sleep(std::time::Duration::from_millis(500)).await;
+          }
+
+          if ready {
+            let _ = w.eval(&format!(
+              "(function(){{console.log('[GanadoAI] Local server ready on {0}'); window.location.replace('http://127.0.0.1:{0}/');}})();",
+              port
+            ));
           } else {
-            // Fallback remoto si no hay Node en el sistema
-            let _ = w.eval("(function(){var online=navigator.onLine; var dest = online ? 'https://ganadero-nine.vercel.app' : 'https://ganadero-nine.vercel.app/offline'; window.location.replace(dest);})();");
+            // Mantener splash y mostrar mensaje amigable; no redirigimos para permitir reintentos en splash
+            let _ = w.eval(
+              "(function(){console.warn('[GanadoAI] No se pudo iniciar el servidor local aún. Intentando de nuevo desde splash...'); var el=document.getElementById('status-text'); if(el){el.textContent='No se pudo iniciar el servidor local';}})();"
+            );
           }
         });
 
