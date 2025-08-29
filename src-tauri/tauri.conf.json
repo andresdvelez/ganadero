@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/v1/tools/cli/schema.json",
   "build": {
     "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build",
+    "beforeBuildCommand": "TAURI=1 node ./scripts/tauri-prebuild.mjs && npm run build && TAURI=1 node ./scripts/tauri-postbuild.mjs",
     "devPath": "http://localhost:3001",
     "distDir": "dist"
   },

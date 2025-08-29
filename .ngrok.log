@@ -365,3 +365,17 @@ t=2025-08-29T07:26:24-0500 lvl=eror msg="session closed, starting reconnect loop
 t=2025-08-29T07:26:27-0500 lvl=info msg="client session established" obj=tunnels.session
 t=2025-08-29T07:26:27-0500 lvl=info msg="tunnel session started" obj=tunnels.session
 t=2025-08-29T07:26:38-0500 lvl=eror msg="heartbeat timeout, terminating session" obj=tunnels.session obj=csess id=3b95d1987985 clientid=a6802c303b51352bb3a0996c0a3deab0
+t=2025-08-29T08:02:52-0500 lvl=eror msg="heartbeat timeout, terminating session" obj=tunnels.session obj=csess id=8c953fd2c578 clientid=a6802c303b51352bb3a0996c0a3deab0
+t=2025-08-29T08:02:52-0500 lvl=eror msg="session closed, starting reconnect loop" obj=tunnels.session obj=csess id=7ab1760e8ca3 err="session closed"
+t=2025-08-29T08:03:02-0500 lvl=eror msg="failed to reconnect session" obj=tunnels.session err="failed to dial ngrok server with address \"connect.ngrok-agent.com:443\": dial tcp: lookup connect.ngrok-agent.com: i/o timeout"
+t=2025-08-29T08:03:12-0500 lvl=eror msg="failed to reconnect session" obj=tunnels.session err="failed to dial ngrok server with address \"connect.ngrok-agent.com:443\": dial tcp: lookup connect.ngrok-agent.com: i/o timeout"
+t=2025-08-29T08:03:23-0500 lvl=eror msg="failed to reconnect session" obj=tunnels.session err="failed to dial ngrok server with address \"connect.ngrok-agent.com:443\": dial tcp: lookup connect.ngrok-agent.com: i/o timeout"
+t=2025-08-29T08:03:35-0500 lvl=eror msg="failed to reconnect session" obj=tunnels.session err="failed to dial ngrok server with address \"connect.ngrok-agent.com:443\": dial tcp: lookup connect.ngrok-agent.com: i/o timeout"
+t=2025-08-29T08:03:49-0500 lvl=eror msg="failed to reconnect session" obj=tunnels.session err="failed to dial ngrok server with address \"connect.ngrok-agent.com:443\": dial tcp: lookup connect.ngrok-agent.com: i/o timeout"
+t=2025-08-29T08:04:07-0500 lvl=eror msg="failed to reconnect session" obj=tunnels.session err="failed to dial ngrok server with address \"connect.ngrok-agent.com:443\": dial tcp: lookup connect.ngrok-agent.com: i/o timeout"
+t=2025-08-29T08:04:33-0500 lvl=eror msg="failed to reconnect session" obj=tunnels.session err="failed to dial ngrok server with address \"connect.ngrok-agent.com:443\": dial tcp: lookup connect.ngrok-agent.com: i/o timeout"
+t=2025-08-29T08:05:13-0500 lvl=eror msg="failed to reconnect session" obj=tunnels.session err="failed to dial ngrok server with address \"connect.ngrok-agent.com:443\": dial tcp [2600:1f16:d83:1200::6e74:3]:443: i/o timeout"
+t=2025-08-29T08:05:53-0500 lvl=eror msg="failed to reconnect session" obj=tunnels.session err="failed to dial ngrok server with address \"connect.ngrok-agent.com:443\": dial tcp [2600:1f16:d83:1200::6e74:3]:443: connect: network is unreachable"
+t=2025-08-29T08:06:33-0500 lvl=eror msg="failed to reconnect session" obj=tunnels.session err="failed to dial ngrok server with address \"connect.ngrok-agent.com:443\": dial tcp: lookup connect.ngrok-agent.com: i/o timeout"
+t=2025-08-29T08:07:04-0500 lvl=info msg="client session established" obj=tunnels.session
+t=2025-08-29T08:07:04-0500 lvl=info msg="tunnel session started" obj=tunnels.session
