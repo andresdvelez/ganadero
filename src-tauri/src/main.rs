@@ -1,6 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::fs::{create_dir_all, File};
+use std::fs::{create_dir_all, File, OpenOptions};
 use std::io::{BufWriter, Write};
 use std::process::{Child, Command, Stdio};
 use std::net::TcpStream;
@@ -150,6 +150,10 @@ fn main() {
 
       // Producción: lanzar servidor Next standalone
       let app_dir = app.path_resolver().resource_dir().ok_or("resource_dir not found")?;
+      let data_dir = app.path_resolver().app_data_dir().ok_or("app_data_dir not found")?;
+      let logs_dir = data_dir.join("logs");
+      let _ = create_dir_all(&logs_dir);
+      let log_path = logs_dir.join("standalone.log");
       let exe_dir = std::env::current_exe().ok().and_then(|p| p.parent().map(|p| p.to_path_buf())).unwrap_or(app_dir.clone());
       let candidate_paths = [
         exe_dir.join("..").join("..").join(".next").join("standalone").join("server.js"),
@@ -164,12 +168,14 @@ fn main() {
       let port = std::env::var("NEXT_PORT").ok().and_then(|s| s.parse::<u16>().ok()).unwrap_or(4317);
 
       let mut started = false;
+      let mut attempted_start = false;
       if let Some(srv) = server_js {
         // Si el puerto ya está ocupado (posible instancia previa), considerarlo disponible
         let prebound = TcpStream::connect(("127.0.0.1", port)).is_ok();
         if prebound {
           started = true;
         } else {
+        attempted_start = true;
         // Preferir sidecar node si existe
         let node_path = app
           .path_resolver()
@@ -188,10 +194,11 @@ fn main() {
           let sidecar_attempt = cmd
             .arg(&srv)
             .env("PORT", port.to_string())
+            .env("HOST", "127.0.0.1")
             .env("ALLOW_DEV_UNAUTH", "1")
             .current_dir(srv.parent().unwrap_or(&app_dir))
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
+            .stdout(Stdio::from(OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap())))
+            .stderr(Stdio::from(OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap())))
             .spawn();
 
           match sidecar_attempt {
@@ -207,10 +214,11 @@ fn main() {
               if let Ok(child) = Command::new("node")
                 .arg(&srv)
                 .env("PORT", port.to_string())
+                .env("HOST", "127.0.0.1")
                 .env("ALLOW_DEV_UNAUTH", "1")
                 .current_dir(srv.parent().unwrap_or(&app_dir))
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
+                .stdout(Stdio::from(OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap())))
+                .stderr(Stdio::from(OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap())))
                 .spawn() {
                 tauri::async_runtime::block_on(async {
                   let mut guard = SERVER_CHILD.lock().await;
@@ -225,10 +233,11 @@ fn main() {
           if let Ok(child) = Command::new("node")
             .arg(&srv)
             .env("PORT", port.to_string())
+            .env("HOST", "127.0.0.1")
             .env("ALLOW_DEV_UNAUTH", "1")
             .current_dir(srv.parent().unwrap_or(&app_dir))
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
+            .stdout(Stdio::from(OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap())))
+            .stderr(Stdio::from(OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap())))
             .spawn() {
             tauri::async_runtime::block_on(async {
               let mut guard = SERVER_CHILD.lock().await;
@@ -238,6 +247,8 @@ fn main() {
           }
         }
         }
+      } else {
+        // No existe server.js en recursos: no podemos iniciar local, nos iremos a remoto si hay internet
       }
 
       if let Some(win) = app.get_window("main") {
@@ -262,9 +273,9 @@ fn main() {
               port
             ));
           } else {
-            // Mantener splash y mostrar mensaje amigable; no redirigimos para permitir reintentos en splash
+            // Si no hay readiness: si tenemos internet, ir a remoto; si no, mantener splash
             let _ = w.eval(
-              "(function(){console.warn('[GanadoAI] No se pudo iniciar el servidor local aún. Intentando de nuevo desde splash...'); var el=document.getElementById('status-text'); if(el){el.textContent='No se pudo iniciar el servidor local';}})();"
+              "(function(){try{var online=navigator.onLine; if(online){window.location.replace('https://ganadero-nine.vercel.app'); return;} var el=document.getElementById('status-text'); if(el){el.textContent='No se pudo iniciar el servidor local';}}catch(e){}})();"
             );
           }
         });
