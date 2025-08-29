@@ -28,6 +28,7 @@ export function OnboardingGate() {
 
   const {
     data: orgs,
+    error,
     isLoading,
     isFetching,
   } = trpc.org.myOrganizations.useQuery(undefined, {
@@ -52,14 +53,17 @@ export function OnboardingGate() {
       if (!isLoaded || !isSignedIn) return;
       if (typeof navigator !== "undefined" && !navigator.onLine) return; // offline: let AuthGate handle
 
-      const hasOrg = !!orgs && orgs.length > 0;
+      // Si hubo error al consultar, no forzar onboarding (permitir navegación normal)
+      if (error) return;
+      // Solo decidir cuando hay datos definidos
+      const hasOrg = Array.isArray(orgs) && orgs.length > 0;
 
       // Only require organization to proceed; passcode/identity is optional
-      if (!hasOrg) {
+      if (Array.isArray(orgs) && !hasOrg) {
         router.replace("/onboarding");
       }
     })();
-  }, [pathname, router, isLoaded, isSignedIn, orgs, checking]);
+  }, [pathname, router, isLoaded, isSignedIn, orgs, error, checking]);
 
   // Visual loading guard while validating to avoid route flashes
   if (checking) {

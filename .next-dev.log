@@ -62842,3 +62842,6 @@ Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allow
   syscall: 'open',
   path: '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'
 }
+ ✓ Compiled middleware in 3ms
+ ✓ Compiled middleware in 0ms
+ ✓ Compiled middleware in 1ms

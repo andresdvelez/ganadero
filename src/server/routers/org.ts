@@ -5,9 +5,51 @@ import { clerkClient } from "@clerk/nextjs/server";
 
 export const orgRouter = createTRPCRouter({
   myOrganizations: protectedProcedure.query(async ({ ctx }) => {
-    const userId = ctx.userId!;
-    const me = await prisma.user.findUnique({ where: { clerkId: userId } });
-    if (!me) return [];
+    const clerkId = ctx.userId!;
+    let me = await prisma.user.findUnique({ where: { clerkId } });
+    if (!me) {
+      try {
+        const client = await clerkClient();
+        const user = await client.users.getUser(clerkId);
+        const primaryEmailId = user.primaryEmailAddressId;
+        const emailFromPrimary = user.emailAddresses?.find(
+          (e) => e.id === primaryEmailId
+        )?.emailAddress;
+        const fallbackEmail = user.emailAddresses?.[0]?.emailAddress;
+        const email = emailFromPrimary || fallbackEmail;
+        if (email) {
+          // Intentar enlazar registro existente por email
+          const existingByEmail = await prisma.user.findUnique({ where: { email } });
+          if (existingByEmail) {
+            me = await prisma.user.update({
+              where: { id: existingByEmail.id },
+              data: { clerkId },
+            });
+          } else {
+            // Crear si no existe
+            me = await prisma.user.create({
+              data: {
+                clerkId,
+                email,
+                name: [user.firstName, user.lastName].filter(Boolean).join(" ") || null,
+              },
+            });
+          }
+        } else {
+          // Sin email disponible, crear placeholder
+          me = await prisma.user.create({
+            data: {
+              clerkId,
+              email: `user_${clerkId}@ganado.ai`,
+              name: [user.firstName, user.lastName].filter(Boolean).join(" ") || null,
+            },
+          });
+        }
+      } catch {
+        // Si Clerk falla, no forzamos onboarding por esta vía; devolver vacío
+        return [];
+      }
+    }
     const memberships = await prisma.organizationMembership.findMany({
       where: { userId: me.id },
       include: { organization: true },
