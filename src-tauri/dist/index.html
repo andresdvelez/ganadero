@@ -64,7 +64,7 @@
         function tick() {
           if (redirected || idx >= tryPorts.length) return;
           const p = tryPorts[idx++];
-          fetch(`http://127.0.0.1:${p}/manifest.json`, { mode: 'no-cors', cache: 'no-store' })
+          fetch(`http://127.0.0.1:${p}/manifest.webmanifest`, { mode: 'no-cors', cache: 'no-store' })
             .then(() => {
               const online = navigator.onLine;
               const dest = online ? `http://127.0.0.1:${p}/` : `http://127.0.0.1:${p}/device-unlock`;
