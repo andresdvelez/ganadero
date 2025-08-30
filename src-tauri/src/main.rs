@@ -209,7 +209,10 @@ fn main() {
               });
               // No marcar started aún; esperaremos readiness del puerto
             }
-            Err(_e) => {
+            Err(e) => {
+              // Registrar error de spawn en log
+              let mut f = OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap());
+              let _ = writeln!(f, "[GanadoAI] Error al iniciar sidecar/node: {}", e);
               // Segundo intento: usar 'node' del sistema
               if let Ok(child) = Command::new("node")
                 .arg(&srv)
@@ -225,6 +228,9 @@ fn main() {
                   *guard = Some(child);
                 });
                 // Esperar readiness del puerto
+              } else {
+                let mut f2 = OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap());
+                let _ = writeln!(f2, "[GanadoAI] Error al iniciar 'node' del sistema");
               }
             }
           }
@@ -244,6 +250,9 @@ fn main() {
               *guard = Some(child);
             });
             // Esperar readiness del puerto
+          } else {
+            let mut f3 = OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap());
+            let _ = writeln!(f3, "[GanadoAI] No se encontró 'node' para iniciar el servidor");
           }
         }
         }
@@ -256,7 +265,7 @@ fn main() {
         tauri::async_runtime::spawn(async move {
           // Esperar hasta 15s a que el puerto esté listo; si ya estaba prebound, esto saldrá rápido
           let mut attempts: u32 = 0;
-          let max_attempts: u32 = 30; // 30 * 500ms = 15s
+          let max_attempts: u32 = 60; // 60 * 500ms = 30s
           let mut ready = started;
           while attempts < max_attempts {
             if TcpStream::connect(("127.0.0.1", port)).is_ok() {
@@ -273,10 +282,11 @@ fn main() {
               port
             ));
           } else {
-            // Si no hay readiness: si tenemos internet, ir a remoto; si no, mantener splash
-            let _ = w.eval(
-              "(function(){try{var online=navigator.onLine; if(online){window.location.replace('https://ganadero-nine.vercel.app'); return;} var el=document.getElementById('status-text'); if(el){el.textContent='No se pudo iniciar el servidor local';}}catch(e){}})();"
-            );
+            // Sin readiness: si offline, llevar directamente al unlock local (frontend maneja falta de identidad)
+            let _ = w.eval(&format!(
+              "(function(){{try{{var online=navigator.onLine; if(!online){{window.location.replace('http://127.0.0.1:{0}/device-unlock'); return;}} window.location.replace('https://ganadero-nine.vercel.app');}}catch(e){{}}}})();",
+              port
+            ));
           }
         });
 
