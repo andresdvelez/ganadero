@@ -380,3 +380,4 @@ t=2025-08-29T08:06:33-0500 lvl=eror msg="failed to reconnect session" obj=tunnel
 t=2025-08-29T08:07:04-0500 lvl=info msg="client session established" obj=tunnels.session
 t=2025-08-29T08:07:04-0500 lvl=info msg="tunnel session started" obj=tunnels.session
 t=2025-08-29T12:36:53-0500 lvl=info msg="update available" obj=updater
+t=2025-08-29T18:36:54-0500 lvl=info msg="update available" obj=updater

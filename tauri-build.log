@@ -26,7 +26,7 @@ For more information, see: https://pris.ly/prisma-config
 Environment variables loaded from .env
 Prisma schema loaded from prisma/schema.prisma
 
-✔ Generated Prisma Client (v6.13.0) to ./node_modules/@prisma/client in 549ms
+✔ Generated Prisma Client (v6.13.0) to ./node_modules/@prisma/client in 450ms
 
 Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
 
@@ -38,7 +38,7 @@ Tip: Interested in query caching in just a few lines of code? Try Accelerate tod
    Creating an optimized production build ...
 > [PWA] PWA support is disabled
 > [PWA] PWA support is disabled
- ✓ Compiled successfully in 7.0s
+ ✓ Compiled successfully in 9.0s
    Linting and checking validity of types ...
 
 ./src/__tests__/integration.test.tsx
@@ -837,9 +837,9 @@ Tip: Interested in query caching in just a few lines of code? Try Accelerate tod
 45:44  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
 
 ./src/server/routers/org.ts
-55:21  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
-137:39  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
-141:31  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+97:21  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+179:39  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+183:31  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
 
 ./src/server/routers/pastures-adv.ts
 37:20  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
@@ -975,7 +975,26 @@ Route (app)                                 Size  First Load JS  Revalidate  Exp
 [postbuild] Restored _pastures_bak -> pastures
 [postbuild] Restored _offline_bak -> offline
    Compiling ganado-ai-app v0.1.0 (/Volumes/Extra Disk/norvik/ganadero/src-tauri)
-    Finished `release` profile [optimized] target(s) in 19.30s
+warning: variable `attempted_start` is assigned to, but never used
+   --> src/main.rs:171:15
+    |
+171 |       let mut attempted_start = false;
+    |               ^^^^^^^^^^^^^^^
+    |
+    = note: consider using `_attempted_start` instead
+    = note: `#[warn(unused_variables)]` on by default
+
+warning: value assigned to `attempted_start` is never read
+   --> src/main.rs:178:9
+    |
+178 |         attempted_start = true;
+    |         ^^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` on by default
+
+warning: `ganado-ai-app` (bin "ganado-ai-app") generated 2 warnings
+    Finished `release` profile [optimized] target(s) in 21.27s
      Signing /Volumes/Extra Disk/norvik/ganadero/src-tauri/target/release/Ganado AI
      Signing sidecar/node-x86_64-apple-darwin
     Bundling Ganado AI.app (/Volumes/Extra Disk/norvik/ganadero/src-tauri/target/release/bundle/macos/Ganado AI.app)
