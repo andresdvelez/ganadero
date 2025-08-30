@@ -8,11 +8,11 @@ const dstStatic = path.join(root, ".next", "standalone", ".next", "static");
 const srcPublic = path.join(root, "public");
 const dstPublic = path.join(root, ".next", "standalone", "public");
 
-// Copia adicional para Tauri: colocar .next dentro de src-tauri/resources/.next
-const tauriResources = path.join(root, "src-tauri", "resources");
-const dstResourcesNext = path.join(tauriResources, ".next");
-const dstResourcesStandalone = path.join(dstResourcesNext, "standalone");
-const dstResourcesStatic = path.join(dstResourcesNext, "static");
+// Copia adicional para Tauri: colocar .next dentro de src-tauri/.next (irá a Contents/Resources/.next)
+const tauriRoot = path.join(root, "src-tauri");
+const dstBundleNext = path.join(tauriRoot, ".next");
+const dstBundleStandalone = path.join(dstBundleNext, "standalone");
+const dstBundleStatic = path.join(dstBundleNext, "static");
 
 function copyDir(src, dst) {
   if (!fs.existsSync(src)) return;
@@ -36,21 +36,21 @@ console.log(
 // Asegurar recursos empaquetados dentro del .app de Tauri en ruta estable (/Contents/Resources/.next)
 try {
   // Limpiar destino previo para evitar residuos
-  if (fs.existsSync(dstResourcesStandalone)) {
-    fs.rmSync(dstResourcesStandalone, { recursive: true, force: true });
+  if (fs.existsSync(dstBundleStandalone)) {
+    fs.rmSync(dstBundleStandalone, { recursive: true, force: true });
   }
-  if (fs.existsSync(dstResourcesStatic)) {
-    fs.rmSync(dstResourcesStatic, { recursive: true, force: true });
+  if (fs.existsSync(dstBundleStatic)) {
+    fs.rmSync(dstBundleStatic, { recursive: true, force: true });
   }
-  fs.mkdirSync(dstResourcesStandalone, { recursive: true });
-  fs.mkdirSync(dstResourcesStatic, { recursive: true });
+  fs.mkdirSync(dstBundleStandalone, { recursive: true });
+  fs.mkdirSync(dstBundleStatic, { recursive: true });
 
   // Copiar standalone completo
   const srcStandaloneRoot = path.join(root, ".next", "standalone");
-  copyDir(srcStandaloneRoot, dstResourcesStandalone);
+  copyDir(srcStandaloneRoot, dstBundleStandalone);
   // Copiar static
-  copyDir(srcStatic, dstResourcesStatic);
-  console.log("[standalone-postbuild] Copiado .next/{standalone,static} a src-tauri/resources/.next/");
+  copyDir(srcStatic, dstBundleStatic);
+  console.log("[standalone-postbuild] Copiado .next/{standalone,static} a src-tauri/.next/");
 } catch (e) {
-  console.warn("[standalone-postbuild] Error copiando recursos a src-tauri/resources:", e?.message || e);
+  console.warn("[standalone-postbuild] Error copiando recursos a src-tauri/.next:", e?.message || e);
 }

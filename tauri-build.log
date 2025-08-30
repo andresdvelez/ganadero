@@ -26,11 +26,11 @@ For more information, see: https://pris.ly/prisma-config
 Environment variables loaded from .env
 Prisma schema loaded from prisma/schema.prisma
 
-✔ Generated Prisma Client (v6.13.0) to ./node_modules/@prisma/client in 603ms
+✔ Generated Prisma Client (v6.13.0) to ./node_modules/@prisma/client in 687ms
 
 Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
 
-Tip: Need your database queries to be 1000x faster? Accelerate offers you that and more: https://pris.ly/tip-2-accelerate
+Tip: Interested in query caching in just a few lines of code? Try Accelerate today! https://pris.ly/tip-3-accelerate
 
    ▲ Next.js 15.4.6
    - Environments: .env
@@ -965,6 +965,7 @@ Route (app)                                 Size  First Load JS  Revalidate  Exp
 ƒ  (Dynamic)  server-rendered on demand
 
 [standalone-postbuild] Copiado .next/static y public dentro de .next/standalone
+[standalone-postbuild] Copiado .next/{standalone,static} a src-tauri/resources/.next/
 [assert-standalone] OK: server.js y static presentes
 [postbuild] Restored _api_bak -> api
 [postbuild] Restored _animals_bak -> animals
@@ -995,7 +996,7 @@ warning: value assigned to `attempted_start` is never read
     = note: `#[warn(unused_assignments)]` on by default
 
 warning: `ganado-ai-app` (bin "ganado-ai-app") generated 2 warnings
-    Finished `release` profile [optimized] target(s) in 19.90s
+    Finished `release` profile [optimized] target(s) in 17.38s
      Signing /Volumes/Extra Disk/norvik/ganadero/src-tauri/target/release/Ganado AI
      Signing sidecar/node-x86_64-apple-darwin
     Bundling Ganado AI.app (/Volumes/Extra Disk/norvik/ganadero/src-tauri/target/release/bundle/macos/Ganado AI.app)

@@ -16,9 +16,9 @@
       "targets": "all",
       "identifier": "ai.ganado.app",
       "resources": [
-        "resources/.next/standalone/**",
-        "resources/.next/static/**",
-        "resources/.next/standalone/server.js"
+        "../src-tauri/.next/standalone/**",
+        "../src-tauri/.next/static/**",
+        "../src-tauri/.next/standalone/server.js"
       ],
       "externalBin": ["sidecar/node"],
       "icon": [
