@@ -7,20 +7,9 @@ const appDir = path.join(projectRoot, 'src', 'app');
 const publicDir = path.join(projectRoot, 'public');
 const tauriDistDir = path.join(projectRoot, 'src-tauri', 'dist');
 
-const entriesToMove = [
-  'api',
-  'middleware.ts',
-  'animals',
-  'breeding',
-  'health',
-  'inventory',
-  'lab',
-  'milk',
-  'pastures',
-  'sign-in',
-  'sign-up',
-  'offline',
-];
+// Ya no movemos rutas fuera antes del build. Mantener todo dentro para que Next standalone
+// incluya API, auth y páginas offline en el paquete de Tauri.
+const entriesToMove = [];
 
 function moveIfExists(fromRel, toRel) {
   const from = path.join(appDir, fromRel);
@@ -39,13 +28,7 @@ if (process.env.TAURI !== '1' && process.env.TAURI !== 'true') {
   process.exit(0);
 }
 
-moveIfExists('api', '_api_bak');
-moveIfExists('middleware.ts', '_middleware_bak.ts');
-for (const name of entriesToMove) {
-  if (name !== 'api' && name !== 'middleware.ts') {
-    moveIfExists(name, `_${name}_bak`);
-  }
-} 
+// Mantener las rutas; no hacer renombres para Tauri
 
 // Copiar logo y recursos necesarios a dist para la splash offline
 try {

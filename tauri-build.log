@@ -1,4 +1,4 @@
-     Running beforeBuildCommand `TAURI=1 node ./scripts/tauri-prebuild.mjs && npm run build && node ./scripts/assert-standalone.mjs && TAURI=1 node ./scripts/tauri-postbuild.mjs`
+     Running beforeBuildCommand `TAURI=1 node ./scripts/tauri-prebuild.mjs && node ./scripts/prepare-node-sidecar.mjs && npm run build && node ./scripts/assert-standalone.mjs && TAURI=1 node ./scripts/tauri-postbuild.mjs`
 [prebuild] Moved api -> _api_bak
 [prebuild] Moved animals -> _animals_bak
 [prebuild] Moved breeding -> _breeding_bak
@@ -9,6 +9,9 @@
 [prebuild] Moved pastures -> _pastures_bak
 [prebuild] Moved offline -> _offline_bak
 [prebuild] Copied public/logo.png -> src-tauri/dist/logo.png
+[prepare-node-sidecar] Ya existe node-x86_64-apple-darwin, omitiendo.
+[prepare-node-sidecar] Creando binario universal con lipo -> /Volumes/Extra Disk/norvik/ganadero/src-tauri/sidecar/node-universal-apple-darwin
+[prepare-node-sidecar] Asegurando sidecar/node
 
 > ganado-ai-app@0.1.0 prebuild
 > node ./scripts/prepare-node-sidecar.mjs
@@ -26,7 +29,7 @@ For more information, see: https://pris.ly/prisma-config
 Environment variables loaded from .env
 Prisma schema loaded from prisma/schema.prisma
 
-✔ Generated Prisma Client (v6.13.0) to ./node_modules/@prisma/client in 501ms
+✔ Generated Prisma Client (v6.13.0) to ./node_modules/@prisma/client in 474ms
 
 Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
 
@@ -38,7 +41,7 @@ Tip: Want to turn off tips and other hints? https://pris.ly/tip-4-nohints
    Creating an optimized production build ...
 > [PWA] PWA support is disabled
 > [PWA] PWA support is disabled
- ✓ Compiled successfully in 9.0s
+ ✓ Compiled successfully in 7.0s
    Linting and checking validity of types ...
 
 ./src/__tests__/integration.test.tsx
@@ -996,13 +999,10 @@ warning: value assigned to `attempted_start` is never read
     = note: `#[warn(unused_assignments)]` on by default
 
 warning: `ganado-ai-app` (bin "ganado-ai-app") generated 2 warnings
-    Finished `release` profile [optimized] target(s) in 18.45s
+    Finished `release` profile [optimized] target(s) in 18.23s
      Signing /Volumes/Extra Disk/norvik/ganadero/src-tauri/target/release/Ganado AI
      Signing sidecar/node-x86_64-apple-darwin
     Bundling Ganado AI.app (/Volumes/Extra Disk/norvik/ganadero/src-tauri/target/release/bundle/macos/Ganado AI.app)
     Bundling Ganado AI_0.1.0_x64.dmg (/Volumes/Extra Disk/norvik/ganadero/src-tauri/target/release/bundle/dmg/Ganado AI_0.1.0_x64.dmg)
      Running bundle_dmg.sh
-    Finished 2 bundles at:
-        /Volumes/Extra Disk/norvik/ganadero/src-tauri/target/release/bundle/macos/Ganado AI.app
-        /Volumes/Extra Disk/norvik/ganadero/src-tauri/target/release/bundle/dmg/Ganado AI_0.1.0_x64.dmg
-
+       Error failed to bundle project: error running bundle_dmg.sh
