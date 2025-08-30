@@ -50,27 +50,20 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
         typeof window !== "undefined" && (window as any).__TAURI__;
       if (isTauri) {
         const localUrl = "http://127.0.0.1:4317/api/trpc";
-        const localReady = await probe("http://127.0.0.1:4317/manifest.webmanifest");
-        // Si el servidor local está listo pero no tenemos token de Clerk (cookie y sesión no válida en 127.0.0.1),
-        // enrutar los requests TRPC al backend remoto para aprovechar la sesión válida del dominio remoto.
-        if (localReady) {
-          try {
-            const token = await getToken();
-            if (!token) {
-              if (!cancelled) setResolvedUrl(remoteFallback);
-              return;
-            }
-          } catch {
-            if (!cancelled) setResolvedUrl(remoteFallback);
-            return;
-          }
-          if (!cancelled) setResolvedUrl(localUrl);
-          return;
-        } else {
-          // Si el servidor local aún no está arriba, usar remoto para mantener la app funcional
+        const online = typeof navigator !== "undefined" && navigator.onLine;
+        // Fuerza backend remoto cuando hay Internet en la app de escritorio (Clerk ya tiene sesión válida allí)
+        if (online) {
           if (!cancelled) setResolvedUrl(remoteFallback);
           return;
         }
+        // Sin Internet: intenta local; si no está listo, deja remoto para UI mínima
+        const localReady = await probe("http://127.0.0.1:4317/manifest.webmanifest");
+        if (localReady) {
+          if (!cancelled) setResolvedUrl(localUrl);
+          return;
+        }
+        if (!cancelled) setResolvedUrl(remoteFallback);
+        return;
       }
       // Web: keep relative so it works on Vercel and dev
       if (!cancelled) setResolvedUrl(baseDefault);
@@ -78,7 +71,7 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [explicit]);
+  }, [explicit, getToken]);
 
   const trpcClient = useMemo(
     () =>
