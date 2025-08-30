@@ -184,6 +184,9 @@ fn main() {
       let server_js = candidate_paths.iter().find(|p| p.exists()).cloned();
 
       let port = std::env::var("NEXT_PORT").ok().and_then(|s| s.parse::<u16>().ok()).unwrap_or(4317);
+      // Ruta al .env en Resources y mapa cargado (para Prisma: DATABASE_URL)
+      let env_file = app_dir.join(".env");
+      let env_map = load_env_from_file(&env_file);
 
       let mut started = false;
       let mut attempted_start = false;
@@ -222,15 +225,12 @@ fn main() {
         // Primer intento: usar el binario preferido si existe
         if let Some(node_bin) = prefer_node {
           let mut cmd = Command::new(node_bin);
-          // Cargar variables de entorno desde .env si existe (para Prisma: DATABASE_URL)
-          let env_file = app_dir.join(".env");
-          let envs = load_env_from_file(&env_file);
           let sidecar_attempt = cmd
             .arg(&srv)
             .env("PORT", port.to_string())
             .env("HOST", "127.0.0.1")
             .env("ALLOW_DEV_UNAUTH", "1")
-            .envs(envs.iter().map(|(k,v)| (k.as_str(), v.as_str())))
+            .envs(env_map.iter().map(|(k,v)| (k.as_str(), v.as_str())))
             .current_dir(srv.parent().unwrap_or(&app_dir))
             .stdout(Stdio::from(OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap())))
             .stderr(Stdio::from(OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap())))
@@ -254,7 +254,7 @@ fn main() {
                 .env("PORT", port.to_string())
                 .env("HOST", "127.0.0.1")
                 .env("ALLOW_DEV_UNAUTH", "1")
-                .envs(load_env_from_file(&env_file).iter().map(|(k,v)| (k.as_str(), v.as_str())))
+                .envs(env_map.iter().map(|(k,v)| (k.as_str(), v.as_str())))
                 .current_dir(srv.parent().unwrap_or(&app_dir))
                 .stdout(Stdio::from(OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap())))
                 .stderr(Stdio::from(OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap())))
@@ -277,7 +277,7 @@ fn main() {
             .env("PORT", port.to_string())
             .env("HOST", "127.0.0.1")
             .env("ALLOW_DEV_UNAUTH", "1")
-            .envs(load_env_from_file(&env_file).iter().map(|(k,v)| (k.as_str(), v.as_str())))
+            .envs(env_map.iter().map(|(k,v)| (k.as_str(), v.as_str())))
             .current_dir(srv.parent().unwrap_or(&app_dir))
             .stdout(Stdio::from(OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap())))
             .stderr(Stdio::from(OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap())))
