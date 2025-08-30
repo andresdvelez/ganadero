@@ -62862,3 +62862,187 @@ Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allow
  ✓ Compiled middleware in 1ms
  ✓ Compiled middleware in 1ms
  ✓ Compiled middleware in 0ms
+ ✓ Compiled middleware in 1ms
+ ✓ Compiled middleware in 1ms
+ ○ Compiling /manifest.webmanifest ...
+ ✓ Compiled /manifest.webmanifest in 537ms
+ ⨯ [Error: ENOENT: no such file or directory, open '/Volumes/Extra Disk/norvik/ganadero/.next/static/development/_buildManifest.js.tmp.q3oxg9uu2b'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Volumes/Extra Disk/norvik/ganadero/.next/static/development/_buildManifest.js.tmp.q3oxg9uu2b'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open '/Volumes/Extra Disk/norvik/ganadero/.next/static/development/_buildManifest.js.tmp.q3oxg9uu2b'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Volumes/Extra Disk/norvik/ganadero/.next/static/development/_buildManifest.js.tmp.q3oxg9uu2b'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Volumes/Extra Disk/norvik/ganadero/.next/server/app/page/app-build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Volumes/Extra Disk/norvik/ganadero/.next/server/app/page/app-build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open '/Volumes/Extra Disk/norvik/ganadero/.next/server/app/page/app-build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Volumes/Extra Disk/norvik/ganadero/.next/server/app/page/app-build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Volumes/Extra Disk/norvik/ganadero/.next/static/development/_buildManifest.js.tmp.kvtomg7lve'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Volumes/Extra Disk/norvik/ganadero/.next/static/development/_buildManifest.js.tmp.kvtomg7lve'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open '/Volumes/Extra Disk/norvik/ganadero/.next/static/development/_buildManifest.js.tmp.kvtomg7lve'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Volumes/Extra Disk/norvik/ganadero/.next/static/development/_buildManifest.js.tmp.kvtomg7lve'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Volumes/Extra Disk/norvik/ganadero/.next/server/app/page/app-build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Volumes/Extra Disk/norvik/ganadero/.next/server/app/page/app-build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open '/Volumes/Extra Disk/norvik/ganadero/.next/server/app/page/app-build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Volumes/Extra Disk/norvik/ganadero/.next/server/app/page/app-build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Volumes/Extra Disk/norvik/ganadero/.next/static/development/_buildManifest.js.tmp.63bk6pibjnr'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Volumes/Extra Disk/norvik/ganadero/.next/static/development/_buildManifest.js.tmp.63bk6pibjnr'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open '/Volumes/Extra Disk/norvik/ganadero/.next/static/development/_buildManifest.js.tmp.63bk6pibjnr'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Volumes/Extra Disk/norvik/ganadero/.next/static/development/_buildManifest.js.tmp.63bk6pibjnr'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Volumes/Extra Disk/norvik/ganadero/.next/server/app/page/app-build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Volumes/Extra Disk/norvik/ganadero/.next/server/app/page/app-build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open '/Volumes/Extra Disk/norvik/ganadero/.next/server/app/page/app-build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Volumes/Extra Disk/norvik/ganadero/.next/server/app/page/app-build-manifest.json'
+}
+ ⨯ [Error: ENOENT: no such file or directory, open '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'
+}
+[Error: ENOENT: no such file or directory, open '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'] {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/Volumes/Extra Disk/norvik/ganadero/.next/server/pages/_app/build-manifest.json'
+}

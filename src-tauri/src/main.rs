@@ -177,19 +177,27 @@ fn main() {
         } else {
         attempted_start = true;
         // Preferir sidecar node si existe
-        let node_path = app
-          .path_resolver()
-          .resolve_resource("sidecar/node")
-          .or_else(|| app.path_resolver().resolve_resource("sidecar/node-x86_64-apple-darwin"))
-          .or_else(|| app.path_resolver().resolve_resource("sidecar/node-aarch64-apple-darwin"))
-          .or_else(|| app.path_resolver().resolve_resource("sidecar/node.exe"));
+        // Candidatos sidecar en Resources; filtrar por existencia real
+        let sidecar_candidates = [
+          app.path_resolver().resolve_resource("sidecar/node"),
+          app.path_resolver().resolve_resource("sidecar/node-x86_64-apple-darwin"),
+          app.path_resolver().resolve_resource("sidecar/node-aarch64-apple-darwin"),
+          app.path_resolver().resolve_resource("sidecar/node.exe"),
+        ];
+        let mut sidecar_existing: Option<std::path::PathBuf> = None;
+        for c in sidecar_candidates.into_iter().flatten() {
+          if c.exists() { sidecar_existing = Some(c); break; }
+        }
 
         // Fallback: binario node copiado por externalBin en Contents/MacOS
         let exe_dir = std::env::current_exe().ok().and_then(|p| p.parent().map(|p| p.to_path_buf()));
-        let node_in_macos = exe_dir.as_ref().map(|d| d.join("node"));
+        let node_in_macos = exe_dir.as_ref().map(|d| d.join("node")).filter(|p| p.exists());
 
-        // Primer intento: sidecar/node si está presente
-        if let Some(node_bin) = node_path.or(node_in_macos.filter(|p| p.exists())) {
+        // Preferir sidecar existente; si no, usar MacOS/node
+        let prefer_node = sidecar_existing.or(node_in_macos);
+
+        // Primer intento: usar el binario preferido si existe
+        if let Some(node_bin) = prefer_node {
           let mut cmd = Command::new(node_bin);
           let sidecar_attempt = cmd
             .arg(&srv)
@@ -235,7 +243,7 @@ fn main() {
             }
           }
         } else {
-          // No hay sidecar: intentar directamente con 'node' del sistema
+          // No hay binario preferido: intentar directamente con 'node' del sistema
           if let Ok(child) = Command::new("node")
             .arg(&srv)
             .env("PORT", port.to_string())
