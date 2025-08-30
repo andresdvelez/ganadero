@@ -1,13 +1,4 @@
      Running beforeBuildCommand `TAURI=1 node ./scripts/tauri-prebuild.mjs && node ./scripts/prepare-node-sidecar.mjs && npm run build && node ./scripts/assert-standalone.mjs && TAURI=1 node ./scripts/tauri-postbuild.mjs`
-[prebuild] Moved api -> _api_bak
-[prebuild] Moved animals -> _animals_bak
-[prebuild] Moved breeding -> _breeding_bak
-[prebuild] Moved health -> _health_bak
-[prebuild] Moved inventory -> _inventory_bak
-[prebuild] Moved lab -> _lab_bak
-[prebuild] Moved milk -> _milk_bak
-[prebuild] Moved pastures -> _pastures_bak
-[prebuild] Moved offline -> _offline_bak
 [prebuild] Copied public/logo.png -> src-tauri/dist/logo.png
 [prepare-node-sidecar] Ya existe node-x86_64-apple-darwin, omitiendo.
 [prepare-node-sidecar] Creando binario universal con lipo -> /Volumes/Extra Disk/norvik/ganadero/src-tauri/sidecar/node-universal-apple-darwin
@@ -29,11 +20,11 @@ For more information, see: https://pris.ly/prisma-config
 Environment variables loaded from .env
 Prisma schema loaded from prisma/schema.prisma
 
-✔ Generated Prisma Client (v6.13.0) to ./node_modules/@prisma/client in 474ms
+✔ Generated Prisma Client (v6.13.0) to ./node_modules/@prisma/client in 659ms
 
 Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
 
-Tip: Want to turn off tips and other hints? https://pris.ly/tip-4-nohints
+Tip: Need your database queries to be 1000x faster? Accelerate offers you that and more: https://pris.ly/tip-2-accelerate
 
    ▲ Next.js 15.4.6
    - Environments: .env
@@ -41,7 +32,7 @@ Tip: Want to turn off tips and other hints? https://pris.ly/tip-4-nohints
    Creating an optimized production build ...
 > [PWA] PWA support is disabled
 > [PWA] PWA support is disabled
- ✓ Compiled successfully in 7.0s
+ ✓ Compiled successfully in 15.0s
    Linting and checking validity of types ...
 
 ./src/__tests__/integration.test.tsx
@@ -180,27 +171,6 @@ Tip: Want to turn off tips and other hints? https://pris.ly/tip-4-nohints
 287:9  Warning: The 'rows' logical expression could make the dependencies of useMemo Hook (at line 312) change on every render. To fix this, wrap the initialization of 'rows' in its own useMemo() Hook.  react-hooks/exhaustive-deps
 299:16  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
 346:27  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
-
-./src/app/_animals_bak/tree/page.tsx
-85:46  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
-105:46  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
-
-./src/app/_api_bak/ai/chat/route.ts
-16:58  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
-62:15  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
-
-./src/app/_api_bak/ai/search/route.ts
-41:36  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
-78:51  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
-88:15  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
-
-./src/app/_api_bak/ollama/[...path]/route.ts
-28:48  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
-33:15  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
-41:50  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
-44:51  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
-47:50  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
-50:53  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
 
 ./src/app/admin/page.tsx
 4:10  Warning: 'TRPCProvider' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
@@ -486,6 +456,27 @@ Tip: Want to turn off tips and other hints? https://pris.ly/tip-4-nohints
 58:22  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
 150:60  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
 166:55  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/animals/tree/page.tsx
+85:46  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+105:46  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/api/ai/chat/route.ts
+16:58  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+62:15  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/api/ai/search/route.ts
+41:36  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+78:51  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+88:15  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+
+./src/app/api/ollama/[...path]/route.ts
+28:48  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+33:15  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+41:50  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+44:51  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+47:50  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+50:53  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
 
 ./src/app/finance/new/page.tsx
 34:10  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
@@ -919,20 +910,20 @@ Tip: Want to turn off tips and other hints? https://pris.ly/tip-4-nohints
 
 info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules
    Collecting page data ...
-   Generating static pages (0/29) ...
-   Generating static pages (7/29) 
-   Generating static pages (14/29) 
-   Generating static pages (21/29) 
- ✓ Generating static pages (29/29)
+   Generating static pages (0/38) ...
+   Generating static pages (9/38) 
+   Generating static pages (18/38) 
+   Generating static pages (28/38) 
+ ✓ Generating static pages (38/38)
    Finalizing page optimization ...
    Collecting build traces ...
 
 Route (app)                                 Size  First Load JS  Revalidate  Expire
-┌ ○ /                                      288 B         418 kB
+┌ ○ /                                      295 B         420 kB
 ├ ○ /_not-found                            999 B         101 kB
-├ ○ /admin                                3.1 kB         332 kB
-├ ○ /ai-assets                           3.01 kB         329 kB
-├ ○ /ai-assistant                          204 B         418 kB
+├ ○ /admin                                3.1 kB         333 kB
+├ ○ /ai-assets                           3.05 kB         329 kB
+├ ○ /ai-assistant                          210 B         420 kB
 ├ ○ /alerts                               2.1 kB         328 kB
 ├ ○ /analysis                              801 B         330 kB
 ├ ○ /analysis/economy                     2.9 kB         329 kB
@@ -941,18 +932,32 @@ Route (app)                                 Size  First Load JS  Revalidate  Exp
 ├ ○ /analysis/milk                       2.66 kB         329 kB
 ├ ○ /analysis/reproduction               2.71 kB         329 kB
 ├ ○ /analysis/selection                  1.88 kB         328 kB
+├ ƒ /animals                             4.89 kB         386 kB
+├ ○ /animals/new                         4.91 kB         383 kB
+├ ○ /animals/tree                        1.33 kB         328 kB
+├ ƒ /api/ai/chat                           141 B         100 kB
+├ ƒ /api/ai/search                         141 B         100 kB
+├ ƒ /api/ollama/[...path]                  141 B         100 kB
+├ ƒ /api/trpc/[[...trpc]]                  141 B         100 kB
+├ ○ /breeding                            5.56 kB         332 kB
 ├ ○ /device-unlock                       1.32 kB         215 kB
 ├ ○ /download                             1.7 kB         328 kB
 ├ ƒ /finance                             3.19 kB         333 kB
-├ ○ /finance/new                         1.24 kB         327 kB
+├ ○ /finance/new                         1.24 kB         328 kB
+├ ○ /health                              9.92 kB         339 kB
+├ ○ /inventory                            2.4 kB         329 kB
+├ ○ /lab                                    1 kB         327 kB
 ├ ○ /locations                             636 B         327 kB
-├ ○ /manifest.webmanifest                  128 B         100 kB          1h      1y
+├ ○ /manifest.webmanifest                  141 B         100 kB          1h      1y
+├ ○ /milk                                2.08 kB         328 kB
+├ ○ /offline                             1.73 kB         141 kB
 ├ ○ /onboarding                          3.36 kB         266 kB
+├ ○ /pastures                            2.13 kB         328 kB
 ├ ○ /reports                               817 B         327 kB
 ├ ○ /sensors                               649 B         327 kB
-├ ○ /settings/ai                         5.67 kB         172 kB
+├ ○ /settings/ai                          5.8 kB         173 kB
 ├ ○ /settings/sync                         967 B         327 kB
-├ ƒ /sign-in/[[...sign-in]]              2.99 kB         174 kB
+├ ƒ /sign-in/[[...sign-in]]              3.13 kB         174 kB
 ├ ƒ /sign-up/[[...sign-up]]              2.38 kB         129 kB
 ├ ○ /tasks                                 760 B         330 kB
 ├ ○ /tasks/new                           1.22 kB         327 kB
@@ -970,15 +975,6 @@ Route (app)                                 Size  First Load JS  Revalidate  Exp
 [standalone-postbuild] Copiado .next/static y public dentro de .next/standalone
 [standalone-postbuild] Copiado .next/{standalone,static} a src-tauri/.next/
 [assert-standalone] OK: server.js y static presentes
-[postbuild] Restored _api_bak -> api
-[postbuild] Restored _animals_bak -> animals
-[postbuild] Restored _breeding_bak -> breeding
-[postbuild] Restored _health_bak -> health
-[postbuild] Restored _inventory_bak -> inventory
-[postbuild] Restored _lab_bak -> lab
-[postbuild] Restored _milk_bak -> milk
-[postbuild] Restored _pastures_bak -> pastures
-[postbuild] Restored _offline_bak -> offline
    Compiling ganado-ai-app v0.1.0 (/Volumes/Extra Disk/norvik/ganadero/src-tauri)
 warning: variable `attempted_start` is assigned to, but never used
    --> src/main.rs:171:15
@@ -999,7 +995,7 @@ warning: value assigned to `attempted_start` is never read
     = note: `#[warn(unused_assignments)]` on by default
 
 warning: `ganado-ai-app` (bin "ganado-ai-app") generated 2 warnings
-    Finished `release` profile [optimized] target(s) in 18.23s
+    Finished `release` profile [optimized] target(s) in 18.78s
      Signing /Volumes/Extra Disk/norvik/ganadero/src-tauri/target/release/Ganado AI
      Signing sidecar/node-x86_64-apple-darwin
     Bundling Ganado AI.app (/Volumes/Extra Disk/norvik/ganadero/src-tauri/target/release/bundle/macos/Ganado AI.app)

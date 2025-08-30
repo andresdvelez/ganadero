@@ -189,12 +189,17 @@ fn main() {
           if c.exists() { sidecar_existing = Some(c); break; }
         }
 
-        // Fallback: binario node copiado por externalBin en Contents/MacOS
+        // Fallback: binarios node copiados por externalBin en Contents/MacOS
         let exe_dir = std::env::current_exe().ok().and_then(|p| p.parent().map(|p| p.to_path_buf()));
-        let node_in_macos = exe_dir.as_ref().map(|d| d.join("node")).filter(|p| p.exists());
+        let node_in_macos_plain = exe_dir.as_ref().map(|d| d.join("node")).filter(|p| p.exists());
+        let node_in_macos_x64 = exe_dir.as_ref().map(|d| d.join("node-x86_64-apple-darwin")).filter(|p| p.exists());
+        let node_in_macos_arm = exe_dir.as_ref().map(|d| d.join("node-aarch64-apple-darwin")).filter(|p| p.exists());
 
-        // Preferir sidecar existente; si no, usar MacOS/node
-        let prefer_node = sidecar_existing.or(node_in_macos);
+        // Preferir sidecar existente; luego MacOS/node*, en orden plain -> x64 -> arm
+        let prefer_node = sidecar_existing
+          .or(node_in_macos_plain)
+          .or(node_in_macos_x64)
+          .or(node_in_macos_arm);
 
         // Primer intento: usar el binario preferido si existe
         if let Some(node_bin) = prefer_node {
