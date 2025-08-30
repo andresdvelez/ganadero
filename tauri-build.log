@@ -21,11 +21,11 @@ For more information, see: https://pris.ly/prisma-config
 Environment variables loaded from .env
 Prisma schema loaded from prisma/schema.prisma
 
-✔ Generated Prisma Client (v6.13.0) to ./node_modules/@prisma/client in 437ms
+✔ Generated Prisma Client (v6.13.0) to ./node_modules/@prisma/client in 391ms
 
 Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
 
-Tip: Interested in query caching in just a few lines of code? Try Accelerate today! https://pris.ly/tip-3-accelerate
+Tip: Want to turn off tips and other hints? https://pris.ly/tip-4-nohints
 
    ▲ Next.js 15.4.6
    - Environments: .env
@@ -977,18 +977,32 @@ Route (app)                                 Size  First Load JS  Revalidate  Exp
 [standalone-postbuild] Copiado .next/{standalone,static} a src-tauri/.next/
 [assert-standalone] OK: server.js y static presentes
    Compiling ganado-ai-app v0.1.0 (/Volumes/Extra Disk/norvik/ganadero/src-tauri)
-error[E0425]: cannot find value `env_file` in this scope
-   --> src/main.rs:280:39
+warning: variable `attempted_start` is assigned to, but never used
+   --> src/main.rs:192:15
     |
-280 |             .envs(load_env_from_file(&env_file).iter().map(|(k,v)| (k.as_str(), v.as_str())))
-    |                                       ^^^^^^^^
+192 |       let mut attempted_start = false;
+    |               ^^^^^^^^^^^^^^^
     |
-help: the binding `env_file` is available in a different scope in the same function
-   --> src/main.rs:226:15
-    |
-226 |           let env_file = app_dir.join(".env");
-    |               ^^^^^^^^
+    = note: consider using `_attempted_start` instead
+    = note: `#[warn(unused_variables)]` on by default
 
-For more information about this error, try `rustc --explain E0425`.
-error: could not compile `ganado-ai-app` (bin "ganado-ai-app") due to 1 previous error
-       Error failed to build app: failed to build app
+warning: value assigned to `attempted_start` is never read
+   --> src/main.rs:199:9
+    |
+199 |         attempted_start = true;
+    |         ^^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` on by default
+
+warning: `ganado-ai-app` (bin "ganado-ai-app") generated 2 warnings
+    Finished `release` profile [optimized] target(s) in 22.37s
+     Signing /Volumes/Extra Disk/norvik/ganadero/src-tauri/target/release/Ganado AI
+     Signing sidecar/node-x86_64-apple-darwin
+    Bundling Ganado AI.app (/Volumes/Extra Disk/norvik/ganadero/src-tauri/target/release/bundle/macos/Ganado AI.app)
+    Bundling Ganado AI_0.1.0_x64.dmg (/Volumes/Extra Disk/norvik/ganadero/src-tauri/target/release/bundle/dmg/Ganado AI_0.1.0_x64.dmg)
+     Running bundle_dmg.sh
+    Finished 2 bundles at:
+        /Volumes/Extra Disk/norvik/ganadero/src-tauri/target/release/bundle/macos/Ganado AI.app
+        /Volumes/Extra Disk/norvik/ganadero/src-tauri/target/release/bundle/dmg/Ganado AI_0.1.0_x64.dmg
+

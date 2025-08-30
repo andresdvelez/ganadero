@@ -50,13 +50,27 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
         typeof window !== "undefined" && (window as any).__TAURI__;
       if (isTauri) {
         const localUrl = "http://127.0.0.1:4317/api/trpc";
-        if (await probe("http://127.0.0.1:4317/manifest.webmanifest")) {
+        const localReady = await probe("http://127.0.0.1:4317/manifest.webmanifest");
+        // Si el servidor local está listo pero no tenemos token de Clerk (cookie y sesión no válida en 127.0.0.1),
+        // enrutar los requests TRPC al backend remoto para aprovechar la sesión válida del dominio remoto.
+        if (localReady) {
+          try {
+            const token = await getToken();
+            if (!token) {
+              if (!cancelled) setResolvedUrl(remoteFallback);
+              return;
+            }
+          } catch {
+            if (!cancelled) setResolvedUrl(remoteFallback);
+            return;
+          }
           if (!cancelled) setResolvedUrl(localUrl);
           return;
+        } else {
+          // Si el servidor local aún no está arriba, usar remoto para mantener la app funcional
+          if (!cancelled) setResolvedUrl(remoteFallback);
+          return;
         }
-        // If local server not up yet, fall back to remote API to keep UI usable
-        if (!cancelled) setResolvedUrl(remoteFallback);
-        return;
       }
       // Web: keep relative so it works on Vercel and dev
       if (!cancelled) setResolvedUrl(baseDefault);
