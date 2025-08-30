@@ -9,6 +9,24 @@ use tokio::time::sleep;
 
 static SERVER_CHILD: tauri::async_runtime::Mutex<Option<Child>> = tauri::async_runtime::Mutex::const_new(None);
 
+fn load_env_from_file(path: &std::path::Path) -> std::collections::HashMap<String, String> {
+  let mut map = std::collections::HashMap::new();
+  if !path.exists() { return map; }
+  if let Ok(content) = std::fs::read_to_string(path) {
+    for line in content.lines() {
+      let trimmed = line.trim();
+      if trimmed.is_empty() || trimmed.starts_with('#') { continue; }
+      if let Some(idx) = trimmed.find('=') {
+        let (k, vraw) = trimmed.split_at(idx);
+        let v = &vraw[1..];
+        let val = v.trim().trim_matches('"').trim_matches('\'');
+        map.insert(k.trim().to_string(), val.to_string());
+      }
+    }
+  }
+  map
+}
+
 #[tauri::command]
 async fn download_model(url: String, sha256_hex: Option<String>, app: tauri::AppHandle, window: tauri::Window) -> Result<String, String> {
   let dir = app.path_resolver().app_data_dir().ok_or("app_data_dir not found")?;
@@ -204,11 +222,15 @@ fn main() {
         // Primer intento: usar el binario preferido si existe
         if let Some(node_bin) = prefer_node {
           let mut cmd = Command::new(node_bin);
+          // Cargar variables de entorno desde .env si existe (para Prisma: DATABASE_URL)
+          let env_file = app_dir.join(".env");
+          let envs = load_env_from_file(&env_file);
           let sidecar_attempt = cmd
             .arg(&srv)
             .env("PORT", port.to_string())
             .env("HOST", "127.0.0.1")
             .env("ALLOW_DEV_UNAUTH", "1")
+            .envs(envs.iter().map(|(k,v)| (k.as_str(), v.as_str())))
             .current_dir(srv.parent().unwrap_or(&app_dir))
             .stdout(Stdio::from(OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap())))
             .stderr(Stdio::from(OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap())))
@@ -232,6 +254,7 @@ fn main() {
                 .env("PORT", port.to_string())
                 .env("HOST", "127.0.0.1")
                 .env("ALLOW_DEV_UNAUTH", "1")
+                .envs(load_env_from_file(&env_file).iter().map(|(k,v)| (k.as_str(), v.as_str())))
                 .current_dir(srv.parent().unwrap_or(&app_dir))
                 .stdout(Stdio::from(OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap())))
                 .stderr(Stdio::from(OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap())))
@@ -254,6 +277,7 @@ fn main() {
             .env("PORT", port.to_string())
             .env("HOST", "127.0.0.1")
             .env("ALLOW_DEV_UNAUTH", "1")
+            .envs(load_env_from_file(&env_file).iter().map(|(k,v)| (k.as_str(), v.as_str())))
             .current_dir(srv.parent().unwrap_or(&app_dir))
             .stdout(Stdio::from(OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap())))
             .stderr(Stdio::from(OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap())))

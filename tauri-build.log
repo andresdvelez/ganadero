@@ -20,7 +20,7 @@ For more information, see: https://pris.ly/prisma-config
 Environment variables loaded from .env
 Prisma schema loaded from prisma/schema.prisma
 
-✔ Generated Prisma Client (v6.13.0) to ./node_modules/@prisma/client in 659ms
+✔ Generated Prisma Client (v6.13.0) to ./node_modules/@prisma/client in 395ms
 
 Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
 
@@ -32,7 +32,7 @@ Tip: Need your database queries to be 1000x faster? Accelerate offers you that a
    Creating an optimized production build ...
 > [PWA] PWA support is disabled
 > [PWA] PWA support is disabled
- ✓ Compiled successfully in 15.0s
+ ✓ Compiled successfully in 12.0s
    Linting and checking validity of types ...
 
 ./src/__tests__/integration.test.tsx
@@ -995,7 +995,7 @@ warning: value assigned to `attempted_start` is never read
     = note: `#[warn(unused_assignments)]` on by default
 
 warning: `ganado-ai-app` (bin "ganado-ai-app") generated 2 warnings
-    Finished `release` profile [optimized] target(s) in 18.78s
+    Finished `release` profile [optimized] target(s) in 23.62s
      Signing /Volumes/Extra Disk/norvik/ganadero/src-tauri/target/release/Ganado AI
      Signing sidecar/node-x86_64-apple-darwin
     Bundling Ganado AI.app (/Volumes/Extra Disk/norvik/ganadero/src-tauri/target/release/bundle/macos/Ganado AI.app)

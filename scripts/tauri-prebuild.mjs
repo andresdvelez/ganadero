@@ -42,3 +42,22 @@ try {
 } catch (e) {
   console.warn('[prebuild] Could not copy splash assets:', e?.message || e);
 }
+
+// Copiar .env para que Prisma/Next standalone lo lean en runtime del bundle
+try {
+  const envSrc = path.join(projectRoot, '.env');
+  const tauriRoot = path.join(projectRoot, 'src-tauri');
+  const standaloneDir = path.join(tauriRoot, '.next', 'standalone');
+  if (fs.existsSync(envSrc)) {
+    fs.mkdirSync(standaloneDir, { recursive: true });
+    const envDst1 = path.join(tauriRoot, '.env');
+    const envDst2 = path.join(standaloneDir, '.env');
+    fs.copyFileSync(envSrc, envDst1);
+    fs.copyFileSync(envSrc, envDst2);
+    console.log('[prebuild] Copied .env -> src-tauri/.env and src-tauri/.next/standalone/.env');
+  } else {
+    console.log('[prebuild] No .env found at project root; skipping copy');
+  }
+} catch (e) {
+  console.warn('[prebuild] Could not copy .env:', e?.message || e);
+}

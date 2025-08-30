@@ -18,13 +18,11 @@
       "resources": [
         ".next/standalone/**",
         ".next/static/**",
-        ".next/standalone/server.js"
+        ".next/standalone/server.js",
+        ".env"
       ],
       "externalBin": [
-        "sidecar/node",
-        "sidecar/node-x86_64-apple-darwin",
-        "sidecar/node-aarch64-apple-darwin",
-        "sidecar/node.exe"
+        "sidecar/node"
       ],
       "icon": [
         "icons/32x32.png",
