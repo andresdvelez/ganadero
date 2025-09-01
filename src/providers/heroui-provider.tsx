@@ -12,6 +12,17 @@ export function Providers({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
+    const isTauri = typeof window !== "undefined" && (window as any).__TAURI__;
+    if (isTauri) {
+      // En Tauri, desregistrar cualquier SW previo para evitar precache/404
+      try {
+        navigator.serviceWorker
+          ?.getRegistrations()
+          .then((rs) => Promise.all(rs.map((r) => r.unregister())))
+          .catch(() => {});
+      } catch {}
+      return;
+    }
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
       navigator.serviceWorker
         .register("/sw.js")

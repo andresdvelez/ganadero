@@ -19,7 +19,6 @@
         ".next/standalone/**",
         ".next/static/**",
         ".next/standalone/server.js",
-        ".next/app-build-manifest.json",
         ".env"
       ],
       "externalBin": [

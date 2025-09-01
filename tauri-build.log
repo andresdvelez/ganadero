@@ -1,18 +1,18 @@
-     Running beforeBuildCommand `TAURI=1 node ./scripts/tauri-prebuild.mjs && node ./scripts/prepare-node-sidecar.mjs && npm run build && node ./scripts/assert-standalone.mjs && TAURI=1 node ./scripts/tauri-postbuild.mjs`
+     Running beforeBuildCommand `TAURI=1 node ./scripts/tauri-prebuild.mjs && node ./scripts/prepare-node-sidecar.mjs && TAURI=1 npm run build && node ./scripts/assert-standalone.mjs && TAURI=1 node ./scripts/tauri-postbuild.mjs`
 [prebuild] Copied public/logo.png -> src-tauri/dist/logo.png
 [prebuild] Copied .env -> src-tauri/.env and src-tauri/.next/standalone/.env
 [prepare-node-sidecar] Ya existe node-x86_64-apple-darwin, omitiendo.
 [prepare-node-sidecar] Creando binario universal con lipo -> /Volumes/Extra Disk/norvik/ganadero/src-tauri/sidecar/node-universal-apple-darwin
 [prepare-node-sidecar] Asegurando sidecar/node
 
-> ganado-ai-app@0.1.0 prebuild
+> ganado-ai-app@0.1.1 prebuild
 > node ./scripts/prepare-node-sidecar.mjs
 
 [prepare-node-sidecar] Ya existe node-x86_64-apple-darwin, omitiendo.
 [prepare-node-sidecar] Creando binario universal con lipo -> /Volumes/Extra Disk/norvik/ganadero/src-tauri/sidecar/node-universal-apple-darwin
 [prepare-node-sidecar] Asegurando sidecar/node
 
-> ganado-ai-app@0.1.0 build
+> ganado-ai-app@0.1.1 build
 > prisma generate && next build && node ./scripts/standalone-postbuild.mjs
 
 warn The configuration property `package.json#prisma` is deprecated and will be removed in Prisma 7. Please migrate to a Prisma config file (e.g., `prisma.config.ts`).
@@ -21,11 +21,11 @@ For more information, see: https://pris.ly/prisma-config
 Environment variables loaded from .env
 Prisma schema loaded from prisma/schema.prisma
 
-✔ Generated Prisma Client (v6.13.0) to ./node_modules/@prisma/client in 421ms
+✔ Generated Prisma Client (v6.13.0) to ./node_modules/@prisma/client in 502ms
 
 Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
 
-Tip: Interested in query caching in just a few lines of code? Try Accelerate today! https://pris.ly/tip-3-accelerate
+Tip: Need your database queries to be 1000x faster? Accelerate offers you that and more: https://pris.ly/tip-2-accelerate
 
    ▲ Next.js 15.4.6
    - Environments: .env
@@ -33,7 +33,7 @@ Tip: Interested in query caching in just a few lines of code? Try Accelerate tod
    Creating an optimized production build ...
 > [PWA] PWA support is disabled
 > [PWA] PWA support is disabled
- ✓ Compiled successfully in 16.0s
+ ✓ Compiled successfully in 15.0s
    Linting and checking validity of types ...
 
 ./src/__tests__/integration.test.tsx
@@ -737,7 +737,6 @@ Tip: Interested in query caching in just a few lines of code? Try Accelerate tod
 
 ./src/lib/trpc/provider.tsx
 50:53  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
-81:6  Warning: React Hook useEffect has a missing dependency: 'getToken'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
 
 ./src/lib/trpc/standalone.ts
 21:40  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
@@ -754,7 +753,7 @@ Tip: Interested in query caching in just a few lines of code? Try Accelerate tod
 ./src/providers/onboarding-gate.tsx
 7:10  Warning: 'hasOfflineIdentity' is defined but never used. Allowed unused vars must match /^_/u.  @typescript-eslint/no-unused-vars
 25:63  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
-65:6  Warning: React Hook useEffect has a missing dependency: 'isTauri'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+69:6  Warning: React Hook useEffect has a missing dependency: 'isTauri'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
 
 ./src/server/api_backup/ollama/dynamic/route.ts
 25:48  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
@@ -979,7 +978,291 @@ Route (app)                                 Size  First Load JS  Revalidate  Exp
 [standalone-postbuild] Copiado .next/static y public dentro de .next/standalone
 [standalone-postbuild] Copiado .next/{standalone,static} a src-tauri/.next/
 [assert-standalone] OK: server.js y static presentes
-   Compiling ganado-ai-app v0.1.0 (/Volumes/Extra Disk/norvik/ganadero/src-tauri)
+   Compiling proc-macro2 v1.0.95
+   Compiling unicode-ident v1.0.18
+   Compiling libc v0.2.174
+   Compiling cfg-if v1.0.1
+   Compiling zerocopy v0.8.26
+   Compiling serde v1.0.219
+   Compiling siphasher v0.3.11
+   Compiling getrandom v0.1.16
+   Compiling autocfg v1.5.0
+   Compiling syn v1.0.109
+   Compiling siphasher v1.0.1
+   Compiling getrandom v0.3.3
+   Compiling parking_lot_core v0.9.11
+   Compiling icu_properties_data v2.0.1
+   Compiling phf_shared v0.11.3
+   Compiling phf_shared v0.8.0
+   Compiling icu_normalizer_data v2.0.0
+   Compiling stable_deref_trait v1.2.0
+   Compiling phf_shared v0.10.0
+   Compiling itoa v1.0.15
+   Compiling proc-macro-hack v0.5.20+deprecated
+   Compiling smallvec v1.15.1
+   Compiling shlex v1.3.0
+   Compiling lock_api v0.4.13
+   Compiling cc v1.2.31
+   Compiling fnv v1.0.7
+   Compiling core-foundation-sys v0.8.7
+   Compiling bytes v1.10.1
+   Compiling thiserror v1.0.69
+   Compiling typenum v1.18.0
+   Compiling indexmap v1.9.3
+   Compiling ident_case v1.0.1
+   Compiling equivalent v1.0.2
+   Compiling memchr v2.7.5
+   Compiling hashbrown v0.15.5
+   Compiling strsim v0.11.1
+   Compiling version_check v0.9.5
+   Compiling crc32fast v1.5.0
+   Compiling generic-array v0.14.7
+   Compiling convert_case v0.4.0
+   Compiling pin-project-lite v0.2.16
+   Compiling indexmap v2.10.0
+   Compiling litemap v0.8.0
+   Compiling writeable v0.6.1
+   Compiling quote v1.0.40
+   Compiling syn v2.0.104
+   Compiling scopeguard v1.2.0
+   Compiling new_debug_unreachable v1.0.6
+   Compiling log v0.4.27
+   Compiling byteorder v1.5.0
+   Compiling bitflags v2.9.1
+   Compiling getrandom v0.2.16
+   Compiling core-foundation v0.9.4
+   Compiling once_cell v1.21.3
+   Compiling rand_core v0.6.4
+   Compiling rand_core v0.5.1
+   Compiling rand_pcg v0.2.1
+   Compiling bitflags v1.3.2
+   Compiling futures-core v0.3.31
+   Compiling mac v0.1.1
+   Compiling semver v1.0.26
+   Compiling precomputed-hash v0.1.1
+   Compiling futf v0.1.5
+   Compiling mio v1.0.4
+   Compiling socket2 v0.6.0
+   Compiling ppv-lite86 v0.2.21
+   Compiling utf-8 v0.7.6
+   Compiling parking_lot v0.12.4
+   Compiling ryu v1.0.20
+   Compiling serde_json v1.0.142
+   Compiling rand_chacha v0.3.1
+   Compiling rand_chacha v0.2.2
+   Compiling percent-encoding v2.3.1
+   Compiling rand v0.8.5
+   Compiling rand v0.7.3
+   Compiling dtoa v1.0.10
+   Compiling tendril v0.4.3
+   Compiling dtoa-short v0.3.5
+   Compiling objc_exception v0.1.2
+   Compiling phf v0.10.1
+   Compiling itoa v0.4.8
+   Compiling alloc-no-stdlib v2.0.4
+   Compiling nodrop v0.1.14
+   Compiling rustix v1.0.8
+   Compiling matches v0.1.10
+   Compiling crossbeam-utils v0.8.21
+   Compiling alloc-stdlib v0.2.2
+   Compiling servo_arc v0.1.1
+   Compiling phf_generator v0.11.3
+   Compiling phf_generator v0.10.0
+   Compiling phf_generator v0.8.0
+   Compiling uuid v1.17.0
+   Compiling phf_codegen v0.10.0
+   Compiling string_cache_codegen v0.5.4
+   Compiling phf_codegen v0.8.0
+   Compiling fxhash v0.2.1
+   Compiling selectors v0.22.0
+   Compiling errno v0.3.13
+   Compiling markup5ever v0.11.0
+   Compiling thin-slice v0.1.1
+   Compiling utf8_iter v1.0.4
+   Compiling slab v0.4.10
+   Compiling hashbrown v0.12.3
+   Compiling form_urlencoded v1.2.1
+   Compiling synstructure v0.13.2
+   Compiling darling_core v0.20.11
+   Compiling cfb v0.7.3
+   Compiling brotli-decompressor v4.0.3
+   Compiling malloc_buf v0.0.6
+   Compiling http v1.3.1
+   Compiling simd-adler32 v0.3.7
+   Compiling pin-utils v0.1.0
+   Compiling anyhow v1.0.98
+   Compiling futures-task v0.3.31
+   Compiling same-file v1.0.6
+   Compiling cssparser v0.27.2
+   Compiling phf_macros v0.8.0
+   Compiling html5ever v0.26.0
+   Compiling walkdir v2.5.0
+   Compiling brotli v7.0.0
+   Compiling serde_derive v1.0.219
+   Compiling zerofrom-derive v0.1.6
+   Compiling yoke-derive v0.8.0
+   Compiling zerovec-derive v0.11.1
+   Compiling displaydoc v0.2.5
+   Compiling cssparser-macros v0.6.1
+   Compiling thiserror-impl v1.0.69
+   Compiling darling_macro v0.20.11
+   Compiling derive_more v0.99.20
+   Compiling phf_macros v0.11.3
+   Compiling tokio-macros v2.5.0
+   Compiling darling v0.20.11
+   Compiling phf v0.8.0
+   Compiling zerofrom v0.1.6
+   Compiling serde_with_macros v3.14.0
+   Compiling ctor v0.2.9
+   Compiling tokio v1.47.1
+   Compiling futures-macro v0.3.31
+   Compiling phf v0.11.3
+   Compiling yoke v0.8.0
+   Compiling futures-util v0.3.31
+   Compiling objc v0.2.7
+   Compiling infer v0.13.0
+   Compiling core-graphics-types v0.1.3
+   Compiling foreign-types-shared v0.1.1
+   Compiling winnow v0.7.12
+   Compiling glob v0.3.2
+   Compiling dunce v1.0.5
+   Compiling winnow v0.5.40
+   Compiling adler2 v2.0.1
+   Compiling toml_write v0.1.2
+   Compiling heck v0.5.0
+   Compiling zerovec v0.11.4
+   Compiling zerotrie v0.2.2
+   Compiling miniz_oxide v0.8.9
+   Compiling foreign-types v0.3.2
+   Compiling http-body v1.0.1
+   Compiling tinystr v0.8.1
+   Compiling potential_utf v0.1.2
+   Compiling icu_collections v2.0.0
+   Compiling icu_locale_core v2.0.0
+   Compiling tracing-core v0.1.34
+   Compiling system-configuration-sys v0.6.0
+   Compiling icu_provider v2.0.0
+   Compiling futures-sink v0.3.31
+   Compiling fastrand v2.3.0
+   Compiling block v0.1.6
+   Compiling httparse v1.10.1
+   Compiling icu_normalizer v2.0.0
+   Compiling icu_properties v2.0.1
+   Compiling powerfmt v0.2.0
+   Compiling string_cache v0.8.9
+   Compiling toml_datetime v0.6.11
+   Compiling serde_spanned v0.6.9
+   Compiling serde_with v3.14.0
+   Compiling toml_edit v0.22.27
+   Compiling toml_edit v0.19.15
+   Compiling idna_adapter v1.2.1
+   Compiling idna v1.0.3
+   Compiling jsonptr v0.4.7
+   Compiling json-patch v2.0.0
+   Compiling url v2.5.4
+   Compiling kuchikiki v0.8.2
+   Compiling toml v0.8.23
+   Compiling deranged v0.4.0
+   Compiling tauri-utils v1.6.2
+   Compiling toml v0.7.8
+   Compiling tempfile v3.20.0
+   Compiling cocoa-foundation v0.1.2
+   Compiling tokio-util v0.7.16
+   Compiling tracing v0.1.41
+   Compiling flate2 v1.1.2
+   Compiling core-graphics v0.22.3
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.6
+   Compiling fdeflate v0.3.7
+   Compiling rustc_version v0.4.1
+   Compiling security-framework-sys v2.14.0
+   Compiling tao v0.16.10
+   Compiling raw-window-handle v0.5.2
+   Compiling atomic-waker v1.1.2
+   Compiling base64 v0.22.1
+   Compiling native-tls v0.2.14
+   Compiling tower-service v0.3.3
+   Compiling try-lock v0.2.5
+   Compiling num-conv v0.1.0
+   Compiling time-core v0.1.4
+   Compiling want v0.3.1
+   Compiling time v0.3.41
+   Compiling h2 v0.4.12
+   Compiling png v0.17.16
+   Compiling security-framework v2.11.1
+   Compiling embed-resource v2.5.2
+   Compiling cocoa v0.24.1
+   Compiling digest v0.10.7
+   Compiling crossbeam-channel v0.5.15
+   Compiling futures-channel v0.3.31
+   Compiling dirs-sys-next v0.1.2
+   Compiling quick-xml v0.38.1
+   Compiling aho-corasick v1.1.3
+   Compiling http v0.2.12
+   Compiling instant v0.1.13
+   Compiling dispatch v0.2.0
+   Compiling cpufeatures v0.2.17
+   Compiling regex-syntax v0.8.5
+   Compiling wry v0.24.11
+   Compiling tauri-runtime v0.14.6
+   Compiling lazy_static v1.5.0
+   Compiling plist v1.7.4
+   Compiling sha2 v0.10.9
+   Compiling hyper v1.6.0
+   Compiling regex-automata v0.4.9
+   Compiling dirs-next v2.0.0
+   Compiling ico v0.4.0
+   Compiling system-configuration v0.6.1
+   Compiling tauri-winres v0.1.1
+   Compiling cargo_toml v0.15.3
+   Compiling objc_id v0.1.1
+   Compiling crossbeam-epoch v0.9.18
+   Compiling sync_wrapper v1.0.2
+   Compiling bstr v1.12.0
+   Compiling http-range v0.1.5
+   Compiling base64 v0.21.7
+   Compiling tower-layer v0.3.3
+   Compiling ipnet v2.11.0
+   Compiling tauri-runtime-wry v0.14.11
+   Compiling tauri-build v1.5.6
+   Compiling globset v0.4.16
+   Compiling hyper-util v0.1.16
+   Compiling tauri v1.8.3
+   Compiling tower v0.5.2
+   Compiling tauri-codegen v1.4.6
+   Compiling crossbeam-deque v0.8.6
+   Compiling tokio-native-tls v0.3.1
+   Compiling http-body-util v0.1.3
+   Compiling serialize-to-javascript-impl v0.1.2
+   Compiling xattr v1.5.1
+   Compiling filetime v0.2.25
+   Compiling encoding_rs v0.8.35
+   Compiling iri-string v0.7.8
+   Compiling zeroize v1.8.1
+   Compiling rustls-pki-types v1.12.0
+   Compiling ganado-ai-app v0.1.1 (/Volumes/Extra Disk/norvik/ganadero/src-tauri)
+   Compiling tar v0.4.44
+   Compiling tauri-macros v1.4.7
+   Compiling serialize-to-javascript v0.1.2
+   Compiling hyper-tls v0.6.0
+   Compiling ignore v0.4.23
+   Compiling serde_urlencoded v0.7.1
+   Compiling serde_repr v0.1.20
+   Compiling embed_plist v1.2.2
+   Compiling tower-http v0.6.6
+   Compiling mime v0.3.17
+   Compiling state v0.5.3
+   Compiling reqwest v0.12.22
+   Compiling hex v0.4.3
+warning: variable `started` is assigned to, but never used
+   --> src/main.rs:191:15
+    |
+191 |       let mut started = false;
+    |               ^^^^^^^
+    |
+    = note: consider using `_started` instead
+    = note: `#[warn(unused_variables)]` on by default
+
 warning: variable `attempted_start` is assigned to, but never used
    --> src/main.rs:192:15
     |
@@ -987,7 +1270,15 @@ warning: variable `attempted_start` is assigned to, but never used
     |               ^^^^^^^^^^^^^^^
     |
     = note: consider using `_attempted_start` instead
-    = note: `#[warn(unused_variables)]` on by default
+
+warning: value assigned to `started` is never read
+   --> src/main.rs:197:11
+    |
+197 |           started = true;
+    |           ^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` on by default
 
 warning: value assigned to `attempted_start` is never read
    --> src/main.rs:199:9
@@ -996,10 +1287,9 @@ warning: value assigned to `attempted_start` is never read
     |         ^^^^^^^^^^^^^^^
     |
     = help: maybe it is overwritten before being read?
-    = note: `#[warn(unused_assignments)]` on by default
 
-warning: `ganado-ai-app` (bin "ganado-ai-app") generated 2 warnings
-    Finished `release` profile [optimized] target(s) in 19.79s
+warning: `ganado-ai-app` (bin "ganado-ai-app") generated 4 warnings
+    Finished `release` profile [optimized] target(s) in 2m 22s
      Signing /Volumes/Extra Disk/norvik/ganadero/src-tauri/target/release/Ganado AI
      Signing sidecar/node-x86_64-apple-darwin
     Bundling Ganado AI.app (/Volumes/Extra Disk/norvik/ganadero/src-tauri/target/release/bundle/macos/Ganado AI.app)

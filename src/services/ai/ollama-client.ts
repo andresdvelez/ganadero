@@ -31,18 +31,22 @@ export class AIClient {
       if (isBrowser) lsHost = window.localStorage.getItem("OLLAMA_HOST");
     } catch {}
 
-    const defaultHost = isTauri
-      ? `http://127.0.0.1:${process.env.NEXT_PUBLIC_LLAMA_PORT || 11434}`
-      : process.env.NODE_ENV === "development"
+    const tauriLocal = `http://127.0.0.1:${process.env.NEXT_PUBLIC_LLAMA_PORT || 11434}`;
+    const defaultHost = process.env.NODE_ENV === "development"
       ? "http://127.0.0.1:11434"
-      : "/api/ollama"; // proxy only on web prod
+      : "/api/ollama"; // proxy solo en web prod
 
-    this._ollamaHost = (
-      lsHost ||
-      config.ollamaHost ||
-      process.env.NEXT_PUBLIC_OLLAMA_HOST ||
-      defaultHost
-    ).replace(/\/$/, "");
+    // En Tauri, forzar siempre localhost:11434 salvo que el usuario haya puesto explícitamente OLLAMA_HOST en localStorage
+    if (isTauri) {
+      this._ollamaHost = (lsHost || tauriLocal).replace(/\/$/, "");
+    } else {
+      this._ollamaHost = (
+        lsHost ||
+        config.ollamaHost ||
+        process.env.NEXT_PUBLIC_OLLAMA_HOST ||
+        defaultHost
+      ).replace(/\/$/, "");
+    }
 
     this.model =
       config.model ||
