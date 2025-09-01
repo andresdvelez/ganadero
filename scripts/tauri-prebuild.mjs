@@ -43,21 +43,28 @@ try {
   console.warn('[prebuild] Could not copy splash assets:', e?.message || e);
 }
 
-// Copiar .env para que Prisma/Next standalone lo lean en runtime del bundle
+// Copiar archivo .env preferido para que Prisma/Next standalone lo lean en runtime del bundle
 try {
-  const envSrc = path.join(projectRoot, '.env');
+  const candidates = [
+    path.join(projectRoot, '.env.tauri.local'),
+    path.join(projectRoot, '.env.tauri'),
+    path.join(projectRoot, '.env.production.local'),
+    path.join(projectRoot, '.env.production'),
+    path.join(projectRoot, '.env'),
+  ];
+  const envSrc = candidates.find((p) => fs.existsSync(p));
   const tauriRoot = path.join(projectRoot, 'src-tauri');
   const standaloneDir = path.join(tauriRoot, '.next', 'standalone');
-  if (fs.existsSync(envSrc)) {
+  if (envSrc) {
     fs.mkdirSync(standaloneDir, { recursive: true });
     const envDst1 = path.join(tauriRoot, '.env');
     const envDst2 = path.join(standaloneDir, '.env');
     fs.copyFileSync(envSrc, envDst1);
     fs.copyFileSync(envSrc, envDst2);
-    console.log('[prebuild] Copied .env -> src-tauri/.env and src-tauri/.next/standalone/.env');
+    console.log(`[prebuild] Copied ${path.basename(envSrc)} -> src-tauri/.env and src-tauri/.next/standalone/.env`);
   } else {
-    console.log('[prebuild] No .env found at project root; skipping copy');
+    console.log('[prebuild] No .env candidate found; skipping copy');
   }
 } catch (e) {
-  console.warn('[prebuild] Could not copy .env:', e?.message || e);
+  console.warn('[prebuild] Could not copy env file:', e?.message || e);
 }
