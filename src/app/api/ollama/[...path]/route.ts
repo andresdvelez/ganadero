@@ -3,10 +3,15 @@ import { NextRequest, NextResponse } from "next/server";
 export const runtime = "nodejs";
 
 async function proxy(req: NextRequest, ctx: { params: { path: string[] } }) {
-  const base =
+  let base =
     process.env.NEXT_PUBLIC_OLLAMA_HOST ||
     process.env.OLLAMA_SERVER_URL ||
     "http://127.0.0.1:11434";
+  // Evitar bucles si la var apunta a una ruta relativa (/api/ollama)
+  if (!/^https?:\/\//i.test(base)) {
+    const port = Number(process.env.NEXT_PUBLIC_LLAMA_PORT || 11434);
+    base = `http://127.0.0.1:${port}`;
+  }
   const targetUrl = `${base.replace(/\/$/, "")}/${ctx.params.path.join("/")}`;
 
   const init: RequestInit = {

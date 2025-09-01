@@ -50,13 +50,12 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
         typeof window !== "undefined" && (window as any).__TAURI__;
       if (isTauri) {
         const localUrl = "http://127.0.0.1:4317/api/trpc";
-        const online = typeof navigator !== "undefined" && navigator.onLine;
-        // Fuerza backend remoto cuando hay Internet en la app de escritorio (Clerk ya tiene sesión válida allí)
-        if (online) {
+        // Decidir por reachability real (no confiar en navigator.onLine)
+        const remoteReady = await probe("https://ganadero-nine.vercel.app/manifest.webmanifest");
+        if (remoteReady) {
           if (!cancelled) setResolvedUrl(remoteFallback);
           return;
         }
-        // Sin Internet: intenta local; si no está listo, deja remoto para UI mínima
         const localReady = await probe("http://127.0.0.1:4317/manifest.webmanifest");
         if (localReady) {
           if (!cancelled) setResolvedUrl(localUrl);
