@@ -45,9 +45,12 @@ export const orgRouter = createTRPCRouter({
             },
           });
         }
-      } catch {
-        // Si Clerk falla, no forzamos onboarding por esta vía; devolver vacío
-        return [];
+      } catch (e) {
+        // Si Clerk falla, propagar error para que el cliente no fuerce onboarding por lista vacía
+        // El OnboardingGate ya evita redirigir cuando hay error en esta consulta.
+        throw new Error(
+          `No se pudo consultar el perfil en Clerk para resolver tus organizaciones`,
+        );
       }
     }
     const memberships = await prisma.organizationMembership.findMany({

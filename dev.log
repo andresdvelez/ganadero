@@ -1,0 +1,30 @@
+
+> ganado-ai-app@0.1.0 dev
+> next dev -p 3001 --turbopack
+
+
+✘ node v22.18.0, and next.js v15.4.6 are not yet supported in the Community edition of Console Ninja.
+We are working hard on it for you https://tinyurl.com/3h9mtwra.
+
+Estimated release dates:
+  - Community users: around 5th October, 2025 (subject to team availability)
+  - PRO users:       priority access is available now
+
+
+✘ node v22.18.0, and next.js v15.4.6 are not yet supported in the Community edition of Console Ninja.
+We are working hard on it for you https://tinyurl.com/3h9mtwra.
+
+Estimated release dates:
+  - Community users: around 5th October, 2025 (subject to team availability)
+  - PRO users:       priority access is available now
+
+   ▲ Next.js 15.4.6 (Turbopack)
+   - Local:        http://localhost:3001
+   - Network:      http://192.168.1.227:3001
+   - Environments: .env.local, .env
+
+ ✓ Starting...
+Slow filesystem detected. The benchmark took 146ms. If /Users/andresvelez/Documents/norvik/ganado-ai/ganado-ai-app/.next is a network drive, consider moving it to a local folder. If you have an antivirus enabled, consider excluding your project directory.
+ ○ Compiling middleware ...
+ ✓ Compiled middleware in 1926ms
+ ✓ Ready in 9.5s
