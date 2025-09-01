@@ -21,11 +21,11 @@ For more information, see: https://pris.ly/prisma-config
 Environment variables loaded from .env
 Prisma schema loaded from prisma/schema.prisma
 
-✔ Generated Prisma Client (v6.13.0) to ./node_modules/@prisma/client in 435ms
+✔ Generated Prisma Client (v6.13.0) to ./node_modules/@prisma/client in 475ms
 
 Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
 
-Tip: Need your database queries to be 1000x faster? Accelerate offers you that and more: https://pris.ly/tip-2-accelerate
+Tip: Want to turn off tips and other hints? https://pris.ly/tip-4-nohints
 
    ▲ Next.js 15.4.6
    - Environments: .env
@@ -33,7 +33,7 @@ Tip: Need your database queries to be 1000x faster? Accelerate offers you that a
    Creating an optimized production build ...
 > [PWA] PWA support is disabled
 > [PWA] PWA support is disabled
- ✓ Compiled successfully in 19.0s
+ ✓ Compiled successfully in 15.0s
    Linting and checking validity of types ...
 
 ./src/__tests__/integration.test.tsx
@@ -472,12 +472,12 @@ Tip: Need your database queries to be 1000x faster? Accelerate offers you that a
 88:15  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
 
 ./src/app/api/ollama/[...path]/route.ts
-28:48  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
-33:15  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
-41:50  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
-44:51  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
-47:50  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
-50:53  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+33:48  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+38:15  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+46:50  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+49:51  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+52:50  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
+55:53  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
 
 ./src/app/finance/new/page.tsx
 34:10  Warning: Unexpected any. Specify a different type.  @typescript-eslint/no-explicit-any
@@ -1017,7 +1017,7 @@ warning: value assigned to `attempted_start` is never read
     = help: maybe it is overwritten before being read?
 
 warning: `ganado-ai-app` (bin "ganado-ai-app") generated 4 warnings
-    Finished `release` profile [optimized] target(s) in 31.23s
+    Finished `release` profile [optimized] target(s) in 20.49s
      Signing /Volumes/Extra Disk/norvik/ganadero/src-tauri/target/release/Ganado AI
      Signing sidecar/node-x86_64-apple-darwin
     Bundling Ganado AI.app (/Volumes/Extra Disk/norvik/ganadero/src-tauri/target/release/bundle/macos/Ganado AI.app)

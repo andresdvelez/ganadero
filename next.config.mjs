@@ -26,9 +26,28 @@ const pwaConfig = withPWA({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
+  reactStrictMode: false,
   // Ejecutaremos con `node .next/standalone/server.js` dentro de Tauri
   output: "standalone",
+  generateEtags: false,
+  async headers() {
+    return [
+      {
+        source: "/_next/static/:path*",
+        headers: [
+          { key: "Cache-Control", value: "no-store, no-cache, must-revalidate, proxy-revalidate" },
+          { key: "Pragma", value: "no-cache" },
+          { key: "Expires", value: "0" },
+        ],
+      },
+      {
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-store" },
+        ],
+      },
+    ];
+  },
   images: {
     unoptimized: true,
     domains: ["localhost"],

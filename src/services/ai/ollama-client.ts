@@ -422,7 +422,14 @@ Responde priorizando prácticas locales y terminología usada en Colombia.`;
 
 let aiClientInstance: AIClient | null = null;
 export function getAIClient() {
-  if (!aiClientInstance) aiClientInstance = new AIClient();
+  // Si estamos en el navegador y es Tauri, asegurar instancia con host local absoluto
+  if (typeof window !== "undefined" && (window as any).__TAURI__) {
+    if (!aiClientInstance || aiClientInstance.ollamaHost.startsWith("/")) {
+      aiClientInstance = new AIClient();
+    }
+  } else if (!aiClientInstance) {
+    aiClientInstance = new AIClient();
+  }
   return aiClientInstance;
 }
 export function setAIClientHost(host: string) {

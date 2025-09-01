@@ -47,6 +47,8 @@ export default function RootLayout({
       clearAndReload();
     }
   });
+  // En Tauri, desregistrar SW al inicio para evitar Workbox 404
+  try{ if(window.__TAURI__){ navigator.serviceWorker?.getRegistrations().then(rs=>Promise.all(rs.map(r=>r.unregister()))); } }catch{}
 })();
 `,
           }}
