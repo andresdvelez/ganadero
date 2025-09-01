@@ -47,6 +47,10 @@ export function OnboardingGate() {
         return;
       }
 
+      // En app de escritorio (Tauri), no forzar redirecciones automáticas de onboarding.
+      // El flujo de onboarding se inicia solo cuando el usuario navega explícitamente.
+      if (isTauri) return;
+
       // Skip other allowed routes
       if (ALLOW_ROUTES.some((p) => pathname?.startsWith(p))) return;
       if (!isLoaded || !isSignedIn) return;

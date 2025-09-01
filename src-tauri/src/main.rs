@@ -300,14 +300,24 @@ fn main() {
       if let Some(win) = app.get_window("main") {
         let w = win.clone();
         tauri::async_runtime::spawn(async move {
-          // Esperar hasta 15s a que el puerto esté listo; si ya estaba prebound, esto saldrá rápido
+          // Esperar hasta 30s por disponibilidad HTTP real del standalone (manifest.webmanifest)
+          let client = reqwest::Client::new();
           let mut attempts: u32 = 0;
           let max_attempts: u32 = 60; // 60 * 500ms = 30s
-          let mut ready = started;
+          let mut ready = false;
           while attempts < max_attempts {
-            if TcpStream::connect(("127.0.0.1", port)).is_ok() {
-              ready = true;
-              break;
+            let url = format!("http://127.0.0.1:{}/manifest.webmanifest", port);
+            match client.get(&url)
+              .header("Cache-Control", "no-store")
+              .send().await {
+              Ok(resp) => {
+                let code = resp.status().as_u16();
+                if resp.status().is_success() || code == 404 || code == 405 {
+                  ready = true;
+                  break;
+                }
+              }
+              Err(_) => {}
             }
             attempts += 1;
             sleep(std::time::Duration::from_millis(500)).await;
@@ -319,7 +329,7 @@ fn main() {
               port
             ));
           } else {
-            // Sin readiness: si offline, llevar directamente al unlock local (frontend maneja falta de identidad)
+            // Sin readiness: si offline, llevar directamente al unlock local; si online, ir a remoto
             let _ = w.eval(&format!(
               "(function(){{try{{var online=navigator.onLine; if(!online){{window.location.replace('http://127.0.0.1:{0}/device-unlock'); return;}} window.location.replace('https://ganadero-nine.vercel.app');}}catch(e){{}}}})();",
               port

@@ -56,31 +56,19 @@
       </div>
     </div>
     <script>
-      // Intento de redirección automática al servidor local si está disponible
+      // El arranque y la redirección los maneja Rust (main.rs) cuando el servidor local está listo.
+      // Aquí solo mostramos el estado de carga para evitar redirecciones prematuras.
       (function () {
-        const tryPorts = [4317, 3000, 3001, 5173];
-        let idx = 0;
-        let redirected = false;
-        function tick() {
-          if (redirected || idx >= tryPorts.length) return;
-          const p = tryPorts[idx++];
-          fetch(`http://127.0.0.1:${p}/manifest.webmanifest`, { mode: 'no-cors', cache: 'no-store' })
-            .then(() => {
-              const online = navigator.onLine;
-              const dest = online ? `http://127.0.0.1:${p}/` : `http://127.0.0.1:${p}/device-unlock`;
-              redirected = true;
-              window.location.replace(dest);
-            })
-            .catch(() => setTimeout(tick, 500));
-        }
-        setTimeout(tick, 600);
-        // Fallback duro: si en 5s no redirigió, mostrar botón para reintentar
         setTimeout(() => {
-          if (!redirected) {
-            const muted = document.querySelector('.muted');
-            if (muted) muted.textContent = 'No se pudo iniciar el servidor local.';
+          const muted = document.querySelector('.muted');
+          if (muted) muted.textContent = 'Verificando servidor local…';
+        }, 1200);
+        setTimeout(() => {
+          const muted = document.querySelector('.muted');
+          if (muted && !/http/.test(location.href)) {
+            muted.textContent = 'No se pudo iniciar el servidor local.';
           }
-        }, 5000);
+        }, 8000);
       })();
     </script>
   </body>
