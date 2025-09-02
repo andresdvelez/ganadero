@@ -38,6 +38,8 @@ export default function RootLayout({
             __html: `
 (function(){
   function clearAndReload(){
+    try{ if (sessionStorage.getItem('NEXT_RECOVERED_ONCE') === '1') { return; } }catch{}
+    try{ sessionStorage.setItem('NEXT_RECOVERED_ONCE','1'); }catch{}
     try{localStorage.removeItem('NEXT_CACHE');}catch{}
     if('caches' in window){caches.keys().then(keys => Promise.all(keys.map(k=>caches.delete(k)))).catch(()=>{}).finally(()=>{try{navigator.serviceWorker?.getRegistrations().then(rs=>Promise.all(rs.map(r=>r.unregister()))).finally(()=>location.reload(true));}catch(e){location.reload(true);}});} else { try{navigator.serviceWorker?.getRegistrations().then(rs=>Promise.all(rs.map(r=>r.unregister()))).finally(()=>location.reload(true));}catch(e){location.reload(true);} }
   }
