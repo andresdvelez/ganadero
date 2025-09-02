@@ -58,6 +58,30 @@ export default function GlobalError({
     } catch {}
   }
 
+  async function repairAndReload() {
+    try {
+      // Limpiar caches y SW, luego recargar
+      try {
+        if ("caches" in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
+        }
+      } catch {}
+      try {
+        await navigator.serviceWorker
+          ?.getRegistrations()
+          .then((rs) => Promise.all(rs.map((r) => r.unregister())));
+      } catch {}
+      try {
+        localStorage.removeItem("NEXT_CACHE");
+      } catch {}
+    } finally {
+      try {
+        location.reload();
+      } catch {}
+    }
+  }
+
   return (
     <html lang="es">
       <body className="min-h-screen grid place-items-center bg-neutral-50 p-6">
@@ -92,6 +116,15 @@ export default function GlobalError({
               <Button onClick={reset} className="shrink-0">
                 Reintentar
               </Button>
+              {String(summary || "").includes("Loading chunk") && (
+                <Button
+                  onClick={repairAndReload}
+                  color="danger"
+                  className="shrink-0"
+                >
+                  Reparar y recargar
+                </Button>
+              )}
               <Button
                 variant="secondary"
                 onClick={copyDetails}
