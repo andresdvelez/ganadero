@@ -77,7 +77,7 @@ export default function GlobalError({
       } catch {}
     } finally {
       try {
-        location.reload();
+        window.location.reload();
       } catch {}
     }
   }
