@@ -18,7 +18,7 @@ const ALLOW_ROUTES = [
 export function OnboardingGate() {
   const router = useRouter();
   const pathname = usePathname();
-  const { isSignedIn, isLoaded } = useAuth();
+  const { isSignedIn, isLoaded, userId } = useAuth();
 
   // En Tauri (desktop), si la API TRPC se está enrutando al remoto (por falta de token local),
   // no bloqueemos por navigator.onLine. Permitimos consulta aunque estemos online/offline.
@@ -69,12 +69,20 @@ export function OnboardingGate() {
       const hasOrg = Array.isArray(orgs) && orgs.length > 0;
 
       // Web: Redirigir a onboarding únicamente desde la raíz
-      // Evita enviar a onboarding si el usuario navega a otras rutas manualmente
+      // y solo una vez por usuario (evitar bucles si hay fallas intermitentes en orgs)
       if (pathname === "/" && Array.isArray(orgs) && !hasOrg) {
+        const key = userId ? `onboarding:redir:${userId}` : null;
+        try {
+          if (key) {
+            const already = localStorage.getItem(key);
+            if (already === "1") return;
+            localStorage.setItem(key, "1");
+          }
+        } catch {}
         router.replace("/onboarding");
       }
     })();
-  }, [pathname, router, isLoaded, isSignedIn, orgs, error, checking]);
+  }, [pathname, router, isLoaded, isSignedIn, userId, orgs, error, checking]);
 
   // Visual loading guard while validating to avoid route flashes
   if (checking) {
