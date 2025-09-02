@@ -116,7 +116,7 @@ export const createTRPCContext = async (opts: { req: NextRequest }) => {
       });
       if (!existing) {
         // En este entorno, clerkClient es función
-        const client = await clerkClient();
+        const client = clerkClient; // v6: objeto directo
         const user = await client.users.getUser(userId);
         const primaryEmailId = user.primaryEmailAddressId;
         const emailFromPrimary = user.emailAddresses?.find(

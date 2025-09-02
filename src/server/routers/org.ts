@@ -9,7 +9,7 @@ export const orgRouter = createTRPCRouter({
     let me = await prisma.user.findUnique({ where: { clerkId } });
     if (!me) {
       try {
-        const client = await clerkClient();
+        const client = clerkClient; // v6: clerkClient es objeto, no función
         const user = await client.users.getUser(clerkId);
         const primaryEmailId = user.primaryEmailAddressId;
         const emailFromPrimary = user.emailAddresses?.find(
@@ -19,7 +19,9 @@ export const orgRouter = createTRPCRouter({
         const email = emailFromPrimary || fallbackEmail;
         if (email) {
           // Intentar enlazar registro existente por email
-          const existingByEmail = await prisma.user.findUnique({ where: { email } });
+          const existingByEmail = await prisma.user.findUnique({
+            where: { email },
+          });
           if (existingByEmail) {
             me = await prisma.user.update({
               where: { id: existingByEmail.id },
@@ -31,7 +33,9 @@ export const orgRouter = createTRPCRouter({
               data: {
                 clerkId,
                 email,
-                name: [user.firstName, user.lastName].filter(Boolean).join(" ") || null,
+                name:
+                  [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+                  null,
               },
             });
           }
@@ -41,7 +45,9 @@ export const orgRouter = createTRPCRouter({
             data: {
               clerkId,
               email: `user_${clerkId}@ganado.ai`,
-              name: [user.firstName, user.lastName].filter(Boolean).join(" ") || null,
+              name:
+                [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+                null,
             },
           });
         }
@@ -49,7 +55,7 @@ export const orgRouter = createTRPCRouter({
         // Si Clerk falla, propagar error para que el cliente no fuerce onboarding por lista vacía
         // El OnboardingGate ya evita redirigir cuando hay error en esta consulta.
         throw new Error(
-          `No se pudo consultar el perfil en Clerk para resolver tus organizaciones`,
+          `No se pudo consultar el perfil en Clerk para resolver tus organizaciones`
         );
       }
     }
