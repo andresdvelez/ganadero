@@ -20,19 +20,39 @@ export default function GlobalError({
     console.error("[GlobalError]", error);
   }, [error]);
 
-  const details = useMemo(() => {
-    const base = `Mensaje: ${error?.message || "Error desconocido"}`;
-    const extra =
-      process.env.NODE_ENV !== "production" && error?.stack
-        ? `\n\nStack:\n${error.stack}`
-        : "";
-    const digest = error?.digest ? `\n\nDigest: ${error.digest}` : "";
-    return `${base}${extra}${digest}`.trim();
+  const { summary, location, full } = useMemo(() => {
+    const message = error?.message || "Error desconocido";
+    const stack = error?.stack || "";
+    const lines = stack.split(/\n+/);
+    let loc: string | null = null;
+    for (const ln of lines) {
+      const m = ln.match(/src\/(.*?):(\d+):(\d+)/);
+      if (m) {
+        loc = `${m[0]}`;
+        break;
+      }
+      const w = ln.match(
+        /\((?:webpack-internal:\/\/)?[^)]*?src\/(.*?):(\d+):(\d+)\)/
+      );
+      if (w) {
+        loc = `${w[1]}:${w[2]}:${w[3]}`;
+        break;
+      }
+    }
+    const digest = error?.digest ? `Digest: ${error.digest}` : "";
+    const full = `${message}${loc ? `\nUbicación: ${loc}` : ""}${
+      digest ? `\n${digest}` : ""
+    }${
+      process.env.NODE_ENV !== "production" && stack
+        ? `\n\nStack:\n${stack}`
+        : ""
+    }`.trim();
+    return { summary: message, location: loc, full };
   }, [error]);
 
   async function copyDetails() {
     try {
-      await navigator.clipboard.writeText(details);
+      await navigator.clipboard.writeText(full);
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     } catch {}
@@ -50,9 +70,14 @@ export default function GlobalError({
               La página encontró un problema y no pudo continuar. Puedes
               reintentar o copiar los detalles para enviarlos al soporte.
             </p>
-            <div className="rounded-md bg-red-50 text-red-800 p-4 text-sm whitespace-pre-wrap break-words mb-4">
-              {`Mensaje: ${error?.message || "Error desconocido"}`}
+            <div className="rounded-md bg-red-50 text-red-800 p-4 text-sm whitespace-pre-wrap break-words mb-2">
+              {`Mensaje: ${summary}`}
             </div>
+            {location ? (
+              <div className="text-xs text-neutral-600 mb-3">
+                Ubicación: {location}
+              </div>
+            ) : null}
             {process.env.NODE_ENV !== "production" && error?.stack ? (
               <details className="mb-4">
                 <summary className="cursor-pointer text-sm text-neutral-600">
