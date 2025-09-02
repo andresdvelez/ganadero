@@ -68,8 +68,9 @@ export function OnboardingGate() {
       // Solo decidir cuando hay datos definidos
       const hasOrg = Array.isArray(orgs) && orgs.length > 0;
 
-      // Only require organization to proceed; passcode/identity is optional
-      if (Array.isArray(orgs) && !hasOrg) {
+      // Web: Redirigir a onboarding únicamente desde la raíz
+      // Evita enviar a onboarding si el usuario navega a otras rutas manualmente
+      if (pathname === "/" && Array.isArray(orgs) && !hasOrg) {
         router.replace("/onboarding");
       }
     })();
