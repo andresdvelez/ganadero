@@ -36,7 +36,13 @@ export const deviceRouter = createTRPCRouter({
             create: { clerkId, email, name: fullName },
           });
         } catch (_e) {
-          throw new Error("Usuario no encontrado");
+          // Si Clerk no está disponible (offline), crear un usuario mínimo local
+          const placeholderEmail = `user_${clerkId}@ganado.ai`;
+          me = await prisma.user.upsert({
+            where: { clerkId },
+            update: {},
+            create: { clerkId, email: placeholderEmail, name: null },
+          });
         }
       }
 
