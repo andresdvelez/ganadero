@@ -18,7 +18,7 @@ export default function HomeClientImpl() {
 
 function FarmsPanel() {
   const { user } = useUser();
-  const orgs = trpc.org.myOrganizations.useQuery();
+  const orgs = trpc.org.myOrganizations.useQuery(undefined, { enabled: true });
   const [open, setOpen] = useState(false);
   const [orgId, setOrgId] = useState<string | null>(null);
 
@@ -26,7 +26,7 @@ function FarmsPanel() {
 
   const farms = trpc.farm.list.useQuery(
     { orgId: orgId || firstOrgId || "" },
-    { enabled: !!(orgId || firstOrgId) }
+    { enabled: Boolean(orgId || firstOrgId) }
   );
 
   return (

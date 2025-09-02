@@ -40,16 +40,20 @@ export default function OnboardingPage() {
   // Estado local (borradores) — no se crea nada hasta confirmar
   const [current, setCurrent] = useState<WizardStep>("org");
   const [orgDraft, setOrgDraft] = useState<{ name: string }>({ name: "" });
-  const [farmDraft, setFarmDraft] = useState<{ name: string; code: string }>(
-    { name: "", code: "" }
-  );
+  const [farmDraft, setFarmDraft] = useState<{ name: string; code: string }>({
+    name: "",
+    code: "",
+  });
   const [deviceLinked, setDeviceLinked] = useState(false);
   const [passA, setPassA] = useState("");
   const [passB, setPassB] = useState("");
-  const [created, setCreated] = useState<
-    | null
-    | { orgId: string; orgName: string; farmId: string; farmName: string; farmCode: string }
-  >(null);
+  const [created, setCreated] = useState<null | {
+    orgId: string;
+    orgName: string;
+    farmId: string;
+    farmName: string;
+    farmCode: string;
+  }>(null);
 
   // Autorellenar código de finca a partir del nombre (prefijo fn-)
   useEffect(() => {
@@ -64,7 +68,7 @@ export default function OnboardingPage() {
 
   // Para usuarios que ya tienen organización, los mostramos pero mantenemos el wizard
   const { data: myOrgs } = trpc.org.myOrganizations.useQuery(undefined, {
-    enabled: isLoaded,
+    enabled: !!isLoaded,
   });
   const alreadyHasOrg = (myOrgs?.length || 0) > 0;
 
@@ -91,7 +95,10 @@ export default function OnboardingPage() {
       // 1) Si el usuario ingresó passcode, provisionar identidad offline local
       if (passA || passB) {
         if (passA.length < 6) {
-          addToast({ variant: "warning", title: "La clave debe tener al menos 6 caracteres" });
+          addToast({
+            variant: "warning",
+            title: "La clave debe tener al menos 6 caracteres",
+          });
           return;
         }
         if (passA !== passB) {
@@ -129,7 +136,11 @@ export default function OnboardingPage() {
       setDeviceLinked(true);
       addToast({ variant: "success", title: "Dispositivo vinculado" });
     } catch (e: any) {
-      addToast({ variant: "error", title: "No se pudo vincular", description: e?.message });
+      addToast({
+        variant: "error",
+        title: "No se pudo vincular",
+        description: e?.message,
+      });
     }
   }
 
@@ -140,7 +151,10 @@ export default function OnboardingPage() {
       let orgName: string = orgDraft.name;
       if (!alreadyHasOrg) {
         if (!orgDraft.name || orgDraft.name.trim().length < 2) {
-          addToast({ variant: "warning", title: "Escribe el nombre de la organización" });
+          addToast({
+            variant: "warning",
+            title: "Escribe el nombre de la organización",
+          });
           setCurrent("org");
           return;
         }
@@ -158,7 +172,10 @@ export default function OnboardingPage() {
 
       // Crear finca
       if (!farmDraft.name || !farmDraft.code) {
-        addToast({ variant: "warning", title: "Completa nombre y código de la finca" });
+        addToast({
+          variant: "warning",
+          title: "Completa nombre y código de la finca",
+        });
         setCurrent("farm");
         return;
       }
@@ -189,7 +206,11 @@ export default function OnboardingPage() {
       });
       addToast({ variant: "success", title: "¡Todo listo!" });
     } catch (e: any) {
-      addToast({ variant: "error", title: "No se pudo completar", description: e?.message });
+      addToast({
+        variant: "error",
+        title: "No se pudo completar",
+        description: e?.message,
+      });
     }
   }
 
@@ -199,11 +220,33 @@ export default function OnboardingPage() {
     <div className="min-h-screen p-6">
       <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-[260px,1fr] gap-6">
         <aside className="bg-white border rounded-2xl p-4 h-fit">
-          <div className="text-xs uppercase tracking-wide text-neutral-500 mb-3">Onboarding</div>
+          <div className="text-xs uppercase tracking-wide text-neutral-500 mb-3">
+            Onboarding
+          </div>
           <nav className="space-y-2">
-            <StepItem index={1} title="Organización" active={current === "org"} done={current !== "org" && (!!orgDraft.name || alreadyHasOrg)} onClick={() => setCurrent("org")} />
-            <StepItem index={2} title="Finca" active={current === "farm"} done={current === "confirm" || (!!farmDraft.name && !!farmDraft.code)} onClick={() => setCurrent("farm")} />
-            <StepItem index={3} title="Vincular & Confirmar" active={current === "confirm"} done={!!created} onClick={() => setCurrent("confirm")} />
+            <StepItem
+              index={1}
+              title="Organización"
+              active={current === "org"}
+              done={current !== "org" && (!!orgDraft.name || alreadyHasOrg)}
+              onClick={() => setCurrent("org")}
+            />
+            <StepItem
+              index={2}
+              title="Finca"
+              active={current === "farm"}
+              done={
+                current === "confirm" || (!!farmDraft.name && !!farmDraft.code)
+              }
+              onClick={() => setCurrent("farm")}
+            />
+            <StepItem
+              index={3}
+              title="Vincular & Confirmar"
+              active={current === "confirm"}
+              done={!!created}
+              onClick={() => setCurrent("confirm")}
+            />
           </nav>
         </aside>
 
@@ -211,20 +254,35 @@ export default function OnboardingPage() {
           {current === "org" && (
             <Card>
               <CardContent>
-                <h2 className="text-xl font-semibold mb-2">Paso 1: Crea tu organización</h2>
+                <h2 className="text-xl font-semibold mb-2">
+                  Paso 1: Crea tu organización
+                </h2>
                 {alreadyHasOrg ? (
-                  <p className="text-neutral-600">Ya perteneces a <span className="font-medium">{myOrgs?.[0]?.name}</span>. Puedes continuar.</p>
+                  <p className="text-neutral-600">
+                    Ya perteneces a{" "}
+                    <span className="font-medium">{myOrgs?.[0]?.name}</span>.
+                    Puedes continuar.
+                  </p>
                 ) : (
                   <div className="grid gap-3 max-w-md">
                     <Input
                       label="Nombre de la organización"
                       placeholder="Ganadera La Primavera"
                       value={orgDraft.name}
-                      onChange={(e) => setOrgDraft({ name: (e.target as HTMLInputElement).value })}
+                      onChange={(e) =>
+                        setOrgDraft({
+                          name: (e.target as HTMLInputElement).value,
+                        })
+                      }
                       required
                     />
                     <div className="flex justify-end">
-                      <Button color="primary" onPress={() => setCurrent("farm")}>Continuar</Button>
+                      <Button
+                        color="primary"
+                        onPress={() => setCurrent("farm")}
+                      >
+                        Continuar
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -235,26 +293,48 @@ export default function OnboardingPage() {
           {current === "farm" && (
             <Card>
               <CardContent>
-                <h2 className="text-xl font-semibold mb-2">Paso 2: Tu primera finca</h2>
+                <h2 className="text-xl font-semibold mb-2">
+                  Paso 2: Tu primera finca
+                </h2>
                 <div className="grid gap-3 max-w-md">
                   <Input
                     label="Nombre de la finca"
                     placeholder="Hacienda La Esmeralda"
                     value={farmDraft.name}
-                    onChange={(e) => setFarmDraft({ ...farmDraft, name: (e.target as HTMLInputElement).value })}
+                    onChange={(e) =>
+                      setFarmDraft({
+                        ...farmDraft,
+                        name: (e.target as HTMLInputElement).value,
+                      })
+                    }
                     required
                   />
                   <Input
                     label="Código de la finca"
                     placeholder="fn-hacienda-la-esmeralda"
                     value={farmDraft.code}
-                    onChange={(e) => setFarmDraft({ ...farmDraft, code: (e.target as HTMLInputElement).value })}
+                    onChange={(e) =>
+                      setFarmDraft({
+                        ...farmDraft,
+                        code: (e.target as HTMLInputElement).value,
+                      })
+                    }
                     required
                   />
-                  <div className="text-xs text-neutral-500">Se genera automáticamente a partir del nombre. Puedes editarlo si lo prefieres.</div>
+                  <div className="text-xs text-neutral-500">
+                    Se genera automáticamente a partir del nombre. Puedes
+                    editarlo si lo prefieres.
+                  </div>
                   <div className="flex justify-between">
-                    <Button variant="flat" onPress={() => setCurrent("org")}>Atrás</Button>
-                    <Button color="primary" onPress={() => setCurrent("confirm")}>Continuar</Button>
+                    <Button variant="flat" onPress={() => setCurrent("org")}>
+                      Atrás
+                    </Button>
+                    <Button
+                      color="primary"
+                      onPress={() => setCurrent("confirm")}
+                    >
+                      Continuar
+                    </Button>
                   </div>
                 </div>
               </CardContent>
@@ -264,61 +344,101 @@ export default function OnboardingPage() {
           {current === "confirm" && (
             <Card>
               <CardContent>
-                <h2 className="text-xl font-semibold mb-3">Paso 3: Vincula tu dispositivo y confirma</h2>
+                <h2 className="text-xl font-semibold mb-3">
+                  Paso 3: Vincula tu dispositivo y confirma
+                </h2>
                 {!created ? (
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-3">
                       <div className="text-sm font-medium">Resumen</div>
                       <div className="rounded-xl border p-3 bg-white">
-                        <div className="text-xs uppercase text-neutral-500 mb-2">Organización</div>
+                        <div className="text-xs uppercase text-neutral-500 mb-2">
+                          Organización
+                        </div>
                         <Input
                           label="Nombre"
                           placeholder="Ganadera La Primavera"
-                          value={alreadyHasOrg ? myOrgs?.[0]?.name ?? "" : orgDraft.name}
-                          onChange={(e) => !alreadyHasOrg && setOrgDraft({ name: (e.target as HTMLInputElement).value })}
+                          value={
+                            alreadyHasOrg
+                              ? myOrgs?.[0]?.name ?? ""
+                              : orgDraft.name
+                          }
+                          onChange={(e) =>
+                            !alreadyHasOrg &&
+                            setOrgDraft({
+                              name: (e.target as HTMLInputElement).value,
+                            })
+                          }
                           disabled={alreadyHasOrg}
                         />
                         <div className="h-3" />
-                        <div className="text-xs uppercase text-neutral-500 mb-2">Finca</div>
+                        <div className="text-xs uppercase text-neutral-500 mb-2">
+                          Finca
+                        </div>
                         <Input
                           label="Nombre"
                           placeholder="Hacienda La Esmeralda"
                           value={farmDraft.name}
-                          onChange={(e) => setFarmDraft({ ...farmDraft, name: (e.target as HTMLInputElement).value })}
+                          onChange={(e) =>
+                            setFarmDraft({
+                              ...farmDraft,
+                              name: (e.target as HTMLInputElement).value,
+                            })
+                          }
                         />
                         <div className="h-2" />
                         <Input
                           label="Código"
                           placeholder="fn-hacienda-la-esmeralda"
                           value={farmDraft.code}
-                          onChange={(e) => setFarmDraft({ ...farmDraft, code: (e.target as HTMLInputElement).value })}
+                          onChange={(e) =>
+                            setFarmDraft({
+                              ...farmDraft,
+                              code: (e.target as HTMLInputElement).value,
+                            })
+                          }
                         />
                       </div>
                     </div>
 
                     <div className="space-y-3">
-                      <div className="text-sm font-medium">Vincular dispositivo</div>
+                      <div className="text-sm font-medium">
+                        Vincular dispositivo
+                      </div>
                       <div className="rounded-xl border p-3 bg-white">
-                        <p className="text-neutral-600 mb-2 text-sm">Vincula este equipo para acceso sin conexión. Puedes crear una clave local ahora o saltar este paso.</p>
+                        <p className="text-neutral-600 mb-2 text-sm">
+                          Vincula este equipo para acceso sin conexión. Puedes
+                          crear una clave local ahora o saltar este paso.
+                        </p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
                           <Input
                             type="password"
                             label="Clave local (mín. 6)"
                             placeholder="••••••"
                             value={passA}
-                            onChange={(e) => setPassA((e.target as HTMLInputElement).value)}
+                            onChange={(e) =>
+                              setPassA((e.target as HTMLInputElement).value)
+                            }
                           />
                           <Input
                             type="password"
                             label="Confirmar clave"
                             placeholder="••••••"
                             value={passB}
-                            onChange={(e) => setPassB((e.target as HTMLInputElement).value)}
+                            onChange={(e) =>
+                              setPassB((e.target as HTMLInputElement).value)
+                            }
                           />
                         </div>
                         <div className="flex gap-2 flex-wrap">
                           <Button asChild>
-                            <a href="/download" target="_blank" rel="noreferrer">Descargar app</a>
+                            <a
+                              href="/download"
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Descargar app
+                            </a>
                           </Button>
                           <Button
                             color="secondary"
@@ -329,39 +449,80 @@ export default function OnboardingPage() {
                           </Button>
                         </div>
                         {deviceLinked && (
-                          <div className="mt-2 text-xs text-green-700">Dispositivo vinculado correctamente.</div>
+                          <div className="mt-2 text-xs text-green-700">
+                            Dispositivo vinculado correctamente.
+                          </div>
                         )}
                       </div>
 
                       <div className="flex justify-between pt-1">
-                        <Button variant="flat" onPress={() => setCurrent("farm")}>Atrás</Button>
-                        <Button color="primary" onPress={handleConfirmAndCreate} isLoading={createOrg.isPending || createFarm.isPending}>Crear y continuar</Button>
+                        <Button
+                          variant="flat"
+                          onPress={() => setCurrent("farm")}
+                        >
+                          Atrás
+                        </Button>
+                        <Button
+                          color="primary"
+                          onPress={handleConfirmAndCreate}
+                          isLoading={
+                            createOrg.isPending || createFarm.isPending
+                          }
+                        >
+                          Crear y continuar
+                        </Button>
                       </div>
                     </div>
                   </div>
                 ) : (
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="rounded-xl border p-4 bg-white">
-                      <div className="text-sm font-semibold mb-2">¡Listo! Se creó tu espacio</div>
-                      <div className="text-sm text-neutral-700">Organización: <span className="font-medium">{created.orgName}</span></div>
-                      <div className="text-sm text-neutral-700">Finca: <span className="font-medium">{created.farmName}</span> (<span className="font-mono">{created.farmCode}</span>)</div>
+                      <div className="text-sm font-semibold mb-2">
+                        ¡Listo! Se creó tu espacio
+                      </div>
+                      <div className="text-sm text-neutral-700">
+                        Organización:{" "}
+                        <span className="font-medium">{created.orgName}</span>
+                      </div>
+                      <div className="text-sm text-neutral-700">
+                        Finca:{" "}
+                        <span className="font-medium">{created.farmName}</span>{" "}
+                        (<span className="font-mono">{created.farmCode}</span>)
+                      </div>
                     </div>
                     <div className="rounded-xl border p-4 bg-white">
-                      <div className="text-sm font-semibold mb-2">Vincular dispositivo</div>
+                      <div className="text-sm font-semibold mb-2">
+                        Vincular dispositivo
+                      </div>
                       <div className="flex gap-2 flex-wrap">
                         <Button asChild>
-                          <a href="/download" target="_blank" rel="noreferrer">Descargar app</a>
+                          <a href="/download" target="_blank" rel="noreferrer">
+                            Descargar app
+                          </a>
                         </Button>
-                        <Button color="secondary" onPress={() => handleLinkDevice(created.orgId)} isLoading={registerDevice.isPending}>
-                          {deviceLinked ? "Vinculado" : "Vincular este dispositivo"}
+                        <Button
+                          color="secondary"
+                          onPress={() => handleLinkDevice(created.orgId)}
+                          isLoading={registerDevice.isPending}
+                        >
+                          {deviceLinked
+                            ? "Vinculado"
+                            : "Vincular este dispositivo"}
                         </Button>
                       </div>
                       {deviceLinked && (
-                        <div className="mt-2 text-xs text-green-700">Dispositivo vinculado correctamente.</div>
+                        <div className="mt-2 text-xs text-green-700">
+                          Dispositivo vinculado correctamente.
+                        </div>
                       )}
                     </div>
                     <div className="md:col-span-2 flex justify-end">
-                      <Button color="primary" onPress={() => router.replace("/")}>Ir al dashboard</Button>
+                      <Button
+                        color="primary"
+                        onPress={() => router.replace("/")}
+                      >
+                        Ir al dashboard
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -402,7 +563,11 @@ function StepItem({
       <div className="flex items-center gap-2">
         <div
           className={`w-6 h-6 grid place-items-center rounded-full text-xs font-semibold ${
-            done ? "bg-green-600 text-white" : active ? "bg-primary-600 text-white" : "bg-neutral-200 text-neutral-700"
+            done
+              ? "bg-green-600 text-white"
+              : active
+              ? "bg-primary-600 text-white"
+              : "bg-neutral-200 text-neutral-700"
           }`}
         >
           {done ? "✓" : index}

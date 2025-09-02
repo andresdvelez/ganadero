@@ -23,7 +23,11 @@ export function OnboardingGate() {
   // En Tauri (desktop), si la API TRPC se está enrutando al remoto (por falta de token local),
   // no bloqueemos por navigator.onLine. Permitimos consulta aunque estemos online/offline.
   const isTauri = typeof window !== "undefined" && (window as any).__TAURI__;
-  const enabledCheck = isLoaded && isSignedIn === true && (isTauri || (typeof navigator !== "undefined" && navigator.onLine));
+  // Coerce a boolean estrictamente; evitar undefined que rompe React Query "enabled"
+  const enabledCheck =
+    !!isLoaded &&
+    isSignedIn === true &&
+    (isTauri || (typeof navigator !== "undefined" && navigator.onLine));
 
   const {
     data: orgs,
@@ -54,7 +58,8 @@ export function OnboardingGate() {
       // Skip other allowed routes
       if (ALLOW_ROUTES.some((p) => pathname?.startsWith(p))) return;
       if (!isLoaded || !isSignedIn) return;
-      if (!isTauri && typeof navigator !== "undefined" && !navigator.onLine) return; // offline web: deja a AuthGate
+      if (!isTauri && typeof navigator !== "undefined" && !navigator.onLine)
+        return; // offline web: deja a AuthGate
 
       // Si hubo error al consultar, no forzar onboarding (permitir navegación normal)
       if (error) return;
