@@ -47,6 +47,12 @@ export default function RootLayout({
       clearAndReload();
     }
   });
+  window.addEventListener('unhandledrejection', function(e){
+    try{
+      var msg = (e && e.reason && (e.reason.message||e.reason.toString())) || '';
+      if(msg.includes('ChunkLoadError') || msg.includes('Loading chunk')){ clearAndReload(); }
+    }catch{}
+  });
   // En Tauri, desregistrar SW al inicio para evitar Workbox 404
   try{ if(window.__TAURI__){ navigator.serviceWorker?.getRegistrations().then(rs=>Promise.all(rs.map(r=>r.unregister()))); } }catch{}
 })();
