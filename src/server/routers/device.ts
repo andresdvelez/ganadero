@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { prisma } from "@/lib/prisma";
+import { clerkClient } from "@clerk/nextjs/server";
 
 export const deviceRouter = createTRPCRouter({
   register: protectedProcedure
@@ -14,8 +15,30 @@ export const deviceRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const clerkId = ctx.userId!;
-      const me = await prisma.user.findUnique({ where: { clerkId } });
-      if (!me) throw new Error("Usuario no encontrado");
+      let me = await prisma.user.findUnique({ where: { clerkId } });
+      if (!me) {
+        // Fallback: intenta provisionar el usuario desde Clerk (como en org.myOrganizations)
+        try {
+          const client = await clerkClient();
+          const user = await client.users.getUser(clerkId);
+          const primaryEmailId = user.primaryEmailAddressId;
+          const emailFromPrimary = user.emailAddresses?.find(
+            (e) => e.id === primaryEmailId
+          )?.emailAddress;
+          const fallbackEmail = user.emailAddresses?.[0]?.emailAddress;
+          const email =
+            emailFromPrimary || fallbackEmail || `user_${clerkId}@ganado.ai`;
+          const fullName =
+            [user.firstName, user.lastName].filter(Boolean).join(" ") || null;
+          me = await prisma.user.upsert({
+            where: { email },
+            update: { clerkId, name: fullName ?? undefined },
+            create: { clerkId, email, name: fullName },
+          });
+        } catch (_e) {
+          throw new Error("Usuario no encontrado");
+        }
+      }
 
       // If orgId provided, verify membership
       if (input.orgId) {
@@ -60,7 +83,9 @@ export const deviceRouter = createTRPCRouter({
       platform: d.platform,
       orgId: d.orgId,
       hasPasscode: (d as any).hasPasscode ?? false,
-      resetPending: Boolean(d.resetCode && d.resetCodeExpiresAt && d.resetCodeExpiresAt > new Date()),
+      resetPending: Boolean(
+        d.resetCode && d.resetCodeExpiresAt && d.resetCodeExpiresAt > new Date()
+      ),
     }));
   }),
 
@@ -72,7 +97,9 @@ export const deviceRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const me = await prisma.user.findUnique({ where: { clerkId: ctx.userId! } });
+      const me = await prisma.user.findUnique({
+        where: { clerkId: ctx.userId! },
+      });
       if (!me) throw new Error("Usuario no encontrado");
       await prisma.device.update({
         where: { deviceId: input.deviceId },
@@ -84,10 +111,15 @@ export const deviceRouter = createTRPCRouter({
   requestPasscodeReset: protectedProcedure
     .input(z.object({ deviceId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const me = await prisma.user.findUnique({ where: { clerkId: ctx.userId! } });
+      const me = await prisma.user.findUnique({
+        where: { clerkId: ctx.userId! },
+      });
       if (!me) throw new Error("Usuario no encontrado");
-      const dev = await prisma.device.findUnique({ where: { deviceId: input.deviceId } });
-      if (!dev || dev.userId !== me.id) throw new Error("Dispositivo no encontrado");
+      const dev = await prisma.device.findUnique({
+        where: { deviceId: input.deviceId },
+      });
+      if (!dev || dev.userId !== me.id)
+        throw new Error("Dispositivo no encontrado");
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       const expires = new Date(Date.now() + 15 * 60 * 1000);
       await prisma.device.update({
@@ -99,14 +131,17 @@ export const deviceRouter = createTRPCRouter({
     }),
 
   resetPasscode: protectedProcedure
-    .input(
-      z.object({ deviceId: z.string(), code: z.string().length(6) })
-    )
+    .input(z.object({ deviceId: z.string(), code: z.string().length(6) }))
     .mutation(async ({ ctx, input }) => {
-      const me = await prisma.user.findUnique({ where: { clerkId: ctx.userId! } });
+      const me = await prisma.user.findUnique({
+        where: { clerkId: ctx.userId! },
+      });
       if (!me) throw new Error("Usuario no encontrado");
-      const dev = await prisma.device.findUnique({ where: { deviceId: input.deviceId } });
-      if (!dev || dev.userId !== me.id) throw new Error("Dispositivo no encontrado");
+      const dev = await prisma.device.findUnique({
+        where: { deviceId: input.deviceId },
+      });
+      if (!dev || dev.userId !== me.id)
+        throw new Error("Dispositivo no encontrado");
       const valid =
         dev.resetCode === input.code &&
         !!dev.resetCodeExpiresAt &&
@@ -122,10 +157,15 @@ export const deviceRouter = createTRPCRouter({
   delete: protectedProcedure
     .input(z.object({ deviceId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const me = await prisma.user.findUnique({ where: { clerkId: ctx.userId! } });
+      const me = await prisma.user.findUnique({
+        where: { clerkId: ctx.userId! },
+      });
       if (!me) throw new Error("Usuario no encontrado");
-      const dev = await prisma.device.findUnique({ where: { deviceId: input.deviceId } });
-      if (!dev || dev.userId !== me.id) throw new Error("Dispositivo no encontrado");
+      const dev = await prisma.device.findUnique({
+        where: { deviceId: input.deviceId },
+      });
+      if (!dev || dev.userId !== me.id)
+        throw new Error("Dispositivo no encontrado");
       await prisma.device.delete({ where: { deviceId: input.deviceId } });
       return { ok: true };
     }),
