@@ -300,27 +300,31 @@ fn main() {
       if let Some(win) = app.get_window("main") {
         let w = win.clone();
         tauri::async_runtime::spawn(async move {
-          // Esperar hasta 30s por disponibilidad HTTP real del standalone (manifest.webmanifest)
+          // Esperar readiness REAL del standalone: requerir 200 en '/'
           let client = reqwest::Client::new();
           let mut attempts: u32 = 0;
-          let max_attempts: u32 = 60; // 60 * 500ms = 30s
+          let max_attempts: u32 = 80; // ~24s (80*300ms)
           let mut ready = false;
           while attempts < max_attempts {
-            let url = format!("http://127.0.0.1:{}/manifest.webmanifest", port);
+            let url = format!("http://127.0.0.1:{}/", port);
             match client.get(&url)
               .header("Cache-Control", "no-store")
               .send().await {
               Ok(resp) => {
-                let code = resp.status().as_u16();
-                if resp.status().is_success() || code == 404 || code == 405 {
-                  ready = true;
-                  break;
+                if resp.status().is_success() {
+                  // Chequear cuerpo básico HTML para evitar redirección prematura con bundles no listos
+                  if let Ok(text) = resp.text().await {
+                    if text.contains("<!DOCTYPE html") || text.contains("<html") {
+                      ready = true;
+                      break;
+                    }
+                  }
                 }
               }
               Err(_) => {}
             }
             attempts += 1;
-            sleep(std::time::Duration::from_millis(500)).await;
+            sleep(std::time::Duration::from_millis(300)).await;
           }
 
           if ready {
