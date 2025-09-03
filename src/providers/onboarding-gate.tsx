@@ -53,32 +53,18 @@ export function OnboardingGate() {
         return;
       }
 
-      // En app de escritorio (Tauri), no forzar redirecciones automáticas de onboarding.
-      // El flujo de onboarding se inicia solo cuando el usuario navega explícitamente.
-      if (isTauri) return;
-
       // Skip other allowed routes
       if (ALLOW_ROUTES.some((p) => pathname?.startsWith(p))) return;
       if (!isLoaded || !isSignedIn) return;
       if (!isTauri && typeof navigator !== "undefined" && !navigator.onLine)
         return; // offline web: deja a AuthGate
 
-      // Si hubo error al consultar, no forzar onboarding (permitir navegación normal)
-      if (error) return;
-      // Solo decidir cuando hay datos definidos
+      // Determinar si la cuenta ya tiene organización
       const hasOrg = Array.isArray(orgs) && orgs.length > 0;
 
-      // Web: Redirigir a onboarding únicamente desde la raíz
-      // y solo una vez por usuario (evitar bucles si hay fallas intermitentes en orgs)
-      if (pathname === "/" && Array.isArray(orgs) && !hasOrg) {
-        const key = userId ? `onboarding:redir:${userId}` : null;
-        try {
-          if (key) {
-            const already = localStorage.getItem(key);
-            if (already === "1") return;
-            localStorage.setItem(key, "1");
-          }
-        } catch {}
+      // Si hay error de consulta o no hay orgs, redirigir SIEMPRE a onboarding
+      // (obligatorio completar onboarding para acceder a la plataforma)
+      if ((!hasOrg || error) && pathname !== "/onboarding") {
         router.replace("/onboarding");
       }
     })();
