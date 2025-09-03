@@ -329,7 +329,17 @@ fn main() {
 
           if ready {
             let _ = w.eval(&format!(
-              "(function(){{console.log('[GanadoAI] Local server ready on {0}'); window.location.replace('http://127.0.0.1:{0}/');}})();",
+              "(function(){{
+                try{{
+                  // Limpieza defensiva antes de la primera navegación para evitar chunks stale
+                  if('caches' in window){{caches.keys().then(keys=>Promise.all(keys.map(k=>caches.delete(k)))).catch(()=>{{}});}}
+                  try{{navigator.serviceWorker?.getRegistrations().then(rs=>Promise.all(rs.map(r=>r.unregister())));}}catch{{}}
+                  try{{localStorage.removeItem('NEXT_CACHE');}}catch{{}}
+                }}catch{{}}
+                var ts=Date.now();
+                console.log('[GanadoAI] Local server ready on {0}, navigating with bust=',ts);
+                window.location.replace('http://127.0.0.1:{0}/?v='+ts);
+              }})();",
               port
             ));
           } else {
