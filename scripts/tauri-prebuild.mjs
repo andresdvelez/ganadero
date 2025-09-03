@@ -30,14 +30,14 @@ if (process.env.TAURI !== '1' && process.env.TAURI !== 'true') {
 
 // Mantener las rutas; no hacer renombres para Tauri
 
-// Copiar logo y recursos necesarios a dist para la splash offline
+// Copiar recursos necesarios a dist para la splash offline
 try {
   fs.mkdirSync(tauriDistDir, { recursive: true });
-  const logoSrc = path.join(publicDir, 'logo.png');
-  const logoDst = path.join(tauriDistDir, 'logo.png');
-  if (fs.existsSync(logoSrc)) {
-    fs.copyFileSync(logoSrc, logoDst);
-    console.log('[prebuild] Copied public/logo.png -> src-tauri/dist/logo.png');
+  const splashSrc = path.join(publicDir, 'brand', 'splash-screen.jpeg');
+  const splashDst = path.join(tauriDistDir, 'splash-screen.jpeg');
+  if (fs.existsSync(splashSrc)) {
+    fs.copyFileSync(splashSrc, splashDst);
+    console.log('[prebuild] Copied public/brand/splash-screen.jpeg -> src-tauri/dist/splash-screen.jpeg');
   }
 } catch (e) {
   console.warn('[prebuild] Could not copy splash assets:', e?.message || e);
