@@ -104,11 +104,13 @@ export const orgRouter = createTRPCRouter({
             },
           });
         } catch (e: any) {
-          const hint =
-            (e && (e.message || e.toString())) || "Fallo al consultar Clerk";
-          throw new Error(
-            `Usuario no encontrado (auth). Verifica sesión de Clerk o token. Detalle: ${hint}`
-          );
+          // Fallback offline/Clerk down: crear usuario placeholder local para no bloquear onboarding
+          const placeholderEmail = `user_${clerkId}@ganado.ai`;
+          me = await prisma.user.upsert({
+            where: { clerkId },
+            update: {},
+            create: { clerkId, email: placeholderEmail, name: null },
+          });
         }
       }
       const org = await prisma.organization.create({
