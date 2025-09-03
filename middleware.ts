@@ -17,6 +17,11 @@ const isPublicRoute = createRouteMatcher([
 export default clerkMiddleware(async (auth, req) => {
   const { pathname } = req.nextUrl;
 
+  // Salir inmediatamente para recursos de Next estáticos
+  if (pathname.startsWith("/_next/")) {
+    return NextResponse.next();
+  }
+
   // Redirect legacy /_/ paths to clean paths
   if (pathname.startsWith("/_/download")) {
     const url = req.nextUrl.clone();
@@ -53,7 +58,7 @@ export default clerkMiddleware(async (auth, req) => {
 
 export const config = {
   matcher: [
-    // Skip Next.js internals and all static files, unless found in search params
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    // Excluir explícitamente recursos internos de Next y APIs
+    "/((?!api|trpc|_next/static|_next/image|_next/webpack-hmr|favicon.ico|sw.js|workbox-.*|manifest.json).*)",
   ],
 };
