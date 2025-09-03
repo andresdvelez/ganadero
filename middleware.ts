@@ -17,6 +17,11 @@ const isPublicRoute = createRouteMatcher([
 export default clerkMiddleware(async (auth, req) => {
   const { pathname } = req.nextUrl;
 
+  // En Tauri (app de escritorio), no aplicar autenticación ni redirecciones desde middleware
+  if (process.env.TAURI === "1" || process.env.TAURI === "true") {
+    return NextResponse.next();
+  }
+
   // Salir inmediatamente para recursos de Next estáticos
   if (pathname.startsWith("/_next/")) {
     return NextResponse.next();
