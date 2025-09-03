@@ -32,9 +32,13 @@ export function HeroModal({
     document.body.appendChild(container);
     containerRef.current = container;
     return () => {
-      document.body.removeChild(container);
+      try {
+        if (container.parentNode) document.body.removeChild(container);
+      } catch {}
       containerRef.current = null;
-      if (previouslyFocused.current) previouslyFocused.current.focus?.();
+      try {
+        if (previouslyFocused.current) previouslyFocused.current.focus?.();
+      } catch {}
     };
   }, [open]);
 
