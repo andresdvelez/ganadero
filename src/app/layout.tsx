@@ -53,7 +53,14 @@ export default function RootLayout({
 (function(){
   // Ocultar splash al finalizar carga o tras un pequeño delay de seguridad
   function hideSplash(){
-    try{ var el = document.getElementById('__splash'); if(!el) return; el.style.opacity='0'; el.style.transition='opacity 260ms ease'; setTimeout(function(){ el.parentNode && el.parentNode.removeChild(el); }, 280); }catch{}
+    try{
+      var el = document.getElementById('__splash');
+      if(!el) return;
+      el.style.opacity='0';
+      el.style.transition='opacity 260ms ease';
+      // No remover el nodo para no interferir con la hidratación/insertBefore de React
+      setTimeout(function(){ try{ el.style.display='none'; el.setAttribute('aria-hidden','true'); }catch{} }, 280);
+    }catch{}
   }
   if(document.readyState==='complete') { hideSplash(); }
   else { window.addEventListener('load', hideSplash); setTimeout(hideSplash, 1800); }
