@@ -24,15 +24,7 @@ export default function AuthSignInPage() {
   if (online)
     return (
       <div className="min-h-screen relative bg-[radial-gradient(1200px_600px_at_50%_-10%,_#ffffff_0%,_#f2f2f2_60%,_#f2f2f2_100%)]">
-        <div className="absolute left-6 top-6 flex items-center gap-3">
-          <Image
-            src="/brand/ganado_logo_full.svg"
-            alt="Ganado AI"
-            width={164}
-            height={48}
-            priority
-          />
-        </div>
+        {/* Logo se muestra desde el layout del grupo (auth) */}
         <div className="min-h-screen grid place-items-center px-4">
           <div className="w-full max-w-md">
             <SignIn
@@ -63,15 +55,7 @@ export default function AuthSignInPage() {
 
   return (
     <div className="min-h-screen relative bg-[radial-gradient(1200px_600px_at_50%_-10%,_#ffffff_0%,_#f2f2f2_60%,_#f2f2f2_100%)]">
-      <div className="absolute left-6 top-6 flex items-center gap-3">
-        <Image
-          src="/brand/ganado_logo_full.svg"
-          alt="Ganado AI"
-          width={164}
-          height={48}
-          priority
-        />
-      </div>
+      {/* Logo provisto por el layout */}
       <div className="min-h-screen grid place-items-center px-4">
         <div className="w-full max-w-md rounded-2xl border border-neutral-200 bg-white p-6 shadow-xl">
           <h1 className="text-xl font-semibold mb-2 text-[#1c2c24]">
