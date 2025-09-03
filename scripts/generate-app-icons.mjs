@@ -6,7 +6,8 @@ import sharp from "sharp";
 const projectRoot = process.cwd();
 const publicDir = path.join(projectRoot, "public");
 const tauriIconsDir = path.join(projectRoot, "src-tauri", "icons");
-const sourceImage = path.join(publicDir, "brand", "app-logo.jpeg");
+// Nueva imagen base solicitada por el usuario
+const sourceImage = path.join(publicDir, "brand", "app-icon.png");
 
 async function ensureDir(dir) {
   await fs.promises.mkdir(dir, { recursive: true });
