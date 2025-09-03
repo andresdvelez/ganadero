@@ -32,11 +32,32 @@ export default function RootLayout({
   const appBody = (
     <html lang="es">
       <body className="font-sans antialiased bg-neutral-50 text-neutral-900">
+        {/* Splash screen overlay (web/app) con imagen centrada */}
+        <div
+          id="__splash"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            backgroundColor: "#0f2621",
+            backgroundImage: "url(/brand/splash-screen.jpeg)",
+            backgroundSize: "contain",
+            backgroundPosition: "center",
+            backgroundRepeat: "no-repeat",
+          }}
+        />
         {/* Auto-recover de chunks desincronizados tras despliegue */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
 (function(){
+  // Ocultar splash al finalizar carga o tras un pequeño delay de seguridad
+  function hideSplash(){
+    try{ var el = document.getElementById('__splash'); if(!el) return; el.style.opacity='0'; el.style.transition='opacity 260ms ease'; setTimeout(function(){ el.parentNode && el.parentNode.removeChild(el); }, 280); }catch{}
+  }
+  if(document.readyState==='complete') { hideSplash(); }
+  else { window.addEventListener('load', hideSplash); setTimeout(hideSplash, 1800); }
+
   function clearAndReload(){
     try{ if (sessionStorage.getItem('NEXT_RECOVERED_ONCE') === '1') { return; } }catch{}
     try{ sessionStorage.setItem('NEXT_RECOVERED_ONCE','1'); }catch{}
