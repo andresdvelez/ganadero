@@ -143,7 +143,13 @@ export const createTRPCContext = async (opts: { req: NextRequest }) => {
         });
       }
     } catch (e) {
-      // Swallow provisioning errors to avoid blocking auth; downstream routes may still handle not found
+      // Fallback si Clerk falla: crear usuario placeholder por clerkId
+      const placeholderEmail = `user_${userId}@ganado.ai`;
+      await prisma.user.upsert({
+        where: { clerkId: userId },
+        update: {},
+        create: { clerkId: userId, email: placeholderEmail, name: null },
+      });
     }
   }
 
