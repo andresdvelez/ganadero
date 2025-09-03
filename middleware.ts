@@ -62,8 +62,8 @@ export default clerkMiddleware(async (auth, req) => {
 });
 
 export const config = {
-  matcher: [
-    // Excluir explícitamente recursos internos de Next y APIs
-    "/((?!api|trpc|_next/static|_next/image|_next/webpack-hmr|favicon.ico|sw.js|workbox-.*|manifest.json).*)",
-  ],
+  matcher:
+    process.env.TAURI === "1" || process.env.TAURI === "true"
+      ? []
+      : ["/((?!_next|.*\\..*|api|trpc).*)"],
 };
