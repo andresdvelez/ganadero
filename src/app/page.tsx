@@ -14,6 +14,7 @@ export default function Page() {
   const inventory = trpc.inventory.kpis.useQuery({}, { enabled: true });
   const milkList = trpc.milk.list.useQuery({ limit: 50 }, { enabled: true });
   const weightsQ = trpc.weights.listWeights.useQuery({ limit: 200 }, { enabled: true });
+  const pastures = trpc.pasture.getAll.useQuery();
 
   const RevenueChart = dynamic(() => import("@/components/embedded/_charts/revenue-chart"), { ssr: false, loading: () => <div className="text-sm text-neutral-500">Cargando gráfico…</div> });
   const IncomeExpenseLines = dynamic(() => import("@/components/embedded/_charts/income-expense-lines"), { ssr: false, loading: () => <div className="text-sm text-neutral-500">Cargando gráfico…</div> });
@@ -129,7 +130,23 @@ export default function Page() {
           <div className="rounded-xl border bg-white p-4">
             <div className="font-medium mb-2">Ocupación de potreros</div>
             <Suspense>
-              <PastureOccupancy data={(inventory.data?.pastureOccupancy || []).map((p: any) => ({ pasture: p.name, occupancy: p.occupancy }))} />
+              <PastureOccupancy
+                data={(pastures.data || []).map((p: any) => ({
+                  pasture: p.name,
+                  occupancy: p.occupancySince
+                    ? Math.min(
+                        100,
+                        Math.max(
+                          0,
+                          Math.round(
+                            (Date.now() - new Date(p.occupancySince).getTime()) /
+                              (24 * 60 * 60 * 1000)
+                          )
+                        )
+                      )
+                    : 0,
+                }))}
+              />
             </Suspense>
           </div>
         </div>
