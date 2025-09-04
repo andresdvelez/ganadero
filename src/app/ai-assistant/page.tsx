@@ -322,6 +322,17 @@ export default function AIAssistantPage() {
     return () => window.removeEventListener("open-modules", handler as any);
   }, []);
 
+  // FAB para nuevo chat (UX: esquina inferior derecha)
+  const FabNewChat = () => (
+    <button
+      className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-neutral-900 text-white shadow-lg hover:scale-105 active:scale-95 transition-all ios-surface"
+      title="Nuevo chat"
+      onClick={() => window.dispatchEvent(new Event("ai-new-chat"))}
+    >
+      <span className="text-2xl leading-none">+</span>
+    </button>
+  );
+
   const scrollToBottom = () =>
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   useEffect(scrollToBottom, [messages, inlineTool]);
@@ -4841,6 +4852,14 @@ export default function AIAssistantPage() {
           </div>
         </HeroDrawer>
       </div>
+      {/* Botón flotante para nuevo chat */}
+      <button
+        className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-neutral-900 text-white shadow-lg hover:scale-105 active:scale-95 transition-all ios-surface"
+        title="Nuevo chat"
+        onClick={() => window.dispatchEvent(new Event("ai-new-chat"))}
+      >
+        <span className="text-2xl leading-none">+</span>
+      </button>
     </DashboardLayout>
   );
 }
