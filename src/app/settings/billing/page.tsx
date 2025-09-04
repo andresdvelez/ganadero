@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { addToast } from "@/components/ui/toast";
 
-export default function BillingPage() {
+export const dynamic = "force-dynamic";
+
+function BillingInner() {
   const params = useSearchParams();
   const welcome = params.get("welcome");
   const orgs = trpc.org.myOrganizations.useQuery();
@@ -113,6 +115,14 @@ export default function BillingPage() {
         Si ya realizaste el pago y no ves tu plan activo, espera unos segundos o recarga esta página.
       </div>
     </div>
+  );
+}
+
+export default function BillingPage() {
+  return (
+    <Suspense fallback={<div className="max-w-5xl mx-auto p-6">Cargando facturación…</div>}>
+      <BillingInner />
+    </Suspense>
   );
 }
 
