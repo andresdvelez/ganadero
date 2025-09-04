@@ -39,7 +39,6 @@ import { trpc } from "@/lib/trpc/client";
 import { AnimalNewEmbedded } from "@/components/embedded/animal-new-embedded";
 import { AIAssistantDashboard } from "@/components/ai/ai-dashboard";
 import { AIInputBar } from "@/components/ai/ai-input-bar";
-import { AISidebar } from "@/components/ai/ai-sidebar";
 import { ModuleLauncher } from "@/components/modules/module-launcher";
 import { HealthNewEmbedded } from "@/components/embedded/health-new-embedded";
 import { MilkNewEmbedded } from "@/components/embedded/milk-new-embedded";
@@ -188,7 +187,6 @@ export default function AIAssistantPage() {
 
   // New TRPC hooks for AI context/memories
   const recordMessage = trpc.ai.recordMessage.useMutation();
-  const utils = trpc.useUtils();
   const confirmMemories = trpc.ai.confirmMemories.useMutation();
   const summarizeSession = trpc.ai.summarizeSession.useMutation();
   const recordChoice = trpc.ai.recordChoice.useMutation();
