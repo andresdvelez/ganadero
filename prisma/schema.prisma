@@ -184,7 +184,7 @@ model Subscription {
   orgId       String
   userId      String
   provider    PaymentProvider
-  providerRef String?
+  providerRef String?           @unique
   status      SubscriptionStatus @default(PENDING)
   period      BillingPeriod
   planKey     String
