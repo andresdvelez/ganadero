@@ -16,6 +16,7 @@ import { useUser } from "@clerk/nextjs";
 import { provisionFromClerk, bindDeviceLocally, hasOfflineIdentity, lock } from "@/lib/auth/offline-auth";
 import { robustDeviceId } from "@/lib/utils";
 import { db } from "@/lib/dexie";
+import { Home, Bot, Compass, CreditCard, Apple, Windows, Download } from "lucide-react";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -179,18 +180,24 @@ export function DashboardLayout({
       <div className="grid grid-cols-[260px,1fr] min-h-0">
         <aside className="border-r bg-white/80 min-h-0 p-3 flex flex-col gap-3">
           <nav className="space-y-1">
-            <Link href="/" className={navLinkClass("/")}>🏠 Inicio</Link>
+            <Link href="/" className={navLinkClass("/")}>
+              <Home className="w-4 h-4" />
+              <span>Inicio</span>
+            </Link>
             <Link href="/ai-assistant" className={navLinkClass("/ai-assistant")}>
-              🤖 Asistente de AI
+              <Bot className="w-4 h-4" />
+              <span>Asistente de AI</span>
             </Link>
             <button
               className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-neutral-100 text-neutral-800 w-full text-left"
               onClick={() => window.dispatchEvent(new CustomEvent("open-modules"))}
             >
-              🧭 Navegador de módulos
+              <Compass className="w-4 h-4" />
+              <span>Navegador de módulos</span>
             </button>
             <Link href="/settings/billing" className={navLinkClass("/settings/billing")}>
-              💳 Plan y facturación
+              <CreditCard className="w-4 h-4" />
+              <span>Plan y facturación</span>
             </Link>
           </nav>
           <div className="mt-2">
@@ -207,8 +214,14 @@ export function DashboardLayout({
               const winUrl = process.env.NEXT_PUBLIC_DESKTOP_WIN_DOWNLOAD_URL || "/download";
               return (
                 <div className="flex flex-col gap-2">
-                  <a className="px-3 py-2 rounded-full bg-black text-white text-sm shadow hover:opacity-90" href={macUrl} target="_blank" rel="noreferrer"> Descargar para Mac</a>
-                  <a className="px-3 py-2 rounded-full bg-neutral-900 text-white text-sm shadow hover:opacity-90" href={winUrl} target="_blank" rel="noreferrer">⊞ Descargar para Windows</a>
+                  <a className="px-3 py-2 rounded-full bg-black text-white text-sm shadow hover:opacity-90 flex items-center gap-2" href={macUrl} target="_blank" rel="noreferrer">
+                    <Apple className="w-4 h-4" />
+                    <span>Descargar para macOS</span>
+                  </a>
+                  <a className="px-3 py-2 rounded-full bg-neutral-900 text-white text-sm shadow hover:opacity-90 flex items-center gap-2" href={winUrl} target="_blank" rel="noreferrer">
+                    <Windows className="w-4 h-4" />
+                    <span>Descargar para Windows</span>
+                  </a>
                 </div>
               );
             })()}
