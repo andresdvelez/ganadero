@@ -111,7 +111,9 @@ export default function AIAssistantPage() {
   const routeIntent = trpc.ai.routeIntent.useMutation();
   const checkLocal = trpc.ai.checkLocalModel.useMutation();
   const ensureLocal = trpc.ai.ensureLocalModel.useMutation();
+  const utils = trpc.useUtils();
   const cloud = trpc.ai.checkCloudAvailable.useQuery();
+  const listSessions = trpc.ai.listSessions.useQuery({ limit: 20 });
   const cloudAvailable = !!cloud.data?.available;
   const [localModelAvailable, setLocalModelAvailable] = useState<
     boolean | null
@@ -283,6 +285,14 @@ export default function AIAssistantPage() {
         setLocalModelAvailable((prev) => (prev === true ? true : false));
       }
     })();
+    // opcional: abrir chat por query ?open=sessionId o mostrar historial con ?history=1
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      const open = sp.get("open");
+      if (open) {
+        onOpenChat({ detail: { uuid: open } } as any);
+      }
+    } catch {}
 
     return () => {
       window.removeEventListener("ai-new-chat", onNewChat as any);

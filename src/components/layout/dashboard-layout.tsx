@@ -186,18 +186,40 @@ export function DashboardLayout({
           {hasClerk && <UserButton />}
         </nav>
       </header>
-      <div className="grid grid-cols-[auto,1fr,auto] min-h-0">
-        {leftSlot ? (
-          <div className="border-r bg-white/80 min-h-0">{leftSlot}</div>
-        ) : (
-          <div />
-        )}
+      <div className="grid grid-cols-[260px,1fr] min-h-0">
+        <aside className="border-r bg-white/80 min-h-0 p-3 flex flex-col gap-3">
+          <nav className="space-y-1">
+            <a className="block px-3 py-2 rounded-lg hover:bg-neutral-100" href="/ai-assistant">Asistente de AI</a>
+            <button
+              className="block w-full text-left px-3 py-2 rounded-lg hover:bg-neutral-100"
+              onClick={() => window.dispatchEvent(new CustomEvent("open-modules"))}
+            >
+              Navegador de módulos
+            </button>
+            <a className="block px-3 py-2 rounded-lg hover:bg-neutral-100" href="/settings/billing">Plan y facturación</a>
+          </nav>
+          <div className="mt-2">
+            <div className="text-xs uppercase tracking-wide text-neutral-500 px-1">Chats recientes</div>
+            <RecentChats />
+            <div className="px-1 mt-2">
+              <a className="text-sm text-primary-600 hover:underline" href="/ai-assistant?history=1">Ver todo</a>
+            </div>
+          </div>
+          <div className="mt-auto pt-2 border-t">
+            <div className="text-xs uppercase tracking-wide text-neutral-500 px-1 mb-2">Descargas</div>
+            {(() => {
+              const macUrl = process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_URL || "/download";
+              const winUrl = process.env.NEXT_PUBLIC_DESKTOP_WIN_DOWNLOAD_URL || "/download";
+              return (
+                <div className="flex flex-col gap-2">
+                  <a className="px-3 py-2 rounded-full bg-black text-white text-sm shadow hover:opacity-90" href={macUrl} target="_blank" rel="noreferrer"> Descargar para Mac</a>
+                  <a className="px-3 py-2 rounded-full bg-neutral-900 text-white text-sm shadow hover:opacity-90" href={winUrl} target="_blank" rel="noreferrer">⊞ Descargar para Windows</a>
+                </div>
+              );
+            })()}
+          </div>
+        </aside>
         <main className="p-4 overflow-auto min-h-0">{children}</main>
-        {rightSlot ? (
-          <div className="border-l bg-white/80 min-h-0">{rightSlot}</div>
-        ) : (
-          <div />
-        )}
       </div>
       {conflictsOpen && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/30">
@@ -280,6 +302,35 @@ export function DashboardLayout({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function RecentChats() {
+  const [items, setItems] = useState<Array<{ uuid: string; title: string; updatedAt: Date }>>([]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const rows = await db.chats.orderBy("updatedAt").reverse().limit(5).toArray();
+        setItems(rows as any);
+      } catch {}
+    })();
+  }, []);
+  if (!items.length) return (
+    <div className="text-sm text-neutral-500 px-2 py-3">Sin chats</div>
+  );
+  return (
+    <div className="space-y-1 mt-1">
+      {items.map((c) => (
+        <button
+          key={c.uuid}
+          className="w-full text-left px-3 py-2 rounded-lg hover:bg-neutral-100"
+          onClick={() => window.dispatchEvent(new CustomEvent("ai-open-chat", { detail: { uuid: c.uuid } }))}
+        >
+          <div className="text-sm font-medium text-neutral-800 line-clamp-2">{c.title}</div>
+          <div className="text-[11px] text-neutral-500">{new Date(c.updatedAt).toLocaleString()}</div>
+        </button>
+      ))}
     </div>
   );
 }

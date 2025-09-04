@@ -205,6 +205,7 @@ export default function OnboardingPage() {
         farmCode: farmDraft.code,
       });
       addToast({ variant: "success", title: "¡Todo listo!" });
+      try { router.replace("/settings/billing?welcome=1"); } catch {}
     } catch (e: any) {
       addToast({
         variant: "error",
@@ -516,12 +517,18 @@ export default function OnboardingPage() {
                         </div>
                       )}
                     </div>
-                    <div className="md:col-span-2 flex justify-end">
+                    <div className="md:col-span-2 flex justify-end gap-2">
                       <Button
-                        color="primary"
+                        variant="bordered"
                         onPress={() => router.replace("/")}
                       >
-                        Ir al dashboard
+                        Volver al inicio
+                      </Button>
+                      <Button
+                        color="primary"
+                        onPress={() => router.replace("/settings/billing?welcome=1")}
+                      >
+                        Continuar a adquirir licencia
                       </Button>
                     </div>
                   </div>
