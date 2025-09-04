@@ -20,7 +20,7 @@ export default function AuthGroupLayout({
       <div className="grid place-items-center px-4 min-h-dvh min-h-screen items-center justify-center">
         <div className="w-full max-w-md">
           {children}
-          <p className="mt-6 text-center text-xs text-neutral-500"></p>
+          <p className="mt-6 text-center text-xs text-neutral-500">
             Al iniciar sesión aceptas nuestros términos y políticas.
           </p>
         </div>
