@@ -20,7 +20,23 @@ export default function AuthSignInPage() {
     };
   }, []);
 
-  if (online) return <SignIn />;
+  if (online)
+    return (
+      <div className="min-h-screen grid place-items-center bg-neutral-50 p-6">
+        <div className="w-full max-w-md">
+          <div className="flex items-center justify-center mb-6">
+            <img
+              src="/brand/full-logo-white.jpeg"
+              alt="Ganado"
+              style={{ maxWidth: 260, height: "auto" }}
+            />
+          </div>
+          <div className="rounded-2xl border bg-white p-4 shadow-sm">
+            <SignIn />
+          </div>
+        </div>
+      </div>
+    );
 
   return (
     <div className="min-h-screen grid place-items-center bg-neutral-50">
