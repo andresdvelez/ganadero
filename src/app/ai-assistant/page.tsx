@@ -197,10 +197,7 @@ export default function AIAssistantPage() {
     { refetchInterval: 30000 }
   );
   const alertsEvaluate = trpc.alerts.evaluateAll.useMutation();
-  const listSessions = trpc.ai.listSessions.useQuery(
-    { limit: 20 },
-    { refetchInterval: 60000 }
-  );
+  // ya declarado arriba
   // We'll fetch messages with utils.ai.listMessages when needed
 
   const MODEL_URL =
