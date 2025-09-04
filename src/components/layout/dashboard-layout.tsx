@@ -16,7 +16,7 @@ import { useUser } from "@clerk/nextjs";
 import { provisionFromClerk, bindDeviceLocally, hasOfflineIdentity, lock } from "@/lib/auth/offline-auth";
 import { robustDeviceId } from "@/lib/utils";
 import { db } from "@/lib/dexie";
-import { Home, Bot, Compass, CreditCard, Apple, Windows, Download } from "lucide-react";
+import { Home, Bot, Compass, CreditCard, Apple, Laptop } from "lucide-react";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -219,7 +219,7 @@ export function DashboardLayout({
                     <span>Descargar para macOS</span>
                   </a>
                   <a className="px-3 py-2 rounded-full bg-neutral-900 text-white text-sm shadow hover:opacity-90 flex items-center gap-2" href={winUrl} target="_blank" rel="noreferrer">
-                    <Windows className="w-4 h-4" />
+                    <Laptop className="w-4 h-4" />
                     <span>Descargar para Windows</span>
                   </a>
                 </div>
