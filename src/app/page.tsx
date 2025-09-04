@@ -26,8 +26,8 @@ export default function Page() {
             <MiniStat label="Registros" value={health.data?.series?.length || 0} />
           </KpiCard>
           <KpiCard title="Reproducción" loading={breeding.isLoading}>
-            <MiniStat label="Tasa preñez (%)" value={breeding.data?.pregnancyRatePct || 0} />
-            <MiniStat label="IEP (días)" value={breeding.data?.calvingIntervalDays || 0} />
+            <MiniStat label="Tasa preñez (%)" value={breeding.data?.kpis?.pregnancyRate ?? 0} />
+            <MiniStat label="IEP (días)" value={breeding.data?.kpis?.avgCalvingInterval ?? 0} />
           </KpiCard>
           <KpiCard title="Inventario" loading={inventory.isLoading}>
             <MiniStat label="Productos críticos" value={inventory.data?.lowStock?.length || 0} />
