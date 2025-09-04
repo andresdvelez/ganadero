@@ -95,10 +95,10 @@ export default function Page() {
             </Suspense>
           </div>
           <div className="rounded-xl border bg-white p-4">
-            <div className="font-medium mb-2">Inventario crítico</div>
+            <div className="font-medium mb-2">Costos por categoría</div>
             <Suspense>
               <InventoryPie
-                data={(inventory.data?.criticalBreakdown || []).map((r: any) => ({ name: r.label ?? r.name, value: r.count ?? r.value }))}
+                data={(inventory.data?.costByCategory || []).map((r: any) => ({ name: r.label, value: r.value }))}
               />
             </Suspense>
           </div>
