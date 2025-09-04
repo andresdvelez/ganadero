@@ -88,8 +88,8 @@ export function DashboardLayout({
   };
 
   return (
-    <div className="min-h-dvh grid grid-rows-[auto,1fr]">
-      <header className="flex items-center justify-between px-4 h-14 border-b bg-white">
+    <div className="min-h-dvh">
+      <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 h-14 border-b bg-white">
         <div className="flex items-center gap-3">
           <Image src="/logo.png" alt="Ganado AI" width={28} height={28} />
           <div className="font-semibold">Ganado AI</div>
@@ -177,8 +177,8 @@ export function DashboardLayout({
           {hasClerk && <UserButton />}
         </nav>
       </header>
-      <div className="grid grid-cols-[260px,1fr] min-h-0">
-        <aside className="border-r bg-white/80 min-h-0 p-3 flex flex-col gap-3 h-dvh">
+      <div className="pt-14">
+        <aside className="fixed top-14 left-0 w-[260px] h-[calc(100dvh-56px)] border-r bg-white/80 p-3 flex flex-col gap-3 overflow-auto">
           <nav className="space-y-1">
             <Link href="/" className={navLinkClass("/")}>
               <Home className="w-4 h-4" />
@@ -227,7 +227,7 @@ export function DashboardLayout({
             })()}
           </div>
         </aside>
-        <main className="p-4 overflow-auto min-h-0">{children}</main>
+        <main className="ml-[260px] p-4 overflow-auto min-h-[calc(100dvh-56px)]">{children}</main>
       </div>
       {conflictsOpen && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/30">
