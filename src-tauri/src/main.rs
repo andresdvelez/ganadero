@@ -223,13 +223,16 @@ fn main() {
           .or(node_in_macos_arm);
 
         // Primer intento: usar el binario preferido si existe
+        // Permitir modo no autenticado SOLO en desarrollo o si ALLOW_DEV_UNAUTH=1 ya viene seteado
+        let allow_dev_unauth = std::env::var("ALLOW_DEV_UNAUTH").ok().as_deref() == Some("1") || cfg!(debug_assertions);
+
         if let Some(node_bin) = prefer_node {
           let mut cmd = Command::new(node_bin);
           let sidecar_attempt = cmd
             .arg(&srv)
             .env("PORT", port.to_string())
             .env("HOST", "127.0.0.1")
-            .env("ALLOW_DEV_UNAUTH", "1")
+            .envs(if allow_dev_unauth { vec![("ALLOW_DEV_UNAUTH", "1")] } else { vec![] as Vec<(&str,&str)> })
             .envs(env_map.iter().map(|(k,v)| (k.as_str(), v.as_str())))
             .current_dir(srv.parent().unwrap_or(&app_dir))
             .stdout(Stdio::from(OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap())))
@@ -253,7 +256,7 @@ fn main() {
                 .arg(&srv)
                 .env("PORT", port.to_string())
                 .env("HOST", "127.0.0.1")
-                .env("ALLOW_DEV_UNAUTH", "1")
+                .envs(if allow_dev_unauth { vec![("ALLOW_DEV_UNAUTH", "1")] } else { vec![] as Vec<(&str,&str)> })
                 .envs(env_map.iter().map(|(k,v)| (k.as_str(), v.as_str())))
                 .current_dir(srv.parent().unwrap_or(&app_dir))
                 .stdout(Stdio::from(OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap())))
@@ -276,7 +279,7 @@ fn main() {
             .arg(&srv)
             .env("PORT", port.to_string())
             .env("HOST", "127.0.0.1")
-            .env("ALLOW_DEV_UNAUTH", "1")
+            .envs(if allow_dev_unauth { vec![("ALLOW_DEV_UNAUTH", "1")] } else { vec![] as Vec<(&str,&str)> })
             .envs(env_map.iter().map(|(k,v)| (k.as_str(), v.as_str())))
             .current_dir(srv.parent().unwrap_or(&app_dir))
             .stdout(Stdio::from(OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap())))
