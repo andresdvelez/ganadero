@@ -20,6 +20,9 @@ export default function Page() {
   const InventoryPie = dynamic(() => import("@/components/embedded/_charts/inventory-pie"), { ssr: false, loading: () => <div className="text-sm text-neutral-500">Cargando gráfico…</div> });
   const HealthTrendChart = dynamic(() => import("@/components/embedded/_charts/health-trend-chart"), { ssr: false, loading: () => <div className="text-sm text-neutral-500">Cargando gráfico…</div> });
   const MilkChart = dynamic(() => import("@/components/embedded/_charts/milk-chart"), { ssr: false, loading: () => <div className="text-sm text-neutral-500">Cargando gráfico…</div> });
+  const ReproductionTrends = dynamic(() => import("@/components/embedded/_charts/reproduction-trends"), { ssr: false, loading: () => <div className="text-sm text-neutral-500">Cargando gráfico…</div> });
+  const GeneticsGrowth = dynamic(() => import("@/components/embedded/_charts/genetics-growth"), { ssr: false, loading: () => <div className="text-sm text-neutral-500">Cargando gráfico…</div> });
+  const PastureOccupancy = dynamic(() => import("@/components/embedded/_charts/pasture-occupancy"), { ssr: false, loading: () => <div className="text-sm text-neutral-500">Cargando gráfico…</div> });
 
   return (
     <DashboardLayout>
@@ -56,6 +59,12 @@ export default function Page() {
             <MiniStat label="Tasa preñez (%)" value={breeding.data?.kpis?.pregnancyRate ?? 0} />
             <MiniStat label="IEP (días)" value={breeding.data?.kpis?.avgCalvingInterval ?? 0} />
           </KpiCard>
+          <div className="rounded-xl border bg-white p-4">
+            <div className="font-medium mb-2">Tendencias de reproducción</div>
+            <Suspense>
+              <ReproductionTrends data={breeding.data?.series || []} />
+            </Suspense>
+          </div>
           <KpiCard title="Inventario" loading={inventory.isLoading}>
             <MiniStat label="Productos críticos" value={inventory.data?.lowStock?.length || 0} />
           </KpiCard>
@@ -85,6 +94,18 @@ export default function Page() {
             <div className="font-medium mb-2">Producción lechera</div>
             <Suspense>
               <MilkChart data={milk.data?.series || []} />
+            </Suspense>
+          </div>
+          <div className="rounded-xl border bg-white p-4">
+            <div className="font-medium mb-2">Genética y crecimiento</div>
+            <Suspense>
+              <GeneticsGrowth data={breeding.data?.genetics || []} />
+            </Suspense>
+          </div>
+          <div className="rounded-xl border bg-white p-4">
+            <div className="font-medium mb-2">Ocupación de potreros</div>
+            <Suspense>
+              <PastureOccupancy data={(inventory.data?.pastureOccupancy || []).map((p: any) => ({ pasture: p.name, occupancy: p.occupancy }))} />
             </Suspense>
           </div>
         </div>
