@@ -6,6 +6,16 @@ type GeneticPoint = { date: string; adg?: number; epdIndex?: number };
 
 export default function GeneticsGrowth({ data }: { data: GeneticPoint[] }) {
   const rows = (data || []).map((d) => ({ date: d.date, adg: d.adg ?? 0, epdIndex: d.epdIndex ?? 0 }));
+  if (rows.length === 0) {
+    return (
+      <div className="h-60 grid place-items-center text-sm text-neutral-500">
+        <div className="text-center">
+          <div className="mb-2">Aún no hay registros de pesos.</div>
+          <a href="/_/weights" className="underline text-primary-600">Registrar peso</a>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="h-60">
       <ResponsiveContainer width="100%" height="100%">

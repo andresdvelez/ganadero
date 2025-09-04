@@ -4,6 +4,16 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGri
 
 export default function MilkChart({ data }: { data: Array<{ date: string; liters?: number }> }) {
   const rows = (data || []).map((d) => ({ date: d.date, liters: d.liters ?? 0 }));
+  if (rows.length === 0) {
+    return (
+      <div className="h-72 grid place-items-center text-sm text-neutral-500">
+        <div className="text-center">
+          <div className="mb-2">Aún no hay datos de leche.</div>
+          <a href="/_/milk/new" className="underline text-primary-600">Registrar ordeño</a>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="h-72">
       <ResponsiveContainer width="100%" height="100%">

@@ -88,7 +88,7 @@ export function DashboardLayout({
   };
 
   return (
-    <div className="min-h-screen grid grid-rows-[auto,1fr]">
+    <div className="min-h-dvh grid grid-rows-[auto,1fr]">
       <header className="flex items-center justify-between px-4 h-14 border-b bg-white">
         <div className="flex items-center gap-3">
           <Image src="/logo.png" alt="Ganado AI" width={28} height={28} />
@@ -178,7 +178,7 @@ export function DashboardLayout({
         </nav>
       </header>
       <div className="grid grid-cols-[260px,1fr] min-h-0">
-        <aside className="border-r bg-white/80 min-h-0 p-3 flex flex-col gap-3">
+        <aside className="border-r bg-white/80 min-h-0 p-3 flex flex-col gap-3 h-dvh">
           <nav className="space-y-1">
             <Link href="/" className={navLinkClass("/")}>
               <Home className="w-4 h-4" />

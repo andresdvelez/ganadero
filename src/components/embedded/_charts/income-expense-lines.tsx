@@ -8,6 +8,16 @@ export default function IncomeExpenseLines({ data }: { data: Array<{ date: strin
     income: d.income ?? 0,
     expense: d.expense ?? 0,
   }));
+  if (rows.length === 0) {
+    return (
+      <div className="h-60 grid place-items-center text-sm text-neutral-500">
+        <div className="text-center">
+          <div className="mb-2">Aún no hay datos financieros.</div>
+          <a href="/finance/new" className="underline text-primary-600">Registrar movimiento</a>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="h-60">
       <ResponsiveContainer width="100%" height="100%">

@@ -8,6 +8,16 @@ export default function HealthTrendChart({ data }: { data: Array<{ date: string;
     cases: d.cases ?? 0,
     recoveries: d.recoveries ?? 0,
   }));
+  if (rows.length === 0) {
+    return (
+      <div className="h-60 grid place-items-center text-sm text-neutral-500">
+        <div className="text-center">
+          <div className="mb-2">Aún no hay datos de salud.</div>
+          <a href="/_/health/new" className="underline text-primary-600">Registrar caso de salud</a>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="h-60">
       <ResponsiveContainer width="100%" height="100%">

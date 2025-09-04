@@ -9,6 +9,16 @@ export default function RevenueChart({ data }: { data: Array<{ date: string; inc
     expense: d.expense ?? 0,
     margin: (d.income ?? 0) - (d.expense ?? 0),
   }));
+  if (rows.length === 0) {
+    return (
+      <div className="h-60 grid place-items-center text-sm text-neutral-500">
+        <div className="text-center">
+          <div className="mb-2">Aún no hay datos para mostrar.</div>
+          <a href="/finance/new" className="underline text-primary-600">Registrar ingresos/egresos</a>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="h-60">
       <ResponsiveContainer width="100%" height="100%">
