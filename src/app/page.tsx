@@ -68,7 +68,13 @@ export default function Page() {
           <div className="rounded-xl border bg-white p-4">
             <div className="font-medium mb-2">Tendencias de reproducción</div>
             <Suspense>
-              <ReproductionTrends data={breeding.data?.series || []} />
+              <ReproductionTrends
+                data={(breeding.data?.trend || []).map((t: any) => ({
+                  date: t.period,
+                  pregnancyRate: t.value ?? 0,
+                  calvingIntervalDays: 0,
+                }))}
+              />
             </Suspense>
           </div>
           <KpiCard title="Inventario" loading={inventory.isLoading}>
