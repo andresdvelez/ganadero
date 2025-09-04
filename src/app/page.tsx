@@ -52,7 +52,13 @@ export default function Page() {
           <div className="rounded-xl border bg-white p-4">
             <div className="font-medium mb-2">Tendencias de salud</div>
             <Suspense>
-              <HealthTrendChart data={health.data?.series || []} />
+              <HealthTrendChart
+                data={(health.data?.series || []).map((r: any) => ({
+                  date: r.date ?? r.period ?? "",
+                  cases: r.cases ?? r.count ?? r.cost ?? 0,
+                  recoveries: r.recoveries ?? r.recovered ?? 0,
+                }))}
+              />
             </Suspense>
           </div>
           <KpiCard title="Reproducción" loading={breeding.isLoading}>
