@@ -25,6 +25,7 @@
     "@capacitor/filesystem": "^7.1.4",
     "@capacitor/geolocation": "^7.1.4",
     "@capacitor/local-notifications": "^7.0.2",
+    "@clerk/localizations": "^3.24.1",
     "@clerk/nextjs": "^6.29.0",
     "@headlessui/react": "^2.2.7",
     "@heroui/react": "^2.8.2",

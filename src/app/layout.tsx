@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
+import { esES } from "@clerk/localizations";
 import { Providers } from "@/providers/heroui-provider";
 import "./globals.css";
 import { GlobalShell } from "@/components/layout/global-shell";
@@ -120,6 +121,27 @@ export default function RootLayout({
       signUpUrl="/sign-up"
       signInFallbackRedirectUrl="/"
       signUpFallbackRedirectUrl="/onboarding"
+      localization={{
+        ...esES,
+        locale: "es-CO",
+        signIn: {
+          ...esES.signIn,
+          start: {
+            ...esES.signIn?.start,
+            title: "Inicia sesión en Ganado AI",
+            subtitle:
+              "Bienvenido de nuevo, por favor inicia sesión para continuar",
+          },
+        },
+        signUp: {
+          ...esES.signUp,
+          start: {
+            ...esES.signUp?.start,
+            title: "Crea tu cuenta",
+            subtitle: "Completa los datos para empezar",
+          },
+        },
+      }}
     >
       {appBody}
     </ClerkProvider>
