@@ -36,7 +36,7 @@ export default function Page() {
             <MiniStat label="Egresos" value={finance.data?.expense || 0} prefix="$" />
             <MiniStat label="Margen" value={(finance.data?.income || 0) - (finance.data?.expense || 0)} prefix="$" />
           </KpiCard>
-          <div className="rounded-xl border bg-white p-4">
+          <div className="rounded-2xl border border-neutral-200/60 bg-white/60 backdrop-blur-md shadow-sm p-4">
             <div className="font-medium mb-2">Comportamiento de ingresos</div>
             <Suspense>
               <RevenueChart
@@ -51,7 +51,7 @@ export default function Page() {
           <KpiCard title="Salud" loading={health.isLoading}>
             <MiniStat label="Registros" value={health.data?.series?.length || 0} />
           </KpiCard>
-          <div className="rounded-xl border bg-white p-4">
+          <div className="rounded-2xl border border-neutral-200/60 bg-white/60 backdrop-blur-md shadow-sm p-4">
             <div className="font-medium mb-2">Tendencias de salud</div>
             <Suspense>
               <HealthTrendChart
@@ -67,7 +67,7 @@ export default function Page() {
             <MiniStat label="Tasa preñez (%)" value={breeding.data?.kpis?.pregnancyRate ?? 0} />
             <MiniStat label="IEP (días)" value={breeding.data?.kpis?.avgCalvingInterval ?? 0} />
           </KpiCard>
-          <div className="rounded-xl border bg-white p-4">
+          <div className="rounded-2xl border border-neutral-200/60 bg-white/60 backdrop-blur-md shadow-sm p-4">
             <div className="font-medium mb-2">Tendencias de reproducción</div>
             <Suspense>
               <ReproductionTrends
@@ -82,7 +82,7 @@ export default function Page() {
           <KpiCard title="Inventario" loading={inventory.isLoading}>
             <MiniStat label="Productos críticos" value={inventory.data?.lowStock?.length || 0} />
           </KpiCard>
-          <div className="rounded-xl border bg-white p-4">
+          <div className="rounded-2xl border border-neutral-200/60 bg-white/60 backdrop-blur-md shadow-sm p-4">
             <div className="font-medium mb-2">Ingresos vs Egresos</div>
             <Suspense>
               <IncomeExpenseLines
@@ -90,7 +90,7 @@ export default function Page() {
               />
             </Suspense>
           </div>
-          <div className="rounded-xl border bg-white p-4">
+          <div className="rounded-2xl border border-neutral-200/60 bg-white/60 backdrop-blur-md shadow-sm p-4">
             <div className="font-medium mb-2">Por categoría</div>
             <Suspense>
               <CategoryBars data={finance.data?.byCategory || []} />
@@ -104,7 +104,7 @@ export default function Page() {
               />
             </Suspense>
           </div>
-          <div className="rounded-xl border bg-white p-4 md:col-span-2">
+          <div className="rounded-2xl border border-neutral-200/60 bg-white/60 backdrop-blur-md shadow-sm p-4 md:col-span-2">
             <div className="font-medium mb-2">Producción lechera</div>
             <Suspense>
               <MilkChart
@@ -115,7 +115,7 @@ export default function Page() {
               />
             </Suspense>
           </div>
-          <div className="rounded-xl border bg-white p-4">
+          <div className="rounded-2xl border border-neutral-200/60 bg-white/60 backdrop-blur-md shadow-sm p-4">
             <div className="font-medium mb-2">Genética y crecimiento</div>
             <Suspense>
               <GeneticsGrowth
@@ -127,7 +127,7 @@ export default function Page() {
               />
             </Suspense>
           </div>
-          <div className="rounded-xl border bg-white p-4">
+          <div className="rounded-2xl border border-neutral-200/60 bg-white/60 backdrop-blur-md shadow-sm p-4">
             <div className="font-medium mb-2">Ocupación de potreros</div>
             <Suspense>
               <PastureOccupancy

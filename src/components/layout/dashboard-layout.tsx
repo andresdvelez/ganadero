@@ -106,12 +106,89 @@ export function DashboardLayout({
 
   return (
     <div className="min-h-dvh">
-      <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 h-14 border-b bg-white/80 backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          {/* Logo movido al sidebar */}
-          <FarmSelector />
-        </div>
-        <nav className="flex items-center gap-3">
+      {/* Header se renderiza dentro del área principal, no ocupa encima del sidebar */}
+      <div className="pt-0">
+        {/* Sidebar flotante de altura completa */}
+        <aside
+          className="fixed top-0 z-40 border border-neutral-200/60 bg-white/70 backdrop-blur-md shadow-lg p-3 flex flex-col gap-3 overflow-auto rounded-2xl"
+          style={{ width: sidebarWidth, left: sidebarLeft, height: "100dvh" }}
+        >
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2 px-1">
+              {collapsed ? (
+                <Image src="/brand/logotype-black-nobg.png" alt="Ganado" width={40} height={40} priority />
+              ) : (
+                <Image src="/brand/full-logo-black-nobg.png" alt="Ganado" width={160} height={36} priority />
+              )}
+            </div>
+            <button
+              className="w-8 h-8 grid place-items-center rounded-full hover:bg-neutral-100 text-neutral-600"
+              onClick={() => setCollapsed((v) => !v)}
+              title={collapsed ? "Expandir" : "Plegar"}
+            >
+              {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+            </button>
+          </div>
+          <nav className="space-y-1">
+            <Link href="/" className={navLinkClass("/")} title="Inicio">
+              <Home className="w-4 h-4" />
+              {!collapsed && <span>Inicio</span>}
+            </Link>
+            <Link href="/ai-assistant" className={navLinkClass("/ai-assistant")} title="Asistente de AI">
+              <Bot className="w-4 h-4" />
+              {!collapsed && <span>Asistente de AI</span>}
+            </Link>
+            <button
+              className={(collapsed ? "justify-center " : "") + "flex items-center gap-2 px-3 py-2 rounded-full hover:bg-neutral-100 text-neutral-800 w-full text-left"}
+              onClick={() => window.dispatchEvent(new CustomEvent("open-modules"))}
+              title="Navegador de módulos"
+            >
+              <Compass className="w-4 h-4" />
+              {!collapsed && <span>Navegador de módulos</span>}
+            </button>
+            <Link href="/settings/billing" className={navLinkClass("/settings/billing")} title="Plan y facturación">
+              <CreditCard className="w-4 h-4" />
+              {!collapsed && <span>Plan y facturación</span>}
+            </Link>
+          </nav>
+          {!collapsed && (
+            <>
+              <div className="mt-2">
+                <div className="text-xs uppercase tracking-wide text-neutral-500 px-1">Chats recientes</div>
+                <RecentChats />
+                <div className="px-1 mt-2">
+                  <a className="text-sm text-primary-600 hover:underline" href="/ai-assistant?history=1">Ver todo</a>
+                </div>
+              </div>
+              <div className="mt-auto pt-2 border-t">
+                <div className="text-xs uppercase tracking-wide text-neutral-500 px-1 mb-2">Descargas</div>
+                {(() => {
+                  const macUrl = process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_URL || "/download";
+                  const winUrl = process.env.NEXT_PUBLIC_DESKTOP_WIN_DOWNLOAD_URL || "/download";
+                  return (
+                    <div className="flex flex-col gap-2">
+                      <a className="px-3 py-2 rounded-full bg-black text-white text-sm shadow hover:opacity-90 flex items-center gap-2" href={macUrl} target="_blank" rel="noreferrer">
+                        <Apple className="w-4 h-4" />
+                        <span>Descargar para macOS</span>
+                      </a>
+                      <a className="px-3 py-2 rounded-full bg-neutral-900 text-white text-sm shadow hover:opacity-90 flex items-center gap-2" href={winUrl} target="_blank" rel="noreferrer">
+                        <Laptop className="w-4 h-4" />
+                        <span>Descargar para Windows</span>
+                      </a>
+                    </div>
+                  );
+                })()}
+              </div>
+            </>
+          )}
+        </aside>
+        {/* Área principal a la derecha del sidebar */}
+        <div className="transition-all" style={{ marginLeft: sidebarLeft + sidebarWidth }}>
+          <header className="flex items-center justify-between px-4 h-14 bg-transparent">
+            <div className="flex items-center gap-3">
+              <FarmSelector />
+            </div>
+            <nav className="flex items-center gap-3">
           {hasConflicts && (
             <div className="flex items-center gap-2">
               <div
@@ -191,82 +268,13 @@ export function DashboardLayout({
           })()}
           {hasClerk && <UserButton />}
         </nav>
-      </header>
-      <div className="pt-14">
-        <aside
-          className="fixed top-14 z-40 border border-neutral-200/60 bg-white/70 backdrop-blur-md shadow-lg p-3 flex flex-col gap-3 overflow-auto rounded-2xl"
-          style={{ width: sidebarWidth, left: sidebarLeft, height: "calc(100dvh - 56px)" }}
-        >
-          <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-2 px-1">
-              {collapsed ? (
-                <Image src="/brand/logotype-black-nobg.png" alt="Ganado" width={28} height={28} />
-              ) : (
-                <Image src="/brand/full-logo-black-nobg.png" alt="Ganado" width={120} height={28} />
-              )}
+          </header>
+          <main className="p-4 overflow-auto min-h-[100dvh] transition-all">
+            <div className="max-w-[1400px] mx-auto space-y-4">
+              {children}
             </div>
-            <button
-              className="w-8 h-8 grid place-items-center rounded-full hover:bg-neutral-100 text-neutral-600"
-              onClick={() => setCollapsed((v) => !v)}
-              title={collapsed ? "Expandir" : "Plegar"}
-            >
-              {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-            </button>
-          </div>
-          <nav className="space-y-1">
-            <Link href="/" className={navLinkClass("/")} title="Inicio">
-              <Home className="w-4 h-4" />
-              {!collapsed && <span>Inicio</span>}
-            </Link>
-            <Link href="/ai-assistant" className={navLinkClass("/ai-assistant")} title="Asistente de AI">
-              <Bot className="w-4 h-4" />
-              {!collapsed && <span>Asistente de AI</span>}
-            </Link>
-            <button
-              className={(collapsed ? "justify-center " : "") + "flex items-center gap-2 px-3 py-2 rounded-full hover:bg-neutral-100 text-neutral-800 w-full text-left"}
-              onClick={() => window.dispatchEvent(new CustomEvent("open-modules"))}
-              title="Navegador de módulos"
-            >
-              <Compass className="w-4 h-4" />
-              {!collapsed && <span>Navegador de módulos</span>}
-            </button>
-            <Link href="/settings/billing" className={navLinkClass("/settings/billing")} title="Plan y facturación">
-              <CreditCard className="w-4 h-4" />
-              {!collapsed && <span>Plan y facturación</span>}
-            </Link>
-          </nav>
-          {!collapsed && (
-            <>
-              <div className="mt-2">
-                <div className="text-xs uppercase tracking-wide text-neutral-500 px-1">Chats recientes</div>
-                <RecentChats />
-                <div className="px-1 mt-2">
-                  <a className="text-sm text-primary-600 hover:underline" href="/ai-assistant?history=1">Ver todo</a>
-                </div>
-              </div>
-              <div className="mt-auto pt-2 border-t">
-                <div className="text-xs uppercase tracking-wide text-neutral-500 px-1 mb-2">Descargas</div>
-                {(() => {
-                  const macUrl = process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_URL || "/download";
-                  const winUrl = process.env.NEXT_PUBLIC_DESKTOP_WIN_DOWNLOAD_URL || "/download";
-                  return (
-                    <div className="flex flex-col gap-2">
-                      <a className="px-3 py-2 rounded-full bg-black text-white text-sm shadow hover:opacity-90 flex items-center gap-2" href={macUrl} target="_blank" rel="noreferrer">
-                        <Apple className="w-4 h-4" />
-                        <span>Descargar para macOS</span>
-                      </a>
-                      <a className="px-3 py-2 rounded-full bg-neutral-900 text-white text-sm shadow hover:opacity-90 flex items-center gap-2" href={winUrl} target="_blank" rel="noreferrer">
-                        <Laptop className="w-4 h-4" />
-                        <span>Descargar para Windows</span>
-                      </a>
-                    </div>
-                  );
-                })()}
-              </div>
-            </>
-          )}
-        </aside>
-        <main className="p-4 overflow-auto min-h-[calc(100dvh-56px)] transition-all" style={{ marginLeft: sidebarLeft + sidebarWidth }}>{children}</main>
+          </main>
+        </div>
       </div>
       {conflictsOpen && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/30">
