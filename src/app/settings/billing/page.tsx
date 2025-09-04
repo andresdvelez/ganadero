@@ -91,13 +91,13 @@ export default function BillingPage() {
             <div className="rounded-xl border p-3">
               <div className="font-medium">Usuarios incluidos</div>
               <div className="mt-2 flex items-center gap-2">
-                <Input type="number" min={1} value={qtyUsers} onChange={(e: any) => setQtyUsers(Math.max(1, Number(e.target.value)||1))} />
+                <Input type="number" min={1} value={String(qtyUsers)} onChange={(e: any) => setQtyUsers(Math.max(1, Number((e.target as HTMLInputElement).value)||1))} />
               </div>
             </div>
             <div className="rounded-xl border p-3">
               <div className="font-medium">Dispositivos incluidos</div>
               <div className="mt-2 flex items-center gap-2">
-                <Input type="number" min={1} value={qtyDevices} onChange={(e: any) => setQtyDevices(Math.max(1, Number(e.target.value)||1))} />
+                <Input type="number" min={1} value={String(qtyDevices)} onChange={(e: any) => setQtyDevices(Math.max(1, Number((e.target as HTMLInputElement).value)||1))} />
               </div>
             </div>
           </div>
