@@ -59,15 +59,49 @@ export const orgRouter = createTRPCRouter({
         );
       }
     }
+    // 1) Orgs por membresía
     const memberships = await prisma.organizationMembership.findMany({
       where: { userId: me.id },
       include: { organization: true },
     });
-    return memberships.map((m) => ({
-      id: m.organization.id,
-      name: m.organization.name,
-      role: m.role,
-    }));
+
+    // 2) Orgs creadas por mí (sanidad de datos: asegurar membresía ADMIN si falta)
+    const ownOrgs = await prisma.organization.findMany({
+      where: { createdByUserId: me.id },
+    });
+    for (const org of ownOrgs) {
+      const has = memberships.find((m) => m.organization.id === org.id);
+      if (!has) {
+        await prisma.organizationMembership.upsert({
+          where: { orgId_userId: { orgId: org.id, userId: me.id } },
+          update: { role: "ADMIN" as any },
+          create: { orgId: org.id, userId: me.id, role: "ADMIN" as any },
+        });
+        memberships.push({
+          id: "seed",
+          role: "ADMIN" as any,
+          organization: org,
+          orgId: org.id,
+          userId: me.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        } as any);
+      }
+    }
+
+    // 3) Respuesta única por organización
+    const seen = new Set<string>();
+    return memberships
+      .filter((m) => {
+        if (seen.has(m.organization.id)) return false;
+        seen.add(m.organization.id);
+        return true;
+      })
+      .map((m) => ({
+        id: m.organization.id,
+        name: m.organization.name,
+        role: m.role,
+      }));
   }),
 
   createOrganization: protectedProcedure
