@@ -1,10 +1,13 @@
 "use client";
 
+import { Suspense } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { trpc } from "@/lib/trpc/client";
 
-export default function AIHistoryPage() {
+export const dynamic = "force-dynamic";
+
+function HistoryInner() {
   const params = useSearchParams();
   const limit = 20;
   const q = trpc.ai.listSessions.useQuery({ limit });
@@ -26,6 +29,14 @@ export default function AIHistoryPage() {
         ))}
       </div>
     </div>
+  );
+}
+
+export default function AIHistoryPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-neutral-600">Cargando historial…</div>}>
+      <HistoryInner />
+    </Suspense>
   );
 }
 
