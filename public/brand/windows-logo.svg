@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M120 32L232 16v112H120V32z" fill="#0F62FE"/>
-  <path d="M24 48l88-12v92H24V48z" fill="#0F62FE"/>
-  <path d="M120 136h112v104l-112-16V136z" fill="#0F62FE"/>
-  <path d="M24 136h88v80L24 200v-64z" fill="#0F62FE"/>
+  <path d="M120 32L232 16v112H120V32z" fill="#FFFFFF"/>
+  <path d="M24 48l88-12v92H24V48z" fill="#FFFFFF"/>
+  <path d="M120 136h112v104l-112-16V136z" fill="#FFFFFF"/>
+  <path d="M24 136h88v80L24 200v-64z" fill="#FFFFFF"/>
 </svg>
-
