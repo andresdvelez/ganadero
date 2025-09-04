@@ -15,6 +15,23 @@ enum Role {
   MEMBER
 }
 
+// Billing enums
+enum SubscriptionStatus {
+  PENDING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+enum BillingPeriod {
+  MONTHLY
+  ANNUAL
+}
+
+enum PaymentProvider {
+  MERCADO_PAGO
+}
+
 // User model - represents a rancher/user
 model User {
   id                String            @id @default(cuid())
@@ -86,6 +103,9 @@ model Organization {
   memberships       OrganizationMembership[]
   devices           Device[]
   farms             Farm[]
+  // Billing relations
+  subscriptions     Subscription[]
+  orgUsage          OrgUsage?
 
   @@index([createdByUserId])
   @@index([name])
@@ -125,6 +145,73 @@ model Device {
 
   @@index([userId])
   @@index([orgId])
+}
+
+// Pricing & Billing models
+
+model Plan {
+  id          String        @id @default(cuid())
+  key         String        @unique
+  name        String
+  description String?
+  period      BillingPeriod
+  priceCop    Int
+  animalLimit Int?
+  userLimit   Int?
+  deviceLimit Int?
+  discountPct Int?
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model Addon {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  name        String
+  description String?
+  priceCop    Int
+  kind        String   // device|user|feature
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Subscription {
+  id          String             @id @default(cuid())
+  orgId       String
+  userId      String
+  provider    PaymentProvider
+  providerRef String?
+  status      SubscriptionStatus @default(PENDING)
+  period      BillingPeriod
+  planKey     String
+  qtyUsers    Int                @default(1)
+  qtyDevices  Int                @default(1)
+  startsAt    DateTime?
+  endsAt      DateTime?
+  canceledAt  DateTime?
+  raw         String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@index([userId])
+  @@index([status])
+}
+
+model OrgUsage {
+  id        String   @id @default(cuid())
+  orgId     String   @unique
+  animals   Int      @default(0)
+  users     Int      @default(1)
+  devices   Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 }
 
 // Animal model - represents cattle/livestock

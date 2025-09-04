@@ -34,7 +34,7 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
 
   const explicit = process.env.NEXT_PUBLIC_TRPC_URL;
   const baseDefault = "/api/trpc";
-  const remoteFallback = "https://ganadero-nine.vercel.app/api/trpc";
+  const remoteFallback = "https://app.ganado.co/api/trpc";
 
   const [resolvedUrl, setResolvedUrl] = useState<string>(
     explicit && explicit.length > 0 ? explicit : baseDefault
@@ -51,7 +51,7 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
       if (isTauri) {
         const localUrl = "http://127.0.0.1:4317/api/trpc";
         // Decidir por reachability real (no confiar en navigator.onLine)
-        const remoteReady = await probe("https://ganadero-nine.vercel.app/manifest.webmanifest");
+        const remoteReady = await probe("https://app.ganado.co/manifest.webmanifest");
         if (remoteReady) {
           if (!cancelled) setResolvedUrl(remoteFallback);
           return;

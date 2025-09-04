@@ -348,7 +348,7 @@ fn main() {
           } else {
             // Sin readiness: si offline, llevar directamente al unlock local; si online, ir a remoto
             let _ = w.eval(&format!(
-              "(function(){{try{{var online=navigator.onLine; if(!online){{window.location.replace('http://127.0.0.1:{0}/device-unlock'); return;}} window.location.replace('https://ganadero-nine.vercel.app');}}catch(e){{}}}})();",
+              "(function(){{try{{var online=navigator.onLine; if(!online){{window.location.replace('http://127.0.0.1:{0}/device-unlock'); return;}} window.location.replace('https://app.ganado.co');}}catch(e){{}}}})();",
               port
             ));
           }

@@ -41,7 +41,7 @@
     "updater": {
       "active": false,
       "endpoints": [
-        "https://ganadero-nine.vercel.app/api/updates/{target}/{current_version}"
+        "https://app.ganado.co/api/updates/{target}/{current_version}"
       ],
       "pubkey": ""
     },
