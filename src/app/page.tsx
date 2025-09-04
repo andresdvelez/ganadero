@@ -13,6 +13,7 @@ export default function Page() {
   const breeding = trpc.breedingAdv.kpis.useQuery({}, { enabled: true });
   const inventory = trpc.inventory.kpis.useQuery({}, { enabled: true });
   const milkList = trpc.milk.list.useQuery({ limit: 50 }, { enabled: true });
+  const weightsQ = trpc.weights.listWeights.useQuery({ limit: 200 }, { enabled: true });
 
   const RevenueChart = dynamic(() => import("@/components/embedded/_charts/revenue-chart"), { ssr: false, loading: () => <div className="text-sm text-neutral-500">Cargando gráfico…</div> });
   const IncomeExpenseLines = dynamic(() => import("@/components/embedded/_charts/income-expense-lines"), { ssr: false, loading: () => <div className="text-sm text-neutral-500">Cargando gráfico…</div> });
@@ -116,7 +117,13 @@ export default function Page() {
           <div className="rounded-xl border bg-white p-4">
             <div className="font-medium mb-2">Genética y crecimiento</div>
             <Suspense>
-              <GeneticsGrowth data={breeding.data?.genetics || []} />
+              <GeneticsGrowth
+                data={(weightsQ.data || []).map((r: any) => ({
+                  date: r.weighedAt ? new Date(r.weighedAt).toISOString().slice(0, 10) : "",
+                  adg: r.weightKg ?? 0,
+                  epdIndex: 0,
+                }))}
+              />
             </Suspense>
           </div>
           <div className="rounded-xl border bg-white p-4">
