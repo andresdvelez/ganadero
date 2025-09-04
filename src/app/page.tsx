@@ -15,6 +15,9 @@ export default function Page() {
   const milk = trpc.milk.kpis.useQuery({}, { enabled: true });
 
   const RevenueChart = dynamic(() => import("@/components/embedded/_charts/revenue-chart"), { ssr: false, loading: () => <div className="text-sm text-neutral-500">Cargando gráfico…</div> });
+  const IncomeExpenseLines = dynamic(() => import("@/components/embedded/_charts/income-expense-lines"), { ssr: false, loading: () => <div className="text-sm text-neutral-500">Cargando gráfico…</div> });
+  const CategoryBars = dynamic(() => import("@/components/embedded/_charts/category-bars"), { ssr: false, loading: () => <div className="text-sm text-neutral-500">Cargando gráfico…</div> });
+  const InventoryPie = dynamic(() => import("@/components/embedded/_charts/inventory-pie"), { ssr: false, loading: () => <div className="text-sm text-neutral-500">Cargando gráfico…</div> });
   const HealthTrendChart = dynamic(() => import("@/components/embedded/_charts/health-trend-chart"), { ssr: false, loading: () => <div className="text-sm text-neutral-500">Cargando gráfico…</div> });
   const MilkChart = dynamic(() => import("@/components/embedded/_charts/milk-chart"), { ssr: false, loading: () => <div className="text-sm text-neutral-500">Cargando gráfico…</div> });
 
@@ -56,6 +59,28 @@ export default function Page() {
           <KpiCard title="Inventario" loading={inventory.isLoading}>
             <MiniStat label="Productos críticos" value={inventory.data?.lowStock?.length || 0} />
           </KpiCard>
+          <div className="rounded-xl border bg-white p-4">
+            <div className="font-medium mb-2">Ingresos vs Egresos</div>
+            <Suspense>
+              <IncomeExpenseLines
+                data={(finance.data?.monthly || []).map((m: any) => ({ date: m.period, income: m.income, expense: m.expense }))}
+              />
+            </Suspense>
+          </div>
+          <div className="rounded-xl border bg-white p-4">
+            <div className="font-medium mb-2">Por categoría</div>
+            <Suspense>
+              <CategoryBars data={finance.data?.byCategory || []} />
+            </Suspense>
+          </div>
+          <div className="rounded-xl border bg-white p-4">
+            <div className="font-medium mb-2">Inventario crítico</div>
+            <Suspense>
+              <InventoryPie
+                data={(inventory.data?.criticalBreakdown || []).map((r: any) => ({ name: r.label ?? r.name, value: r.count ?? r.value }))}
+              />
+            </Suspense>
+          </div>
           <div className="rounded-xl border bg-white p-4 md:col-span-2">
             <div className="font-medium mb-2">Producción lechera</div>
             <Suspense>
