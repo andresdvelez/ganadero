@@ -3658,32 +3658,7 @@ export default function AIAssistantPage() {
   }, []);
 
   return (
-    <DashboardLayout
-      leftSlot={
-        <AISidebar
-          chats={
-            listSessions.data && listSessions.data.length
-              ? listSessions.data.map((s: any) => ({
-                  uuid: s.sessionId,
-                  title: s.sessionId.slice(0, 8),
-                  updatedAt: s.updatedAt,
-                }))
-              : chatList.map((c) => ({
-                  uuid: c.uuid,
-                  title: c.title,
-                  updatedAt: c.updatedAt,
-                }))
-          }
-          activeChatUuid={chatUuid}
-          onNewChat={() => window.dispatchEvent(new Event("ai-new-chat"))}
-          onSelectChat={(uuid) =>
-            window.dispatchEvent(
-              new CustomEvent("ai-open-chat", { detail: { uuid } })
-            )
-          }
-        />
-      }
-    >
+    <DashboardLayout>
       <div className="flex flex-col h-[calc(100vh-4rem)]">
         <div className="p-2 border-b border-neutral-200 flex items-center justify-between gap-3">
           <div className="text-sm text-neutral-600">

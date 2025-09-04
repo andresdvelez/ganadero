@@ -189,7 +189,16 @@ export function DashboardLayout({
       <div className="grid grid-cols-[260px,1fr] min-h-0">
         <aside className="border-r bg-white/80 min-h-0 p-3 flex flex-col gap-3">
           <nav className="space-y-1">
-            <a className="block px-3 py-2 rounded-lg hover:bg-neutral-100" href="/ai-assistant">Asistente de AI</a>
+            <div className="px-3 py-2 rounded-lg bg-neutral-50 flex items-center justify-between">
+              <a className="hover:underline" href="/ai-assistant">Asistente de AI</a>
+              <button
+                className="text-xs px-2 py-1 rounded-full bg-white border shadow-sm"
+                onClick={() => window.dispatchEvent(new Event("ai-new-chat"))}
+                title="Nuevo chat"
+              >
+                Nuevo
+              </button>
+            </div>
             <button
               className="block w-full text-left px-3 py-2 rounded-lg hover:bg-neutral-100"
               onClick={() => window.dispatchEvent(new CustomEvent("open-modules"))}
