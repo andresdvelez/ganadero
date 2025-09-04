@@ -58,6 +58,8 @@ model User {
   memberships       OrganizationMembership[]
   organizations     Organization[]     @relation("OrgCreatedBy")
   devices           Device[]
+  // Billing relations
+  subscriptions     Subscription[]
   deletionLogs      DeletionLog[]
   aiUserProfile     AIUserProfile?
   aiMemories        AIMemory[]
