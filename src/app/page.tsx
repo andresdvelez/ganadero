@@ -12,7 +12,7 @@ export default function Page() {
   const health = trpc.health.kpis.useQuery({}, { enabled: true });
   const breeding = trpc.breedingAdv.kpis.useQuery({}, { enabled: true });
   const inventory = trpc.inventory.kpis.useQuery({}, { enabled: true });
-  const milk = trpc.milk.kpis.useQuery({}, { enabled: true });
+  const milkList = trpc.milk.list.useQuery({ limit: 50 }, { enabled: true });
 
   const RevenueChart = dynamic(() => import("@/components/embedded/_charts/revenue-chart"), { ssr: false, loading: () => <div className="text-sm text-neutral-500">Cargando gráfico…</div> });
   const IncomeExpenseLines = dynamic(() => import("@/components/embedded/_charts/income-expense-lines"), { ssr: false, loading: () => <div className="text-sm text-neutral-500">Cargando gráfico…</div> });
@@ -105,7 +105,12 @@ export default function Page() {
           <div className="rounded-xl border bg-white p-4 md:col-span-2">
             <div className="font-medium mb-2">Producción lechera</div>
             <Suspense>
-              <MilkChart data={milk.data?.series || []} />
+              <MilkChart
+                data={(milkList.data || []).map((r: any) => ({
+                  date: r.recordedAt ? new Date(r.recordedAt).toISOString().slice(0, 10) : "",
+                  liters: r.liters || 0,
+                }))}
+              />
             </Suspense>
           </div>
           <div className="rounded-xl border bg-white p-4">
