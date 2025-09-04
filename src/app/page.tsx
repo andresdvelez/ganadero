@@ -157,7 +157,7 @@ export default function Page() {
 
 function KpiCard({ title, loading, children }: { title: string; loading?: boolean; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border bg-white p-4">
+    <div className="island p-4">
       <div className="font-medium mb-2">{title}</div>
       {loading ? <div className="text-sm text-neutral-500">Cargando…</div> : <div className="grid sm:grid-cols-2 gap-3">{children}</div>}
     </div>
