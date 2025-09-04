@@ -31,7 +31,13 @@ export default function Page() {
           <div className="rounded-xl border bg-white p-4">
             <div className="font-medium mb-2">Comportamiento de ingresos</div>
             <Suspense>
-              <RevenueChart data={finance.data?.series || []} />
+              <RevenueChart
+                data={(finance.data?.monthly || []).map((m: any) => ({
+                  date: m.period,
+                  income: m.income,
+                  expense: m.expense,
+                }))}
+              />
             </Suspense>
           </div>
           <KpiCard title="Salud" loading={health.isLoading}>
