@@ -162,11 +162,11 @@ export function DashboardLayout({
                   return (
                     <div className="flex flex-col gap-2">
                       <a className="px-3 py-2 rounded-full bg-black text-white text-sm shadow hover:opacity-90 flex items-center gap-2" href={macUrl} target="_blank" rel="noreferrer">
-                        <Apple className="w-4 h-4" />
+                        <img src="/brand/apple-logo.svg" alt="Apple" className="w-4 h-4" />
                         <span>Descargar para macOS</span>
                       </a>
                       <a className="px-3 py-2 rounded-full bg-neutral-900 text-white text-sm shadow hover:opacity-90 flex items-center gap-2" href={winUrl} target="_blank" rel="noreferrer">
-                        <Laptop className="w-4 h-4" />
+                        <img src="/brand/windows-logo.svg" alt="Windows" className="w-4 h-4" />
                         <span>Descargar para Windows</span>
                       </a>
                     </div>
