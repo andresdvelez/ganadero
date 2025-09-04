@@ -111,7 +111,7 @@ export function DashboardLayout({
         {/* Sidebar flotante de altura completa */}
         <aside
           className="fixed top-0 z-40 border border-neutral-200/60 bg-white/70 backdrop-blur-md shadow-lg p-3 flex flex-col gap-3 overflow-auto rounded-2xl"
-          style={{ width: sidebarWidth, left: sidebarLeft, height: "100dvh" }}
+          style={{ width: sidebarWidth, left: sidebarLeft, height: "100dvh", transition: "width 260ms cubic-bezier(0.22,1,0.36,1), left 260ms cubic-bezier(0.22,1,0.36,1)" }}
         >
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2 px-1">
@@ -121,13 +121,7 @@ export function DashboardLayout({
                 <Image src="/brand/full-logo-black-nobg.png" alt="Ganado" width={160} height={36} priority />
               )}
             </div>
-            <button
-              className="w-8 h-8 grid place-items-center rounded-full hover:bg-neutral-100 text-neutral-600"
-              onClick={() => setCollapsed((v) => !v)}
-              title={collapsed ? "Expandir" : "Plegar"}
-            >
-              {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-            </button>
+            {/* Botón interno opcional (no necesario, mantenemos foco en el flotante) */}
           </div>
           <nav className="space-y-1">
             <Link href="/" className={navLinkClass("/")} title="Inicio">
@@ -182,8 +176,18 @@ export function DashboardLayout({
             </>
           )}
         </aside>
+        {/* Botón flotante fijo para plegar/expandir (siempre visible) */}
+        <button
+          className="fixed z-50 w-8 h-8 grid place-items-center rounded-full shadow bg-white/90 hover:bg-white text-neutral-700 border border-neutral-200/70"
+          style={{ top: 16, left: sidebarLeft + sidebarWidth - 12, transition: "left 260ms cubic-bezier(0.22,1,0.36,1)" }}
+          onClick={() => setCollapsed((v) => !v)}
+          title={collapsed ? "Expandir" : "Plegar"}
+        >
+          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        </button>
+
         {/* Área principal a la derecha del sidebar */}
-        <div className="transition-all" style={{ marginLeft: sidebarLeft + sidebarWidth }}>
+        <div className="transition-all" style={{ marginLeft: sidebarLeft + sidebarWidth, transition: "margin-left 260ms cubic-bezier(0.22,1,0.36,1)" }}>
           <header className="flex items-center justify-between px-4 h-14 bg-transparent">
             <div className="flex items-center gap-3">
               <FarmSelector />
@@ -269,7 +273,13 @@ export function DashboardLayout({
           {hasClerk && <UserButton />}
         </nav>
           </header>
-          <main className="p-4 overflow-auto min-h-[100dvh] transition-all">
+          <main className="relative p-4 overflow-auto min-h-[100dvh] transition-all">
+            {/* Puntos difuminados de fondo para reforzar efecto glass */}
+            <div className="pointer-events-none fixed inset-0 -z-10">
+              <div className="absolute top-28 left-40 h-72 w-72 rounded-full bg-emerald-200/25 blur-3xl" />
+              <div className="absolute bottom-24 right-32 h-96 w-96 rounded-full bg-sky-200/20 blur-3xl" />
+              <div className="absolute top-1/2 left-1/3 h-64 w-64 -translate-y-1/2 rounded-full bg-amber-200/20 blur-3xl" />
+            </div>
             <div className="max-w-[1400px] mx-auto space-y-4">
               {children}
             </div>
