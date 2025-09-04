@@ -2,6 +2,7 @@
 
 import { ReactNode, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import Image from "next/image";
 import { UserButton } from "@clerk/nextjs";
 import { getSyncManager } from "@/services/sync/sync-manager";
@@ -75,37 +76,26 @@ export function DashboardLayout({
     };
   }, []);
 
+  const pathname = usePathname();
+
+  const navLinkClass = (href: string) => {
+    const isActive = pathname === href || (href !== "/" && pathname.startsWith(href));
+    return (
+      "flex items-center gap-2 px-3 py-2 rounded-lg " +
+      (isActive ? "bg-neutral-900 text-white" : "hover:bg-neutral-100 text-neutral-800")
+    );
+  };
+
   return (
     <div className="min-h-screen grid grid-rows-[auto,1fr]">
       <header className="flex items-center justify-between px-4 h-14 border-b bg-white">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <Image src="/logo.png" alt="Ganado AI" width={28} height={28} />
           <div className="font-semibold">Ganado AI</div>
           {/* Selector de finca (solo ADMIN) */}
           <FarmSelector />
         </div>
         <nav className="flex items-center gap-3">
-          {/* Descargas de app de escritorio */}
-          {(() => {
-            const macUrl =
-              process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_URL || "/download";
-            const winUrl =
-              process.env.NEXT_PUBLIC_DESKTOP_WIN_DOWNLOAD_URL || "/download";
-            return (
-              <>
-                <Button asChild size="sm" variant="light">
-                  <a href={macUrl} target="_blank" rel="noreferrer">
-                    Descargar macOS
-                  </a>
-                </Button>
-                <Button asChild size="sm" variant="light">
-                  <a href={winUrl} target="_blank" rel="noreferrer">
-                    Descargar Windows
-                  </a>
-                </Button>
-              </>
-            );
-          })()}
           {hasConflicts && (
             <div className="flex items-center gap-2">
               <div
@@ -189,23 +179,19 @@ export function DashboardLayout({
       <div className="grid grid-cols-[260px,1fr] min-h-0">
         <aside className="border-r bg-white/80 min-h-0 p-3 flex flex-col gap-3">
           <nav className="space-y-1">
-            <div className="px-3 py-2 rounded-lg bg-neutral-50 flex items-center justify-between">
-              <a className="hover:underline" href="/ai-assistant">Asistente de AI</a>
-              <button
-                className="text-xs px-2 py-1 rounded-full bg-white border shadow-sm"
-                onClick={() => window.dispatchEvent(new Event("ai-new-chat"))}
-                title="Nuevo chat"
-              >
-                Nuevo
-              </button>
-            </div>
+            <Link href="/" className={navLinkClass("/")}>🏠 Inicio</Link>
+            <Link href="/ai-assistant" className={navLinkClass("/ai-assistant")}>
+              🤖 Asistente de AI
+            </Link>
             <button
-              className="block w-full text-left px-3 py-2 rounded-lg hover:bg-neutral-100"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-neutral-100 text-neutral-800 w-full text-left"
               onClick={() => window.dispatchEvent(new CustomEvent("open-modules"))}
             >
-              Navegador de módulos
+              🧭 Navegador de módulos
             </button>
-            <a className="block px-3 py-2 rounded-lg hover:bg-neutral-100" href="/settings/billing">Plan y facturación</a>
+            <Link href="/settings/billing" className={navLinkClass("/settings/billing")}>
+              💳 Plan y facturación
+            </Link>
           </nav>
           <div className="mt-2">
             <div className="text-xs uppercase tracking-wide text-neutral-500 px-1">Chats recientes</div>
