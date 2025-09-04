@@ -2,7 +2,8 @@
 
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { trpc } from "@/lib/trpc/client";
-import { useMemo } from "react";
+import { useMemo, Suspense } from "react";
+import dynamic from "next/dynamic";
 
 export default function Page() {
   const orgs = trpc.org.myOrganizations.useQuery();
@@ -11,6 +12,11 @@ export default function Page() {
   const health = trpc.health.kpis.useQuery({}, { enabled: true });
   const breeding = trpc.breedingAdv.kpis.useQuery({}, { enabled: true });
   const inventory = trpc.inventory.kpis.useQuery({}, { enabled: true });
+  const milk = trpc.milk.kpis.useQuery({}, { enabled: true });
+
+  const RevenueChart = dynamic(() => import("@/components/embedded/_charts/revenue-chart"), { ssr: false, loading: () => <div className="text-sm text-neutral-500">Cargando gráfico…</div> });
+  const HealthTrendChart = dynamic(() => import("@/components/embedded/_charts/health-trend-chart"), { ssr: false, loading: () => <div className="text-sm text-neutral-500">Cargando gráfico…</div> });
+  const MilkChart = dynamic(() => import("@/components/embedded/_charts/milk-chart"), { ssr: false, loading: () => <div className="text-sm text-neutral-500">Cargando gráfico…</div> });
 
   return (
     <DashboardLayout>
@@ -22,9 +28,21 @@ export default function Page() {
             <MiniStat label="Egresos" value={finance.data?.expense || 0} prefix="$" />
             <MiniStat label="Margen" value={(finance.data?.income || 0) - (finance.data?.expense || 0)} prefix="$" />
           </KpiCard>
+          <div className="rounded-xl border bg-white p-4">
+            <div className="font-medium mb-2">Comportamiento de ingresos</div>
+            <Suspense>
+              <RevenueChart data={finance.data?.series || []} />
+            </Suspense>
+          </div>
           <KpiCard title="Salud" loading={health.isLoading}>
             <MiniStat label="Registros" value={health.data?.series?.length || 0} />
           </KpiCard>
+          <div className="rounded-xl border bg-white p-4">
+            <div className="font-medium mb-2">Tendencias de salud</div>
+            <Suspense>
+              <HealthTrendChart data={health.data?.series || []} />
+            </Suspense>
+          </div>
           <KpiCard title="Reproducción" loading={breeding.isLoading}>
             <MiniStat label="Tasa preñez (%)" value={breeding.data?.kpis?.pregnancyRate ?? 0} />
             <MiniStat label="IEP (días)" value={breeding.data?.kpis?.avgCalvingInterval ?? 0} />
@@ -32,6 +50,12 @@ export default function Page() {
           <KpiCard title="Inventario" loading={inventory.isLoading}>
             <MiniStat label="Productos críticos" value={inventory.data?.lowStock?.length || 0} />
           </KpiCard>
+          <div className="rounded-xl border bg-white p-4 md:col-span-2">
+            <div className="font-medium mb-2">Producción lechera</div>
+            <Suspense>
+              <MilkChart data={milk.data?.series || []} />
+            </Suspense>
+          </div>
         </div>
       </div>
     </DashboardLayout>
