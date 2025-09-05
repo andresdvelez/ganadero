@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { trpc } from "@/lib/trpc/client";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { bindDeviceLocally, provisionFromClerk } from "@/lib/auth/offline-auth";
@@ -12,7 +11,7 @@ import { addToast } from "@/components/ui/toast";
 import { robustDeviceId } from "@/lib/utils";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, MicOff, ArrowUp, Plus, Copy, Edit3, X, Image as ImageIcon, Bot } from "lucide-react";
+import { Copy, Edit3, X, Image as ImageIcon, Bot } from "lucide-react";
 import { AIInputBar } from "@/components/ai/ai-input-bar";
 import { useDropzone } from "react-dropzone";
 
@@ -208,7 +207,7 @@ export default function OnboardingPage() {
     if (!field) return null;
 
     // extraer valor después de "por" o "a" o comillas
-    let m = raw.match(/\bpor\s+"?([^\"\n]+)\"?$/i) || raw.match(/\ba\s+"?([^\"\n]+)\"?$/i);
+    const m = raw.match(/\bpor\s+"?([^\"\n]+)\"?$/i) || raw.match(/\ba\s+"?([^\"\n]+)\"?$/i);
     let value = m ? m[1].trim() : "";
     if (!value) {
       // fallback: última frase después del campo
@@ -1121,7 +1120,6 @@ export default function OnboardingPage() {
                         // El usuario decide subir después
                         proceedToFarm();
                       }}
-                      awaitingFor={awaitingLogoFor}
                     />
                   ) : m.kind === "summary" && m.summary ? (
                     <div className="max-w-[85%] w-full">
@@ -1263,12 +1261,10 @@ function LogoDropMessage({
   onUploaded,
   current,
   onClear,
-  awaitingFor,
 }: {
   onUploaded: (d: { dataUrl: string; fileName?: string }) => void;
   current: { dataUrl: string; fileName?: string } | null;
   onClear: () => void;
-  awaitingFor?: "org" | "farm" | null;
 }) {
   const onDrop = (accepted: File[]) => {
     if (!accepted || accepted.length === 0) return;
