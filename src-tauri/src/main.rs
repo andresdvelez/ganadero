@@ -6,6 +6,7 @@ use std::process::{Child, Command, Stdio};
 use std::net::TcpStream;
 use tauri::Manager;
 use tokio::time::sleep;
+use std::time::Duration;
 
 static SERVER_CHILD: tauri::async_runtime::Mutex<Option<Child>> = tauri::async_runtime::Mutex::const_new(None);
 
@@ -166,7 +167,7 @@ fn main() {
         return Ok(());
       }
 
-      // Producción: lanzar servidor Next standalone
+      // Producción: preferir remoto si hay Internet; si no, lanzar servidor Next standalone
       let app_dir = app.path_resolver().resource_dir().ok_or("resource_dir not found")?;
       let data_dir = app.path_resolver().app_data_dir().ok_or("app_data_dir not found")?;
       let logs_dir = data_dir.join("logs");
@@ -188,8 +189,28 @@ fn main() {
       let env_file = app_dir.join(".env");
       let env_map = load_env_from_file(&env_file);
 
+      let public_remote = std::env::var("PUBLIC_APP_URL").ok().unwrap_or("https://app.ganado.co".to_string());
+
       let mut started = false;
       let mut attempted_start = false;
+
+      // Decidir destino según conectividad: primero intentar remoto si hay Internet
+      if let Some(win) = app.get_window("main") {
+        let w = win.clone();
+        let remote = public_remote.clone();
+        tauri::async_runtime::block_on(async {
+          let client = reqwest::Client::builder().timeout(Duration::from_millis(1500)).build().unwrap();
+          let mut online = false;
+          if let Ok(resp) = client.get(&remote).header("Cache-Control", "no-store").send().await {
+            online = resp.status().is_success();
+          }
+          if online {
+            let _ = w.eval(&format!("window.location.replace('{}');", remote));
+            return;
+          }
+        });
+      }
+
       if let Some(srv) = server_js {
         // Si el puerto ya está ocupado (posible instancia previa), considerarlo disponible
         let prebound = TcpStream::connect(("127.0.0.1", port)).is_ok();

@@ -4,7 +4,7 @@ import { ReactNode, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
-import { UserButton } from "@clerk/nextjs";
+import { UserButton, useClerk } from "@clerk/nextjs";
 import { getSyncManager } from "@/services/sync/sync-manager";
 import { Button } from "@/components/ui/button";
 import { addToast } from "@/components/ui/toast";
@@ -29,6 +29,7 @@ export function DashboardLayout({
   leftSlot,
   rightSlot,
 }: DashboardLayoutProps) {
+  const { signOut } = useClerk();
   const hasClerk = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
   const [syncStatus, setSyncStatus] = useState<{
     online: boolean;
@@ -276,7 +277,31 @@ export function DashboardLayout({
               </button>
             );
           })()}
-          {hasClerk && <UserButton />}
+          {hasClerk && (
+            <div className="flex items-center gap-2">
+              <UserButton />
+              <Button
+                size="sm"
+                variant="light"
+                onPress={async () => {
+                  try {
+                    await signOut({ redirectUrl: "/sign-in" });
+                  } catch (e) {
+                    console.warn("Sign out failed, forcing redirect", e as any);
+                  } finally {
+                    try {
+                      // Limpieza defensiva del estado local
+                      window.localStorage.removeItem("ACTIVE_FARM_ID");
+                    } catch {}
+                    window.location.href = "/sign-in";
+                  }
+                }}
+                title="Cerrar sesión"
+              >
+                Cerrar sesión
+              </Button>
+            </div>
+          )}
         </nav>
           </header>
           <main className="relative p-4 overflow-auto min-h-[100dvh] transition-all">
