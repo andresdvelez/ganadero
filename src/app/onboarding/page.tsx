@@ -90,6 +90,12 @@ export default function OnboardingPage() {
   const [pendingEdit, setPendingEdit] = useState<null | "org" | "farmName" | "farmCode">(null);
   const endRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), [messages]);
+  const [isDesktopApp, setIsDesktopApp] = useState(false);
+  useEffect(() => {
+    try {
+      setIsDesktopApp(typeof window !== "undefined" && !!(window as any).__TAURI__);
+    } catch {}
+  }, []);
 
   // Voz: síntesis y reconocimiento
   const [voiceOn, setVoiceOn] = useState(true);
@@ -629,7 +635,7 @@ export default function OnboardingPage() {
         </div>
 
         {/* Bloque opcional: vinculación de dispositivo como isla aparte cuando current === "confirm" y no locked */}
-        {current === "confirm" && !created && (
+        {current === "confirm" && !created && isDesktopApp && (
           <div className="mt-4 island p-4">
             <div className="text-sm font-medium mb-2">Vincular dispositivo (opcional)</div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
