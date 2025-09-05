@@ -131,6 +131,24 @@ export default function OnboardingPage() {
     setIsListening(false);
   };
 
+  // Saludo inicial automático del agente
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (messages.length > 0) return;
+    const hiName = user?.firstName ? `, ${user.firstName}` : "";
+    const intro = `¡Hola${hiName}! Soy tu asistente de configuración en Ganado.co.`;
+    const prompt = alreadyHasOrg
+      ? `Ya encontré tu organización ${myOrgs?.[0]?.name}. Continuemos: ¿cómo se llama tu primera finca?`
+      : `Empecemos por tu organización. ¿Cómo se llama?`;
+    const m1: ChatMsg = { id: `${Date.now()}-w1`, role: "ai", text: intro };
+    const m2: ChatMsg = { id: `${Date.now()}-w2`, role: "ai", text: prompt };
+    setMessages([m1, m2]);
+    speak(`${intro} ${prompt}`);
+    // set current accordingly
+    setCurrent(alreadyHasOrg ? "farm" : "org");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded, alreadyHasOrg]);
+
   async function handleLinkDevice(orgId?: string) {
     if (!user) return;
     try {
