@@ -190,25 +190,28 @@ fn main() {
       let env_map = load_env_from_file(&env_file);
 
       let public_remote = std::env::var("PUBLIC_APP_URL").ok().unwrap_or("https://app.ganado.co".to_string());
+      let prefer_remote = std::env::var("PREFER_REMOTE").ok().map(|v| v=="1"||v.to_lowercase()=="true").unwrap_or(false);
 
       let mut started = false;
       let mut attempted_start = false;
 
-      // Decidir destino según conectividad: primero intentar remoto si hay Internet
-      if let Some(win) = app.get_window("main") {
-        let w = win.clone();
-        let remote = public_remote.clone();
-        tauri::async_runtime::block_on(async {
-          let client = reqwest::Client::builder().timeout(Duration::from_millis(1500)).build().unwrap();
-          let mut online = false;
-          if let Ok(resp) = client.get(&remote).header("Cache-Control", "no-store").send().await {
-            online = resp.status().is_success();
-          }
-          if online {
-            let _ = w.eval(&format!("window.location.replace('{}');", remote));
-            return;
-          }
-        });
+      // Decidir destino según conectividad SOLO si se prefiere remoto vía env
+      if prefer_remote {
+        if let Some(win) = app.get_window("main") {
+          let w = win.clone();
+          let remote = public_remote.clone();
+          tauri::async_runtime::block_on(async {
+            let client = reqwest::Client::builder().timeout(Duration::from_millis(1500)).build().unwrap();
+            let mut online = false;
+            if let Ok(resp) = client.get(&remote).header("Cache-Control", "no-store").send().await {
+              online = resp.status().is_success();
+            }
+            if online {
+              let _ = w.eval(&format!("window.location.replace('{}');", remote));
+              return;
+            }
+          });
+        }
       }
 
       if let Some(srv) = server_js {
@@ -377,6 +380,8 @@ fn main() {
 
         // Preparar modelo local: copiar desde Resources/models si existe, o descargar
         let app_handle = app.app_handle();
+        let auto_model = std::env::var("AUTO_MODEL_SETUP").ok().map(|v| v=="1"||v.to_lowercase()=="true").unwrap_or(false);
+        if auto_model {
         tauri::async_runtime::spawn(async move {
           // Configuración por variables de entorno (opcional)
           let model_url = std::env::var("NEXT_PUBLIC_MODEL_DOWNLOAD_URL").ok()
@@ -438,6 +443,7 @@ fn main() {
             let _ = start_llama_server(app_handle.clone(), model_path, llama_port).await;
           }
         });
+        }
 
         win.on_window_event(|event| {
           if let tauri::WindowEvent::CloseRequested { .. } = event {
