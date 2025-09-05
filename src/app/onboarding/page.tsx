@@ -12,7 +12,7 @@ import { addToast } from "@/components/ui/toast";
 import { robustDeviceId } from "@/lib/utils";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, MicOff, Volume2 } from "lucide-react";
+import { Mic, MicOff, ArrowUp, Plus } from "lucide-react";
 
 type WizardStep = "org" | "farm" | "confirm";
 
@@ -141,6 +141,255 @@ export default function OnboardingPage() {
   const stopListening = () => {
     try { recognitionRef.current?.stop?.(); } catch {}
     setIsListening(false);
+  };
+
+  const handleSend = () => {
+    const text = inputText.trim();
+    if (!text) return;
+    setMessages((p) => [...p, { id: `${Date.now()}-u`, role: "user", text }]);
+    setInputText("");
+    // Intento de edición directa: "cambiar/editar <campo> a <valor>"
+    const low = text.toLowerCase();
+    const wantsChange = /\b(cambiar|editar)\b/.test(low);
+    const extractAfterA = (t: string) => {
+      const m = t.match(/\ba\s+(.+)$/);
+      return m ? m[1].trim() : "";
+    };
+    if (wantsChange) {
+      if (/organ/i.test(low)) {
+        const val = extractAfterA(text);
+        if (val) {
+          setOrgDraft({ name: val });
+          const msg = `Nuevo dato guardado: organización = ${val}.`;
+          setMessages((p) => [...p, { id: `${Date.now()}-chg1`, role: "ai", text: msg }]);
+          speak(msg);
+        } else {
+          setPendingEdit("org");
+          const ask = "¿Cuál es el nuevo nombre de tu organización?";
+          setMessages((p) => [...p, { id: `${Date.now()}-ask-org`, role: "ai", text: ask }]);
+          speak(ask);
+          return;
+        }
+      } else if (/c[oó]digo|code/i.test(low)) {
+        const val = extractAfterA(text).toLowerCase();
+        if (val) {
+          if (!/^fn-[a-z0-9-]{3,}$/.test(val)) {
+            const msg = "El código debe iniciar con fn- y usar solo letras, números y guiones.";
+            setMessages((p) => [...p, { id: `${Date.now()}-chg2x`, role: "ai", text: msg }]);
+            speak(msg);
+            return;
+          }
+          setFarmDraft((prev) => ({ ...prev, code: val }));
+          const msg = `Nuevo dato guardado: código de la finca = ${val}.`;
+          setMessages((p) => [...p, { id: `${Date.now()}-chg2`, role: "ai", text: msg }]);
+          speak(msg);
+        } else {
+          setPendingEdit("farmCode");
+          const ask = "¿Cuál es el nuevo código? (ej. fn-mi-finca)";
+          setMessages((p) => [...p, { id: `${Date.now()}-ask-code`, role: "ai", text: ask }]);
+          speak(ask);
+          return;
+        }
+      } else if (/finca|nombre/i.test(low)) {
+        const val = extractAfterA(text);
+        if (val) {
+          setFarmDraft((prev) => ({ ...prev, name: val }));
+          const msg = `Nuevo dato guardado: nombre de la finca = ${val}.`;
+          setMessages((p) => [...p, { id: `${Date.now()}-chg3`, role: "ai", text: msg }]);
+          speak(msg);
+        } else {
+          setPendingEdit("farmName");
+          const ask = "¿Cuál es el nuevo nombre de tu finca?";
+          setMessages((p) => [...p, { id: `${Date.now()}-ask-name`, role: "ai", text: ask }]);
+          speak(ask);
+          return;
+        }
+      }
+      // Si estamos en edición confirmada, volver al siguiente faltante o resumen
+      if (!orgDraft.name && !alreadyHasOrg) {
+        const ask = "Escribe el nombre de tu organización.";
+        setMessages((p) => [...p, { id: `${Date.now()}-next1`, role: "ai", text: ask }]);
+        speak(ask);
+        setCurrent("org");
+        setLocked(false);
+        return;
+      }
+      if (!farmDraft.name) {
+        const ask = "Ahora dime el nombre de tu finca.";
+        setMessages((p) => [...p, { id: `${Date.now()}-next2`, role: "ai", text: ask }]);
+        speak(ask);
+        setCurrent("farm");
+        setLocked(false);
+        return;
+      }
+      if (!farmDraft.code) {
+        const ask = "Escribe el código de tu finca (ej. fn-mi-finca).";
+        setMessages((p) => [...p, { id: `${Date.now()}-next3`, role: "ai", text: ask }]);
+        speak(ask);
+        setCurrent("farm");
+        setLocked(false);
+        return;
+      }
+      // Todo completo → mostrar resumen y bloquear
+      const summary2 = `Organización: ${alreadyHasOrg ? (myOrgs?.[0]?.name ?? orgDraft.name) : orgDraft.name}\nFinca: ${farmDraft.name}\nCódigo: ${farmDraft.code}`;
+      setMessages((p) => [...p,
+        { id: `${Date.now()}-sum1`, role: "ai", text: "Perfecto, actualicé tus datos. Este es el resumen actualizado:" },
+        { id: `${Date.now()}-sum2`, role: "ai", text: summary2 },
+        { id: `${Date.now()}-sum3`, role: "ai", text: "Confirma para continuar o indica qué deseas editar." },
+      ]);
+      speak("Perfecto, actualicé tus datos. Revisa el resumen y confirma para continuar.");
+      setLocked(true);
+      return;
+    }
+
+    // Si hay una edición pendiente (preguntamos por el nuevo valor)
+    if (pendingEdit) {
+      if (pendingEdit === "org") {
+        if (text.length < 2) {
+          const msg = "Ese nombre es muy corto. Escribe un nombre más descriptivo, por favor.";
+          setMessages((p) => [...p, { id: `${Date.now()}-porgx`, role: "ai", text: msg }]);
+          speak(msg);
+          return;
+        }
+        setOrgDraft({ name: text });
+        const msg = `Nuevo dato guardado: organización = ${text}.`;
+        setMessages((p) => [...p, { id: `${Date.now()}-porg`, role: "ai", text: msg }]);
+        speak(msg);
+      }
+      if (pendingEdit === "farmName") {
+        if (text.length < 2) {
+          const msg = "Ese nombre es muy corto. Inténtalo nuevamente.";
+          setMessages((p) => [...p, { id: `${Date.now()}-pfnamex`, role: "ai", text: msg }]);
+          speak(msg);
+          return;
+        }
+        setFarmDraft((prev) => ({ ...prev, name: text }));
+        const msg = `Nuevo dato guardado: nombre de la finca = ${text}.`;
+        setMessages((p) => [...p, { id: `${Date.now()}-pfname`, role: "ai", text: msg }]);
+        speak(msg);
+      }
+      if (pendingEdit === "farmCode") {
+        const code = text.toLowerCase();
+        if (!/^fn-[a-z0-9-]{3,}$/.test(code)) {
+          const msg = "El código debe iniciar con fn- y usar solo letras, números y guiones.";
+          setMessages((p) => [...p, { id: `${Date.now()}-pfcodex`, role: "ai", text: msg }]);
+          speak(msg);
+          return;
+        }
+        setFarmDraft((prev) => ({ ...prev, code }));
+        const msg = `Nuevo dato guardado: código de la finca = ${code}.`;
+        setMessages((p) => [...p, { id: `${Date.now()}-pfcode`, role: "ai", text: msg }]);
+        speak(msg);
+      }
+      setPendingEdit(null);
+      // Continuar con faltantes o resumen
+      if (!orgDraft.name && !alreadyHasOrg) {
+        const ask = "Escribe el nombre de tu organización.";
+        setMessages((p) => [...p, { id: `${Date.now()}-next1b`, role: "ai", text: ask }]);
+        speak(ask);
+        setCurrent("org");
+        setLocked(false);
+        return;
+      }
+      if (!farmDraft.name) {
+        const ask = "Ahora dime el nombre de tu finca.";
+        setMessages((p) => [...p, { id: `${Date.now()}-next2b`, role: "ai", text: ask }]);
+        speak(ask);
+        setCurrent("farm");
+        setLocked(false);
+        return;
+      }
+      if (!farmDraft.code) {
+        const ask = "Escribe el código de tu finca (ej. fn-mi-finca).";
+        setMessages((p) => [...p, { id: `${Date.now()}-next3b`, role: "ai", text: ask }]);
+        speak(ask);
+        setCurrent("farm");
+        setLocked(false);
+        return;
+      }
+      const summary3 = `Organización: ${alreadyHasOrg ? (myOrgs?.[0]?.name ?? orgDraft.name) : orgDraft.name}\nFinca: ${farmDraft.name}\nCódigo: ${farmDraft.code}`;
+      setMessages((p) => [...p,
+        { id: `${Date.now()}-sum4`, role: "ai", text: "Actualicé tus respuestas. Este es el resumen:" },
+        { id: `${Date.now()}-sum5`, role: "ai", text: summary3 },
+        { id: `${Date.now()}-sum6`, role: "ai", text: "Confirma para continuar o dime si quieres editar algo más." },
+      ]);
+      speak("Actualicé tus respuestas. Revisa el resumen y confirma para continuar.");
+      setLocked(true);
+      return;
+    }
+
+    // reglas simples de validación/onboarding guiado
+    const step = current;
+    if (step === "org" && !alreadyHasOrg) {
+      if (text.length < 2) {
+        const msg = "Ese nombre es muy corto. Escribe el nombre completo de tu organización, por favor.";
+        setMessages((p) => [...p, { id: `${Date.now()}-ai1`, role: "ai", text: msg }]);
+        speak(msg);
+        return;
+      }
+      setOrgDraft({ name: text });
+      const msg2 = "¡Perfecto! Ahora dime el nombre de tu primera finca.";
+      setMessages((p) => [...p, { id: `${Date.now()}-ai2`, role: "ai", text: msg2 }]);
+      speak(msg2);
+      setCurrent("farm");
+      return;
+    }
+    if (step === "farm") {
+      if (!farmDraft.name) {
+        if (text.length < 2) {
+          const msg3 = "Ese nombre parece corto. ¿Cómo se llama tu finca?";
+          setMessages((p) => [...p, { id: `${Date.now()}-ai3`, role: "ai", text: msg3 }]);
+          speak(msg3);
+          return;
+        }
+        const genCode = `fn-${slugify(text)}`;
+        setFarmDraft((prev) => ({ ...prev, name: text, code: genCode }));
+        setCurrent("confirm");
+        const summary = `Organización: ${alreadyHasOrg ? (myOrgs?.[0]?.name ?? orgDraft.name) : orgDraft.name}\nFinca: ${text}\nCódigo asignado: ${genCode}`;
+        const nextMsgs: ChatMsg[] = [
+          ...messages,
+          { id: `${Date.now()}-ai6`, role: "ai", text: "He asignado automáticamente un código a tu finca." },
+          { id: `${Date.now()}-ai7`, role: "ai", text: summary },
+          { id: `${Date.now()}-ai8`, role: "ai", text: "Confirma para continuar o dime si deseas editar la organización o el nombre de la finca." },
+        ];
+        setMessages(nextMsgs);
+        speak("He asignado automáticamente un código a tu finca. Revisa el resumen y confirma para continuar.");
+        setLocked(true);
+        return;
+      }
+    }
+    if (locked) {
+      // Edición guiada
+      const lower = text.toLowerCase();
+      if (/organ/i.test(lower)) {
+        setLocked(false);
+        setCurrent("org");
+        const msg9 = "Claro, ¿cuál es el nuevo nombre de tu organización?";
+        setMessages((p) => [...p, { id: `${Date.now()}-ai9`, role: "ai", text: msg9 }]);
+        speak(msg9);
+        return;
+      }
+      if (/finca|nombre/i.test(lower)) {
+        setLocked(false);
+        setCurrent("farm");
+        setFarmDraft((prev) => ({ ...prev, name: "" }));
+        const msg10 = "Entendido, escribe el nuevo nombre de tu finca.";
+        setMessages((p) => [...p, { id: `${Date.now()}-ai10`, role: "ai", text: msg10 }]);
+        speak(msg10);
+        return;
+      }
+      if (/c[oó]digo|code/i.test(lower)) {
+        setLocked(false);
+        setCurrent("farm");
+        const msg11 = "Escribe el nuevo código (ej. fn-mi-finca).";
+        setMessages((p) => [...p, { id: `${Date.now()}-ai11`, role: "ai", text: msg11 }]);
+        speak(msg11);
+        return;
+      }
+      const msg12 = "Sigamos enfocados en el onboarding. Dime si quieres editar organización, nombre de la finca o su código.";
+      setMessages((p) => [...p, { id: `${Date.now()}-ai12`, role: "ai", text: msg12 }]);
+      speak(msg12);
+    }
   };
 
   // Saludo inicial automático del agente
@@ -339,297 +588,44 @@ export default function OnboardingPage() {
             </AnimatePresence>
             <div ref={endRef} />
           </div>
-          {/* Input */}
-          <div className="mt-4 flex items-center gap-2">
-            <Input
-              placeholder="Escribe tu respuesta…"
+          {/* Input estilo pill con íconos internos */}
+          <div className="mt-4 relative">
+            <input
+              placeholder="Pregunta lo que quieras"
               value={inputText}
               onChange={(e) => setInputText((e.target as HTMLInputElement).value)}
               disabled={locked}
+              className="w-full h-12 rounded-full border border-neutral-200 bg-white/70 pl-10 pr-28 text-sm placeholder-neutral-500 outline-none"
             />
-            <Button
-              color="primary"
-              onPress={() => {
-                const text = inputText.trim();
-                if (!text) return;
-                setMessages((p) => [...p, { id: `${Date.now()}-u`, role: "user", text }]);
-                setInputText("");
-                // Intento de edición directa: "cambiar/editar <campo> a <valor>"
-                const low = text.toLowerCase();
-                const wantsChange = /\b(cambiar|editar)\b/.test(low);
-                const extractAfterA = (t: string) => {
-                  const m = t.match(/\ba\s+(.+)$/);
-                  return m ? m[1].trim() : "";
-                };
-                if (wantsChange) {
-                  if (/organ/i.test(low)) {
-                    const val = extractAfterA(text);
-                    if (val) {
-                      setOrgDraft({ name: val });
-                      const msg = `Nuevo dato guardado: organización = ${val}.`;
-                      setMessages((p) => [...p, { id: `${Date.now()}-chg1`, role: "ai", text: msg }]);
-                      speak(msg);
-                    } else {
-                      setPendingEdit("org");
-                      const ask = "¿Cuál es el nuevo nombre de tu organización?";
-                      setMessages((p) => [...p, { id: `${Date.now()}-ask-org`, role: "ai", text: ask }]);
-                      speak(ask);
-                      return;
-                    }
-                  } else if (/c[oó]digo|code/i.test(low)) {
-                    const val = extractAfterA(text).toLowerCase();
-                    if (val) {
-                      if (!/^fn-[a-z0-9-]{3,}$/.test(val)) {
-                        const msg = "El código debe iniciar con fn- y usar solo letras, números y guiones.";
-                        setMessages((p) => [...p, { id: `${Date.now()}-chg2x`, role: "ai", text: msg }]);
-                        speak(msg);
-                        return;
-                      }
-                      setFarmDraft((prev) => ({ ...prev, code: val }));
-                      const msg = `Nuevo dato guardado: código de la finca = ${val}.`;
-                      setMessages((p) => [...p, { id: `${Date.now()}-chg2`, role: "ai", text: msg }]);
-                      speak(msg);
-                    } else {
-                      setPendingEdit("farmCode");
-                      const ask = "¿Cuál es el nuevo código? (ej. fn-mi-finca)";
-                      setMessages((p) => [...p, { id: `${Date.now()}-ask-code`, role: "ai", text: ask }]);
-                      speak(ask);
-                      return;
-                    }
-                  } else if (/finca|nombre/i.test(low)) {
-                    const val = extractAfterA(text);
-                    if (val) {
-                      setFarmDraft((prev) => ({ ...prev, name: val }));
-                      const msg = `Nuevo dato guardado: nombre de la finca = ${val}.`;
-                      setMessages((p) => [...p, { id: `${Date.now()}-chg3`, role: "ai", text: msg }]);
-                      speak(msg);
-                    } else {
-                      setPendingEdit("farmName");
-                      const ask = "¿Cuál es el nuevo nombre de tu finca?";
-                      setMessages((p) => [...p, { id: `${Date.now()}-ask-name`, role: "ai", text: ask }]);
-                      speak(ask);
-                      return;
-                    }
-                  }
-                  // Si estamos en edición confirmada, volver al siguiente faltante o resumen
-                  if (!orgDraft.name && !alreadyHasOrg) {
-                    const ask = "Escribe el nombre de tu organización.";
-                    setMessages((p) => [...p, { id: `${Date.now()}-next1`, role: "ai", text: ask }]);
-                    speak(ask);
-                    setCurrent("org");
-                    setLocked(false);
-                    return;
-                  }
-                  if (!farmDraft.name) {
-                    const ask = "Ahora dime el nombre de tu finca.";
-                    setMessages((p) => [...p, { id: `${Date.now()}-next2`, role: "ai", text: ask }]);
-                    speak(ask);
-                    setCurrent("farm");
-                    setLocked(false);
-                    return;
-                  }
-                  if (!farmDraft.code) {
-                    const ask = "Escribe el código de tu finca (ej. fn-mi-finca).";
-                    setMessages((p) => [...p, { id: `${Date.now()}-next3`, role: "ai", text: ask }]);
-                    speak(ask);
-                    setCurrent("farm");
-                    setLocked(false);
-                    return;
-                  }
-                  // Todo completo → mostrar resumen y bloquear
-                  const summary2 = `Organización: ${alreadyHasOrg ? (myOrgs?.[0]?.name ?? orgDraft.name) : orgDraft.name}\nFinca: ${farmDraft.name}\nCódigo: ${farmDraft.code}`;
-                  setMessages((p) => [...p,
-                    { id: `${Date.now()}-sum1`, role: "ai", text: "Perfecto, actualicé tus datos. Este es el resumen actualizado:" },
-                    { id: `${Date.now()}-sum2`, role: "ai", text: summary2 },
-                    { id: `${Date.now()}-sum3`, role: "ai", text: "Confirma para continuar o indica qué deseas editar." },
-                  ]);
-                  speak("Perfecto, actualicé tus datos. Revisa el resumen y confirma para continuar.");
-                  setLocked(true);
-                  return;
-                }
-
-                // Si hay una edición pendiente (preguntamos por el nuevo valor)
-                if (pendingEdit) {
-                  if (pendingEdit === "org") {
-                    if (text.length < 2) {
-                      const msg = "Ese nombre es muy corto. Escribe un nombre más descriptivo, por favor.";
-                      setMessages((p) => [...p, { id: `${Date.now()}-porgx`, role: "ai", text: msg }]);
-                      speak(msg);
-                      return;
-                    }
-                    setOrgDraft({ name: text });
-                    const msg = `Nuevo dato guardado: organización = ${text}.`;
-                    setMessages((p) => [...p, { id: `${Date.now()}-porg`, role: "ai", text: msg }]);
-                    speak(msg);
-                  }
-                  if (pendingEdit === "farmName") {
-                    if (text.length < 2) {
-                      const msg = "Ese nombre es muy corto. Inténtalo nuevamente.";
-                      setMessages((p) => [...p, { id: `${Date.now()}-pfnamex`, role: "ai", text: msg }]);
-                      speak(msg);
-                      return;
-                    }
-                    setFarmDraft((prev) => ({ ...prev, name: text }));
-                    const msg = `Nuevo dato guardado: nombre de la finca = ${text}.`;
-                    setMessages((p) => [...p, { id: `${Date.now()}-pfname`, role: "ai", text: msg }]);
-                    speak(msg);
-                  }
-                  if (pendingEdit === "farmCode") {
-                    const code = text.toLowerCase();
-                    if (!/^fn-[a-z0-9-]{3,}$/.test(code)) {
-                      const msg = "El código debe iniciar con fn- y usar solo letras, números y guiones.";
-                      setMessages((p) => [...p, { id: `${Date.now()}-pfcodex`, role: "ai", text: msg }]);
-                      speak(msg);
-                      return;
-                    }
-                    setFarmDraft((prev) => ({ ...prev, code }));
-                    const msg = `Nuevo dato guardado: código de la finca = ${code}.`;
-                    setMessages((p) => [...p, { id: `${Date.now()}-pfcode`, role: "ai", text: msg }]);
-                    speak(msg);
-                  }
-                  setPendingEdit(null);
-                  // Continuar con faltantes o resumen
-                  if (!orgDraft.name && !alreadyHasOrg) {
-                    const ask = "Escribe el nombre de tu organización.";
-                    setMessages((p) => [...p, { id: `${Date.now()}-next1b`, role: "ai", text: ask }]);
-                    speak(ask);
-                    setCurrent("org");
-                    setLocked(false);
-                    return;
-                  }
-                  if (!farmDraft.name) {
-                    const ask = "Ahora dime el nombre de tu finca.";
-                    setMessages((p) => [...p, { id: `${Date.now()}-next2b`, role: "ai", text: ask }]);
-                    speak(ask);
-                    setCurrent("farm");
-                    setLocked(false);
-                    return;
-                  }
-                  if (!farmDraft.code) {
-                    const ask = "Escribe el código de tu finca (ej. fn-mi-finca).";
-                    setMessages((p) => [...p, { id: `${Date.now()}-next3b`, role: "ai", text: ask }]);
-                    speak(ask);
-                    setCurrent("farm");
-                    setLocked(false);
-                    return;
-                  }
-                  const summary3 = `Organización: ${alreadyHasOrg ? (myOrgs?.[0]?.name ?? orgDraft.name) : orgDraft.name}\nFinca: ${farmDraft.name}\nCódigo: ${farmDraft.code}`;
-                  setMessages((p) => [...p,
-                    { id: `${Date.now()}-sum4`, role: "ai", text: "Actualicé tus respuestas. Este es el resumen:" },
-                    { id: `${Date.now()}-sum5`, role: "ai", text: summary3 },
-                    { id: `${Date.now()}-sum6`, role: "ai", text: "Confirma para continuar o dime si quieres editar algo más." },
-                  ]);
-                  speak("Actualicé tus respuestas. Revisa el resumen y confirma para continuar.");
-                  setLocked(true);
-                  return;
-                }
-
-                // reglas simples de validación/onboarding guiado
-                const step = current;
-                if (step === "org" && !alreadyHasOrg) {
-                  if (text.length < 2) {
-                    const msg = "Ese nombre es muy corto. Escribe el nombre completo de tu organización, por favor.";
-                    setMessages((p) => [...p, { id: `${Date.now()}-ai1`, role: "ai", text: msg }]);
-                    speak(msg);
-                    return;
-                  }
-                  setOrgDraft({ name: text });
-                  const msg2 = "¡Perfecto! Ahora dime el nombre de tu primera finca.";
-                  setMessages((p) => [...p, { id: `${Date.now()}-ai2`, role: "ai", text: msg2 }]);
-                  speak(msg2);
-                  setCurrent("farm");
-                  return;
-                }
-                if (step === "farm") {
-                  if (!farmDraft.name) {
-                    // primera respuesta será nombre
-                    if (text.length < 2) {
-                      const msg3 = "Ese nombre parece corto. ¿Cómo se llama tu finca?";
-                      setMessages((p) => [...p, { id: `${Date.now()}-ai3`, role: "ai", text: msg3 }]);
-                      speak(msg3);
-                      return;
-                    }
-                    setFarmDraft((prev) => ({ ...prev, name: text }));
-                    const msg4 = "Gracias. Ahora escribe el código de tu finca (ej. fn-mi-finca). Esto nos ayuda a identificarla de forma única.";
-                    setMessages((p) => [...p, { id: `${Date.now()}-ai4`, role: "ai", text: msg4 }]);
-                    speak(msg4);
-                    return;
-                  }
-                  // segundo dato: código
-                  const code = text.toLowerCase();
-                  if (!/^fn-[a-z0-9-]{3,}$/.test(code)) {
-                    const msg5 = "El código debe iniciar con fn- y usar solo letras, números y guiones. Inténtalo de nuevo.";
-                    setMessages((p) => [...p, { id: `${Date.now()}-ai5`, role: "ai", text: msg5 }]);
-                    speak(msg5);
-                    return;
-                  }
-                  setFarmDraft((prev) => ({ ...prev, code }));
-                  setCurrent("confirm");
-                  // Resumen y bloqueo con acciones
-                  const summary = `Organización: ${alreadyHasOrg ? (myOrgs?.[0]?.name ?? orgDraft.name) : orgDraft.name}\nFinca: ${farmDraft.name || "(pendiente)"}\nCódigo: ${code}`;
-                  const nextMsgs: ChatMsg[] = [
-                    ...messages,
-                    { id: `${Date.now()}-ai6`, role: "ai", text: "Excelente. Este es el resumen de tu configuración:" },
-                    { id: `${Date.now()}-ai7`, role: "ai", text: summary },
-                    { id: `${Date.now()}-ai8`, role: "ai", text: "Si todo está bien, confirma para continuar. O dime qué deseas editar (organización, nombre o código de la finca)." },
-                  ];
-                  setMessages(nextMsgs);
-                  speak("Excelente. Este es el resumen de tu configuración. Si todo está bien, confirma para continuar o dime qué deseas editar.");
-                  setLocked(true);
-                  return;
-                }
-                if (locked) {
-                  // Edición guiada
-                  const lower = text.toLowerCase();
-                  if (/organ/i.test(lower)) {
-                    setLocked(false);
-                    setCurrent("org");
-                    const msg9 = "Claro, ¿cuál es el nuevo nombre de tu organización?";
-                    setMessages((p) => [...p, { id: `${Date.now()}-ai9`, role: "ai", text: msg9 }]);
-                    speak(msg9);
-                    return;
-                  }
-                  if (/finca|nombre/i.test(lower)) {
-                    setLocked(false);
-                    setCurrent("farm");
-                    setFarmDraft((prev) => ({ ...prev, name: "" }));
-                    const msg10 = "Entendido, escribe el nuevo nombre de tu finca.";
-                    setMessages((p) => [...p, { id: `${Date.now()}-ai10`, role: "ai", text: msg10 }]);
-                    speak(msg10);
-                    return;
-                  }
-                  if (/c[oó]digo|code/i.test(lower)) {
-                    setLocked(false);
-                    setCurrent("farm");
-                    const msg11 = "Escribe el nuevo código (ej. fn-mi-finca).";
-                    setMessages((p) => [...p, { id: `${Date.now()}-ai11`, role: "ai", text: msg11 }]);
-                    speak(msg11);
-                    return;
-                  }
-                  const msg12 = "Sigamos enfocados en el onboarding. Dime si quieres editar organización, nombre de la finca o su código.";
-                  setMessages((p) => [...p, { id: `${Date.now()}-ai12`, role: "ai", text: msg12 }]);
-                  speak(msg12);
-                }
-              }}
-              disabled={locked}
-            >
-              Enviar
-            </Button>
+            <Plus className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-700" />
+            <span className={`absolute right-16 top-1/2 -translate-y-1/2 inline-block w-2 h-2 rounded-full ${isListening ? "bg-emerald-500" : "bg-emerald-400"}`} />
             <Button
               aria-label={isListening ? "Detener micrófono" : "Hablar"}
               variant="flat"
               onPress={() => (isListening ? stopListening() : startListening())}
               disabled={locked}
+              isIconOnly
+              className="absolute right-9 top-1/2 -translate-y-1/2 rounded-full"
             >
               {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                          </Button>
-                          <Button
-              aria-label={voiceOn ? "Silenciar voz" : "Activar voz"}
-              variant="light"
-              onPress={() => setVoiceOn((v) => !v)}
-            >
-              <Volume2 className={`w-4 h-4 ${voiceOn ? "text-neutral-900" : "text-neutral-400"}`} />
-                          </Button>
+            </Button>
+            <AnimatePresence>
+              {inputText.trim() && (
+                <motion.button
+                  key="send"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ duration: 0.12 }}
+                  aria-label="Enviar"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-black text-white rounded-full w-10 h-10 grid place-items-center"
+                  onClick={handleSend}
+                >
+                  <ArrowUp className="w-4 h-4" />
+                </motion.button>
+              )}
+            </AnimatePresence>
+            {/* acciones duplicadas eliminadas y control Volume2 removido para evitar ReferenceError */}
             {locked && (
               <div className="flex gap-2">
                 <Button color="primary" onPress={handleConfirmAndCreate} isLoading={createOrg.isPending || createFarm.isPending}>Confirmar y continuar</Button>

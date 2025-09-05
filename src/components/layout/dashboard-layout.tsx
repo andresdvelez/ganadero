@@ -110,8 +110,8 @@ export function DashboardLayout({
       <div className="pt-0">
         {/* Sidebar flotante de altura completa */}
         <aside
-          className="fixed top-0 z-40 border border-neutral-200/60 bg-white/70 backdrop-blur-md shadow-lg p-3 flex flex-col gap-3 overflow-auto rounded-2xl"
-          style={{ width: sidebarWidth, left: sidebarLeft, height: "100dvh", transition: "width 260ms cubic-bezier(0.22,1,0.36,1), left 260ms cubic-bezier(0.22,1,0.36,1)" }}
+          className="fixed top-0 z-40 my-3 border border-neutral-200/60 bg-white/70 backdrop-blur-md shadow-lg p-3 flex flex-col gap-3 overflow-auto rounded-2xl"
+          style={{ width: sidebarWidth, left: sidebarLeft, height: "98dvh", transition: "width 260ms cubic-bezier(0.22,1,0.36,1), left 260ms cubic-bezier(0.22,1,0.36,1)" }}
         >
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2 px-1">
