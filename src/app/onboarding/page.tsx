@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { trpc } from "@/lib/trpc/client";
@@ -10,6 +10,9 @@ import { Button } from "@/components/ui/button";
 import { bindDeviceLocally, provisionFromClerk } from "@/lib/auth/offline-auth";
 import { addToast } from "@/components/ui/toast";
 import { robustDeviceId } from "@/lib/utils";
+import Image from "next/image";
+import { motion, AnimatePresence } from "framer-motion";
+import { Mic, MicOff, Volume2 } from "lucide-react";
 
 type WizardStep = "org" | "farm" | "confirm";
 
@@ -79,6 +82,54 @@ export default function OnboardingPage() {
   const setPassStatus = trpc.device.setPasscodeStatus.useMutation();
 
   const deviceId = useMemo(() => robustDeviceId(), []);
+  // Chat state
+  type ChatMsg = { id: string; role: "ai" | "user"; text: string };
+  const [messages, setMessages] = useState<ChatMsg[]>([]);
+  const [inputText, setInputText] = useState("");
+  const [locked, setLocked] = useState(false); // lock after summary
+  const endRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), [messages]);
+
+  // Voz: síntesis y reconocimiento
+  const [voiceOn, setVoiceOn] = useState(true);
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef<any>(null);
+  const speak = (text: string) => {
+    if (!voiceOn) return;
+    try {
+      if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = "es-CO";
+      u.rate = 1;
+      u.pitch = 1;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(u);
+    } catch {}
+  };
+  const startListening = () => {
+    if (typeof window === "undefined") return;
+    const SR: any = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+    if (!SR) {
+      addToast({ variant: "warning", title: "Voz no soportada en este navegador" });
+      return;
+    }
+    const rec = new SR();
+    recognitionRef.current = rec;
+    rec.lang = "es-CO";
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+    rec.onresult = (e: any) => {
+      const t = e.results?.[0]?.[0]?.transcript || "";
+      if (t) setInputText((prev) => (prev ? prev + " " + t : t));
+    };
+    rec.onend = () => setIsListening(false);
+    rec.start();
+    setIsListening(true);
+  };
+  const stopListening = () => {
+    try { recognitionRef.current?.stop?.(); } catch {}
+    setIsListening(false);
+  };
 
   async function handleLinkDevice(orgId?: string) {
     if (!user) return;
@@ -218,325 +269,175 @@ export default function OnboardingPage() {
   if (!isLoaded) return null;
 
   return (
-    <div className="min-h-screen p-6">
-      <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-[260px,1fr] gap-6">
-        <aside className="bg-white border rounded-2xl p-4 h-fit">
-          <div className="text-xs uppercase tracking-wide text-neutral-500 mb-3">
-            Onboarding
+    <div className="min-h-screen p-6 bg-gradient-mesh">
+      <div className="max-w-5xl mx-auto">
+        <div className="flex items-center justify-center mb-6">
+          <Image src="/brand/full-logo-black-nobg.png" alt="Ganado AI" width={220} height={48} />
+        </div>
+        {/* Contenedor de chat tipo isla */}
+        <div className="island p-4 md:p-6">
+          <div className="text-lg font-semibold mb-1">¡Hola{user?.firstName ? `, ${user.firstName}` : ""}! Bienvenido a Ganado.co</div>
+          <div className="text-sm text-neutral-600 mb-4">Soy tu asistente de configuración. Juntos vamos a preparar tu espacio. Te haré preguntas cortas y te iré guiando. Si tienes dudas, pregúntame “¿para qué sirve esto?” y te explico. Puedes responder por texto o usando tu voz.</div>
+          {/* Mensajes */}
+          <div className="space-y-3 max-h-[52vh] overflow-auto pr-1">
+            <AnimatePresence>
+              {messages.map((m) => (
+                <motion.div key={m.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                  <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${m.role === "ai" ? "bg-white/70 border border-neutral-200/60" : "bg-neutral-900 text-white ml-auto"}`}>
+                    {m.text}
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+            <div ref={endRef} />
           </div>
-          <nav className="space-y-2">
-            <StepItem
-              index={1}
-              title="Organización"
-              active={current === "org"}
-              done={current !== "org" && (!!orgDraft.name || alreadyHasOrg)}
-              onClick={() => setCurrent("org")}
+          {/* Input */}
+          <div className="mt-4 flex items-center gap-2">
+            <Input
+              placeholder="Escribe tu respuesta…"
+              value={inputText}
+              onChange={(e) => setInputText((e.target as HTMLInputElement).value)}
+              disabled={locked}
             />
-            <StepItem
-              index={2}
-              title="Finca"
-              active={current === "farm"}
-              done={
-                current === "confirm" || (!!farmDraft.name && !!farmDraft.code)
-              }
-              onClick={() => setCurrent("farm")}
-            />
-            <StepItem
-              index={3}
-              title="Vincular & Confirmar"
-              active={current === "confirm"}
-              done={!!created}
-              onClick={() => setCurrent("confirm")}
-            />
-          </nav>
-        </aside>
-
-        <main className="space-y-4">
-          {current === "org" && (
-            <Card>
-              <CardContent>
-                <h2 className="text-xl font-semibold mb-2">
-                  Paso 1: Crea tu organización
-                </h2>
-                {alreadyHasOrg ? (
-                  <p className="text-neutral-600">
-                    Ya perteneces a{" "}
-                    <span className="font-medium">{myOrgs?.[0]?.name}</span>.
-                    Puedes continuar.
-                  </p>
-                ) : (
-                  <div className="grid gap-3 max-w-md">
-                    <Input
-                      label="Nombre de la organización"
-                      placeholder="Ganadera La Primavera"
-                      value={orgDraft.name}
-                      onChange={(e) =>
-                        setOrgDraft({
-                          name: (e.target as HTMLInputElement).value,
-                        })
-                      }
-                      required
-                    />
-                    <div className="flex justify-end">
-                      <Button
-                        color="primary"
-                        onPress={() => setCurrent("farm")}
-                      >
-                        Continuar
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {current === "farm" && (
-            <Card>
-              <CardContent>
-                <h2 className="text-xl font-semibold mb-2">
-                  Paso 2: Tu primera finca
-                </h2>
-                <div className="grid gap-3 max-w-md">
-                  <Input
-                    label="Nombre de la finca"
-                    placeholder="Hacienda La Esmeralda"
-                    value={farmDraft.name}
-                    onChange={(e) =>
-                      setFarmDraft({
-                        ...farmDraft,
-                        name: (e.target as HTMLInputElement).value,
-                      })
+            <Button
+              color="primary"
+              onPress={() => {
+                const text = inputText.trim();
+                if (!text) return;
+                setMessages((p) => [...p, { id: `${Date.now()}-u`, role: "user", text }]);
+                setInputText("");
+                // reglas simples de validación/onboarding guiado
+                const step = current;
+                if (step === "org" && !alreadyHasOrg) {
+                  if (text.length < 2) {
+                    const msg = "Ese nombre es muy corto. Escribe el nombre completo de tu organización, por favor.";
+                    setMessages((p) => [...p, { id: `${Date.now()}-ai1`, role: "ai", text: msg }]);
+                    speak(msg);
+                    return;
+                  }
+                  setOrgDraft({ name: text });
+                  const msg2 = "¡Perfecto! Ahora dime el nombre de tu primera finca.";
+                  setMessages((p) => [...p, { id: `${Date.now()}-ai2`, role: "ai", text: msg2 }]);
+                  speak(msg2);
+                  setCurrent("farm");
+                  return;
+                }
+                if (step === "farm") {
+                  if (!farmDraft.name) {
+                    // primera respuesta será nombre
+                    if (text.length < 2) {
+                      const msg3 = "Ese nombre parece corto. ¿Cómo se llama tu finca?";
+                      setMessages((p) => [...p, { id: `${Date.now()}-ai3`, role: "ai", text: msg3 }]);
+                      speak(msg3);
+                      return;
                     }
-                    required
-                  />
-                  <Input
-                    label="Código de la finca"
-                    placeholder="fn-hacienda-la-esmeralda"
-                    value={farmDraft.code}
-                    onChange={(e) =>
-                      setFarmDraft({
-                        ...farmDraft,
-                        code: (e.target as HTMLInputElement).value,
-                      })
-                    }
-                    required
-                  />
-                  <div className="text-xs text-neutral-500">
-                    Se genera automáticamente a partir del nombre. Puedes
-                    editarlo si lo prefieres.
-                  </div>
-                  <div className="flex justify-between">
-                    <Button variant="flat" onPress={() => setCurrent("org")}>
-                      Atrás
-                    </Button>
-                    <Button
-                      color="primary"
-                      onPress={() => setCurrent("confirm")}
-                    >
-                      Continuar
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                    setFarmDraft((prev) => ({ ...prev, name: text }));
+                    const msg4 = "Gracias. Ahora escribe el código de tu finca (ej. fn-mi-finca). Esto nos ayuda a identificarla de forma única.";
+                    setMessages((p) => [...p, { id: `${Date.now()}-ai4`, role: "ai", text: msg4 }]);
+                    speak(msg4);
+                    return;
+                  }
+                  // segundo dato: código
+                  const code = text.toLowerCase();
+                  if (!/^fn-[a-z0-9-]{3,}$/.test(code)) {
+                    const msg5 = "El código debe iniciar con fn- y usar solo letras, números y guiones. Inténtalo de nuevo.";
+                    setMessages((p) => [...p, { id: `${Date.now()}-ai5`, role: "ai", text: msg5 }]);
+                    speak(msg5);
+                    return;
+                  }
+                  setFarmDraft((prev) => ({ ...prev, code }));
+                  setCurrent("confirm");
+                  // Resumen y bloqueo con acciones
+                  const summary = `Organización: ${alreadyHasOrg ? (myOrgs?.[0]?.name ?? orgDraft.name) : orgDraft.name}\nFinca: ${farmDraft.name || "(pendiente)"}\nCódigo: ${code}`;
+                  const nextMsgs: ChatMsg[] = [
+                    ...messages,
+                    { id: `${Date.now()}-ai6`, role: "ai", text: "Excelente. Este es el resumen de tu configuración:" },
+                    { id: `${Date.now()}-ai7`, role: "ai", text: summary },
+                    { id: `${Date.now()}-ai8`, role: "ai", text: "Si todo está bien, confirma para continuar. O dime qué deseas editar (organización, nombre o código de la finca)." },
+                  ];
+                  setMessages(nextMsgs);
+                  speak("Excelente. Este es el resumen de tu configuración. Si todo está bien, confirma para continuar o dime qué deseas editar.");
+                  setLocked(true);
+                  return;
+                }
+                if (locked) {
+                  // Edición guiada
+                  const lower = text.toLowerCase();
+                  if (/organ/i.test(lower)) {
+                    setLocked(false);
+                    setCurrent("org");
+                    const msg9 = "Claro, ¿cuál es el nuevo nombre de tu organización?";
+                    setMessages((p) => [...p, { id: `${Date.now()}-ai9`, role: "ai", text: msg9 }]);
+                    speak(msg9);
+                    return;
+                  }
+                  if (/finca|nombre/i.test(lower)) {
+                    setLocked(false);
+                    setCurrent("farm");
+                    setFarmDraft((prev) => ({ ...prev, name: "" }));
+                    const msg10 = "Entendido, escribe el nuevo nombre de tu finca.";
+                    setMessages((p) => [...p, { id: `${Date.now()}-ai10`, role: "ai", text: msg10 }]);
+                    speak(msg10);
+                    return;
+                  }
+                  if (/c[oó]digo|code/i.test(lower)) {
+                    setLocked(false);
+                    setCurrent("farm");
+                    const msg11 = "Escribe el nuevo código (ej. fn-mi-finca).";
+                    setMessages((p) => [...p, { id: `${Date.now()}-ai11`, role: "ai", text: msg11 }]);
+                    speak(msg11);
+                    return;
+                  }
+                  const msg12 = "Sigamos enfocados en el onboarding. Dime si quieres editar organización, nombre de la finca o su código.";
+                  setMessages((p) => [...p, { id: `${Date.now()}-ai12`, role: "ai", text: msg12 }]);
+                  speak(msg12);
+                }
+              }}
+              disabled={locked}
+            >
+              Enviar
+            </Button>
+            <Button
+              aria-label={isListening ? "Detener micrófono" : "Hablar"}
+              variant="flat"
+              onPress={() => (isListening ? stopListening() : startListening())}
+              disabled={locked}
+            >
+              {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            </Button>
+            <Button
+              aria-label={voiceOn ? "Silenciar voz" : "Activar voz"}
+              variant="light"
+              onPress={() => setVoiceOn((v) => !v)}
+            >
+              <Volume2 className={`w-4 h-4 ${voiceOn ? "text-neutral-900" : "text-neutral-400"}`} />
+            </Button>
+            {locked && (
+              <div className="flex gap-2">
+                <Button color="primary" onPress={handleConfirmAndCreate} isLoading={createOrg.isPending || createFarm.isPending}>Confirmar y continuar</Button>
+                <Button variant="flat" onPress={() => { setLocked(false); setMessages((p) => [...p, { id: `${Date.now()}-ai13`, role: "ai", text: "¿Qué deseas editar de tu información ingresada?" }]); }}>Seguir editando</Button>
+              </div>
+            )}
+          </div>
+        </div>
 
-          {current === "confirm" && (
-            <Card>
-              <CardContent>
-                <h2 className="text-xl font-semibold mb-3">
-                  Paso 3: Vincula tu dispositivo y confirma
-                </h2>
-                {!created ? (
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-3">
-                      <div className="text-sm font-medium">Resumen</div>
-                      <div className="rounded-xl border p-3 bg-white">
-                        <div className="text-xs uppercase text-neutral-500 mb-2">
-                          Organización
-                        </div>
-                        <Input
-                          label="Nombre"
-                          placeholder="Ganadera La Primavera"
-                          value={
-                            alreadyHasOrg
-                              ? myOrgs?.[0]?.name ?? ""
-                              : orgDraft.name
-                          }
-                          onChange={(e) =>
-                            !alreadyHasOrg &&
-                            setOrgDraft({
-                              name: (e.target as HTMLInputElement).value,
-                            })
-                          }
-                          disabled={alreadyHasOrg}
-                        />
-                        <div className="h-3" />
-                        <div className="text-xs uppercase text-neutral-500 mb-2">
-                          Finca
-                        </div>
-                        <Input
-                          label="Nombre"
-                          placeholder="Hacienda La Esmeralda"
-                          value={farmDraft.name}
-                          onChange={(e) =>
-                            setFarmDraft({
-                              ...farmDraft,
-                              name: (e.target as HTMLInputElement).value,
-                            })
-                          }
-                        />
-                        <div className="h-2" />
-                        <Input
-                          label="Código"
-                          placeholder="fn-hacienda-la-esmeralda"
-                          value={farmDraft.code}
-                          onChange={(e) =>
-                            setFarmDraft({
-                              ...farmDraft,
-                              code: (e.target as HTMLInputElement).value,
-                            })
-                          }
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="text-sm font-medium">
-                        Vincular dispositivo
-                      </div>
-                      <div className="rounded-xl border p-3 bg-white">
-                        <p className="text-neutral-600 mb-2 text-sm">
-                          Vincula este equipo para acceso sin conexión. Puedes
-                          crear una clave local ahora o saltar este paso.
-                        </p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
-                          <Input
-                            type="password"
-                            label="Clave local (mín. 6)"
-                            placeholder="••••••"
-                            value={passA}
-                            onChange={(e) =>
-                              setPassA((e.target as HTMLInputElement).value)
-                            }
-                          />
-                          <Input
-                            type="password"
-                            label="Confirmar clave"
-                            placeholder="••••••"
-                            value={passB}
-                            onChange={(e) =>
-                              setPassB((e.target as HTMLInputElement).value)
-                            }
-                          />
-                        </div>
-                        <div className="flex gap-2 flex-wrap">
-                          <Button asChild>
-                            <a
-                              href="/download"
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              Descargar app
-                            </a>
-                          </Button>
-                          <Button
-                            color="secondary"
-                            isLoading={registerDevice.isPending}
-                            onPress={() => handleLinkDevice(undefined)}
-                          >
-                            Vincular este dispositivo
-                          </Button>
-                        </div>
-                        {deviceLinked && (
-                          <div className="mt-2 text-xs text-green-700">
-                            Dispositivo vinculado correctamente.
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex justify-between pt-1">
-                        <Button
-                          variant="flat"
-                          onPress={() => setCurrent("farm")}
-                        >
-                          Atrás
-                        </Button>
-                        <Button
-                          color="primary"
-                          onPress={handleConfirmAndCreate}
-                          isLoading={
-                            createOrg.isPending || createFarm.isPending
-                          }
-                        >
-                          Crear y continuar
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="rounded-xl border p-4 bg-white">
-                      <div className="text-sm font-semibold mb-2">
-                        ¡Listo! Se creó tu espacio
-                      </div>
-                      <div className="text-sm text-neutral-700">
-                        Organización:{" "}
-                        <span className="font-medium">{created.orgName}</span>
-                      </div>
-                      <div className="text-sm text-neutral-700">
-                        Finca:{" "}
-                        <span className="font-medium">{created.farmName}</span>{" "}
-                        (<span className="font-mono">{created.farmCode}</span>)
-                      </div>
-                    </div>
-                    <div className="rounded-xl border p-4 bg-white">
-                      <div className="text-sm font-semibold mb-2">
-                        Vincular dispositivo
-                      </div>
-                      <div className="flex gap-2 flex-wrap">
-                        <Button asChild>
-                          <a href="/download" target="_blank" rel="noreferrer">
-                            Descargar app
-                          </a>
-                        </Button>
-                        <Button
-                          color="secondary"
-                          onPress={() => handleLinkDevice(created.orgId)}
-                          isLoading={registerDevice.isPending}
-                        >
-                          {deviceLinked
-                            ? "Vinculado"
-                            : "Vincular este dispositivo"}
-                        </Button>
-                      </div>
-                      {deviceLinked && (
-                        <div className="mt-2 text-xs text-green-700">
-                          Dispositivo vinculado correctamente.
-                        </div>
-                      )}
-                    </div>
-                    <div className="md:col-span-2 flex justify-end gap-2">
-                      <Button
-                        variant="bordered"
-                        onPress={() => router.replace("/")}
-                      >
-                        Volver al inicio
-                      </Button>
-                      <Button
-                        color="primary"
-                        onPress={() => router.replace("/settings/billing?welcome=1")}
-                      >
-                        Continuar a adquirir licencia
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-        </main>
+        {/* Bloque opcional: vinculación de dispositivo como isla aparte cuando current === "confirm" y no locked */}
+        {current === "confirm" && !created && (
+          <div className="mt-4 island p-4">
+            <div className="text-sm font-medium mb-2">Vincular dispositivo (opcional)</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+              <Input type="password" label="Clave local (mín. 6)" placeholder="••••••" value={passA} onChange={(e) => setPassA((e.target as HTMLInputElement).value)} />
+              <Input type="password" label="Confirmar clave" placeholder="••••••" value={passB} onChange={(e) => setPassB((e.target as HTMLInputElement).value)} />
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <Button asChild>
+                <a href="/download" target="_blank" rel="noreferrer">Descargar app</a>
+              </Button>
+              <Button color="secondary" isLoading={registerDevice.isPending} onPress={() => handleLinkDevice(undefined)}>Vincular este dispositivo</Button>
+            </div>
+            {deviceLinked && <div className="mt-2 text-xs text-green-700">Dispositivo vinculado correctamente.</div>}
+          </div>
+        )}
       </div>
     </div>
   );
