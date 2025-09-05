@@ -354,7 +354,7 @@ fn main() {
           }
         });
 
-        // Auto-descarga e inicio del servidor local de IA en segundo plano (primer arranque)
+        // Preparar modelo local: copiar desde Resources/models si existe, o descargar
         let app_handle = app.app_handle();
         tauri::async_runtime::spawn(async move {
           // Configuración por variables de entorno (opcional)
@@ -375,9 +375,43 @@ fn main() {
               })
           });
 
-          let model_path_res = if let Some(p) = existing_model { Ok(p.to_string_lossy().into_owned()) } else if let Some(url) = model_url.clone() {
-            download_model(url, model_sha.clone(), app_handle.clone(), app_handle.get_window("main").unwrap()).await
-          } else { Err("no model url configured".to_string()) };
+          // Intentar copiar desde Resources/models si no hay modelo
+          let model_path_res = if let Some(p) = existing_model {
+            Ok(p.to_string_lossy().into_owned())
+          } else {
+            let resources_dir = app_handle.path_resolver().resource_dir();
+            let bundled_model = resources_dir.as_ref().and_then(|rd| {
+              let md = rd.join("models");
+              std::fs::read_dir(&md).ok().and_then(|mut it| {
+                it.find_map(|e| e.ok()).and_then(|e| {
+                  let p = e.path();
+                  if p.extension().and_then(|s| s.to_str()).unwrap_or("") == "gguf" { Some(p) } else { None }
+                })
+              })
+            });
+
+            if let Some(src) = bundled_model {
+              if let Some(app_models) = models_dir.clone() {
+                let _ = std::fs::create_dir_all(&app_models);
+                let target = app_models.join(src.file_name().unwrap_or_else(|| std::ffi::OsStr::new("model.gguf")));
+                if std::fs::copy(&src, &target).is_ok() {
+                  Ok(target.to_string_lossy().into_owned())
+                } else if let Some(url) = model_url.clone() {
+                  download_model(url, model_sha.clone(), app_handle.clone(), app_handle.get_window("main").unwrap()).await
+                } else {
+                  Err("no model available".to_string())
+                }
+              } else if let Some(url) = model_url.clone() {
+                download_model(url, model_sha.clone(), app_handle.clone(), app_handle.get_window("main").unwrap()).await
+              } else {
+                Err("no model available".to_string())
+              }
+            } else if let Some(url) = model_url.clone() {
+              download_model(url, model_sha.clone(), app_handle.clone(), app_handle.get_window("main").unwrap()).await
+            } else {
+              Err("no model url configured".to_string())
+            }
+          };
 
           if let Ok(model_path) = model_path_res {
             let _ = start_llama_server(app_handle.clone(), model_path, llama_port).await;

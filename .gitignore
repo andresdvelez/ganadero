@@ -61,3 +61,6 @@ next-env.d.ts
 
 # clerk configuration (can include secrets)
 /.clerk/
+
+# large local AI models (bundled via Tauri resources, not versioned)
+src-tauri/models/*.gguf

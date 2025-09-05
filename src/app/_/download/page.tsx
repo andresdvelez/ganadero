@@ -14,7 +14,7 @@ import {
 } from "@/lib/auth/offline-auth";
 import { useEffect, useMemo, useState } from "react";
 import { addToast } from "@/components/ui/toast";
-import { robustDeviceId } from "@/lib/utils";
+import { robustDeviceId, isAppInstalledRuntime } from "@/lib/utils";
 
 export default function DownloadPage() {
   const { user } = useUser();
@@ -42,22 +42,7 @@ export default function DownloadPage() {
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const isTauri = Boolean((window as any).__TAURI__ || (window as any).__TAURI_IPC__);
-      const isStandalone = (() => {
-        try {
-          const byMedia = typeof window.matchMedia === "function" && window.matchMedia("(display-mode: standalone)").matches;
-          const byIOS = (navigator as any).standalone === true;
-          return Boolean(byMedia || byIOS);
-        } catch {
-          return false;
-        }
-      })();
-      setIsAppInstalled(isTauri || isStandalone);
-    } catch {
-      setIsAppInstalled(false);
-    }
+    setIsAppInstalled(isAppInstalledRuntime());
   }, []);
 
   const modelUrl =
@@ -157,11 +142,13 @@ export default function DownloadPage() {
                   </Button>
                 </div>
               )}
-              <div className="mt-6">
-                <Button asChild color="secondary">
-                  <a href={modelUrl}>Descargar modelo IA local</a>
-                </Button>
-              </div>
+              {!isAppInstalled && (
+                <div className="mt-6">
+                  <Button asChild color="secondary">
+                    <a href={modelUrl}>Descargar modelo IA local</a>
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
 
