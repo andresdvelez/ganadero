@@ -91,9 +91,14 @@ export default function OnboardingPage() {
   const endRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), [messages]);
   const [isDesktopApp, setIsDesktopApp] = useState(false);
+  const [os, setOs] = useState<"mac" | "windows" | "other">("other");
   useEffect(() => {
     try {
       setIsDesktopApp(typeof window !== "undefined" && !!(window as any).__TAURI__);
+      const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+      if (/Mac OS X|Macintosh/i.test(ua)) setOs("mac");
+      else if (/Windows NT|Win64|WOW64/i.test(ua)) setOs("windows");
+      else setOs("other");
     } catch {}
   }, []);
 
@@ -617,39 +622,51 @@ export default function OnboardingPage() {
               disabled={locked}
             >
               {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-            </Button>
-            <Button
+                          </Button>
+                          <Button
               aria-label={voiceOn ? "Silenciar voz" : "Activar voz"}
               variant="light"
               onPress={() => setVoiceOn((v) => !v)}
             >
               <Volume2 className={`w-4 h-4 ${voiceOn ? "text-neutral-900" : "text-neutral-400"}`} />
-            </Button>
+                          </Button>
             {locked && (
               <div className="flex gap-2">
                 <Button color="primary" onPress={handleConfirmAndCreate} isLoading={createOrg.isPending || createFarm.isPending}>Confirmar y continuar</Button>
                 <Button variant="flat" onPress={() => { setLocked(false); setMessages((p) => [...p, { id: `${Date.now()}-ai13`, role: "ai", text: "¿Qué deseas editar de tu información ingresada?" }]); }}>Seguir editando</Button>
-              </div>
-            )}
-          </div>
-        </div>
+                          </div>
+                        )}
+                      </div>
+                      </div>
 
         {/* Bloque opcional: vinculación de dispositivo como isla aparte cuando current === "confirm" y no locked */}
-        {current === "confirm" && !created && isDesktopApp && (
+        {current === "confirm" && !created && (
           <div className="mt-4 island p-4">
-            <div className="text-sm font-medium mb-2">Vincular dispositivo (opcional)</div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
-              <Input type="password" label="Clave local (mín. 6)" placeholder="••••••" value={passA} onChange={(e) => setPassA((e.target as HTMLInputElement).value)} />
-              <Input type="password" label="Confirmar clave" placeholder="••••••" value={passB} onChange={(e) => setPassB((e.target as HTMLInputElement).value)} />
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              <Button asChild>
-                <a href="/download" target="_blank" rel="noreferrer">Descargar app</a>
-              </Button>
-              <Button color="secondary" isLoading={registerDevice.isPending} onPress={() => handleLinkDevice(undefined)}>Vincular este dispositivo</Button>
-            </div>
-            {deviceLinked && <div className="mt-2 text-xs text-green-700">Dispositivo vinculado correctamente.</div>}
-          </div>
+            <div className="text-sm font-medium mb-2">Aplicación de escritorio</div>
+            {!isDesktopApp ? (
+              <div>
+                <p className="text-sm text-neutral-600 mb-2">Para vincular un dispositivo, usa la app de escritorio. Descárgala según tu sistema:</p>
+                <div className="flex gap-2 flex-wrap">
+                  <a className="px-3 py-2 rounded-full bg-black text-white text-sm shadow hover:opacity-90 flex items-center gap-2" href={os === "mac" ? (process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_URL || "/download") : (process.env.NEXT_PUBLIC_DESKTOP_WIN_DOWNLOAD_URL || "/download")} target="_blank" rel="noreferrer">
+                    <img src={`/brand/${os === "mac" ? "apple-logo.svg" : "windows-logo.svg"}`} alt="Logo" className="w-4 h-4" />
+                    <span>{os === "mac" ? "Descargar para macOS" : os === "windows" ? "Descargar para Windows" : "Descargar app"}</span>
+                  </a>
+                    </div>
+                <div className="text-xs text-neutral-500 mt-2">Una vez instalada, vuelve a este paso desde la app para vincular el dispositivo.</div>
+                  </div>
+                ) : (
+              <div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+                  <Input type="password" label="Clave local (mín. 6)" placeholder="••••••" value={passA} onChange={(e) => setPassA((e.target as HTMLInputElement).value)} />
+                  <Input type="password" label="Confirmar clave" placeholder="••••••" value={passB} onChange={(e) => setPassB((e.target as HTMLInputElement).value)} />
+                      </div>
+                      <div className="flex gap-2 flex-wrap">
+                  <Button color="secondary" isLoading={registerDevice.isPending} onPress={() => handleLinkDevice(undefined)}>Vincular este dispositivo</Button>
+                      </div>
+                {deviceLinked && <div className="mt-2 text-xs text-green-700">Dispositivo vinculado correctamente.</div>}
+                        </div>
+                      )}
+                    </div>
         )}
       </div>
     </div>
