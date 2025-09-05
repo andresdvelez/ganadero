@@ -87,6 +87,7 @@ export default function OnboardingPage() {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [inputText, setInputText] = useState("");
   const [locked, setLocked] = useState(false); // lock after summary
+  const [pendingEdit, setPendingEdit] = useState<null | "org" | "farmName" | "farmCode">(null);
   const endRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), [messages]);
 
@@ -296,6 +297,24 @@ export default function OnboardingPage() {
         <div className="island p-4 md:p-6">
           <div className="text-lg font-semibold mb-1">¡Hola{user?.firstName ? `, ${user.firstName}` : ""}! Bienvenido a Ganado.co</div>
           <div className="text-sm text-neutral-600 mb-4">Soy tu asistente de configuración. Juntos vamos a preparar tu espacio. Te haré preguntas cortas y te iré guiando. Si tienes dudas, pregúntame “¿para qué sirve esto?” y te explico. Puedes responder por texto o usando tu voz.</div>
+          {/* Progreso */}
+          {(() => {
+            const step1 = alreadyHasOrg || !!orgDraft.name;
+            const step2 = !!farmDraft.name && !!farmDraft.code;
+            const done = (step1 ? 1 : 0) + (step2 ? 1 : 0) + (locked ? 1 : 0);
+            const pct = Math.min(100, Math.round((done / 3) * 100));
+            return (
+              <div className="mb-4">
+                <div className="flex items-center justify-between text-xs text-neutral-600 mb-1">
+                  <span>Progreso</span>
+                  <span>{pct}%</span>
+                </div>
+                <div className="h-2 rounded-full bg-neutral-200 overflow-hidden">
+                  <div className="h-full bg-neutral-900 transition-all" style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+            );
+          })()}
           {/* Mensajes */}
           <div className="space-y-3 max-h-[52vh] overflow-auto pr-1">
             <AnimatePresence>
@@ -324,6 +343,176 @@ export default function OnboardingPage() {
                 if (!text) return;
                 setMessages((p) => [...p, { id: `${Date.now()}-u`, role: "user", text }]);
                 setInputText("");
+                // Intento de edición directa: "cambiar/editar <campo> a <valor>"
+                const low = text.toLowerCase();
+                const wantsChange = /\b(cambiar|editar)\b/.test(low);
+                const extractAfterA = (t: string) => {
+                  const m = t.match(/\ba\s+(.+)$/);
+                  return m ? m[1].trim() : "";
+                };
+                if (wantsChange) {
+                  if (/organ/i.test(low)) {
+                    const val = extractAfterA(text);
+                    if (val) {
+                      setOrgDraft({ name: val });
+                      const msg = `Nuevo dato guardado: organización = ${val}.`;
+                      setMessages((p) => [...p, { id: `${Date.now()}-chg1`, role: "ai", text: msg }]);
+                      speak(msg);
+                    } else {
+                      setPendingEdit("org");
+                      const ask = "¿Cuál es el nuevo nombre de tu organización?";
+                      setMessages((p) => [...p, { id: `${Date.now()}-ask-org`, role: "ai", text: ask }]);
+                      speak(ask);
+                      return;
+                    }
+                  } else if (/c[oó]digo|code/i.test(low)) {
+                    const val = extractAfterA(text).toLowerCase();
+                    if (val) {
+                      if (!/^fn-[a-z0-9-]{3,}$/.test(val)) {
+                        const msg = "El código debe iniciar con fn- y usar solo letras, números y guiones.";
+                        setMessages((p) => [...p, { id: `${Date.now()}-chg2x`, role: "ai", text: msg }]);
+                        speak(msg);
+                        return;
+                      }
+                      setFarmDraft((prev) => ({ ...prev, code: val }));
+                      const msg = `Nuevo dato guardado: código de la finca = ${val}.`;
+                      setMessages((p) => [...p, { id: `${Date.now()}-chg2`, role: "ai", text: msg }]);
+                      speak(msg);
+                    } else {
+                      setPendingEdit("farmCode");
+                      const ask = "¿Cuál es el nuevo código? (ej. fn-mi-finca)";
+                      setMessages((p) => [...p, { id: `${Date.now()}-ask-code`, role: "ai", text: ask }]);
+                      speak(ask);
+                      return;
+                    }
+                  } else if (/finca|nombre/i.test(low)) {
+                    const val = extractAfterA(text);
+                    if (val) {
+                      setFarmDraft((prev) => ({ ...prev, name: val }));
+                      const msg = `Nuevo dato guardado: nombre de la finca = ${val}.`;
+                      setMessages((p) => [...p, { id: `${Date.now()}-chg3`, role: "ai", text: msg }]);
+                      speak(msg);
+                    } else {
+                      setPendingEdit("farmName");
+                      const ask = "¿Cuál es el nuevo nombre de tu finca?";
+                      setMessages((p) => [...p, { id: `${Date.now()}-ask-name`, role: "ai", text: ask }]);
+                      speak(ask);
+                      return;
+                    }
+                  }
+                  // Si estamos en edición confirmada, volver al siguiente faltante o resumen
+                  if (!orgDraft.name && !alreadyHasOrg) {
+                    const ask = "Escribe el nombre de tu organización.";
+                    setMessages((p) => [...p, { id: `${Date.now()}-next1`, role: "ai", text: ask }]);
+                    speak(ask);
+                    setCurrent("org");
+                    setLocked(false);
+                    return;
+                  }
+                  if (!farmDraft.name) {
+                    const ask = "Ahora dime el nombre de tu finca.";
+                    setMessages((p) => [...p, { id: `${Date.now()}-next2`, role: "ai", text: ask }]);
+                    speak(ask);
+                    setCurrent("farm");
+                    setLocked(false);
+                    return;
+                  }
+                  if (!farmDraft.code) {
+                    const ask = "Escribe el código de tu finca (ej. fn-mi-finca).";
+                    setMessages((p) => [...p, { id: `${Date.now()}-next3`, role: "ai", text: ask }]);
+                    speak(ask);
+                    setCurrent("farm");
+                    setLocked(false);
+                    return;
+                  }
+                  // Todo completo → mostrar resumen y bloquear
+                  const summary2 = `Organización: ${alreadyHasOrg ? (myOrgs?.[0]?.name ?? orgDraft.name) : orgDraft.name}\nFinca: ${farmDraft.name}\nCódigo: ${farmDraft.code}`;
+                  setMessages((p) => [...p,
+                    { id: `${Date.now()}-sum1`, role: "ai", text: "Perfecto, actualicé tus datos. Este es el resumen actualizado:" },
+                    { id: `${Date.now()}-sum2`, role: "ai", text: summary2 },
+                    { id: `${Date.now()}-sum3`, role: "ai", text: "Confirma para continuar o indica qué deseas editar." },
+                  ]);
+                  speak("Perfecto, actualicé tus datos. Revisa el resumen y confirma para continuar.");
+                  setLocked(true);
+                  return;
+                }
+
+                // Si hay una edición pendiente (preguntamos por el nuevo valor)
+                if (pendingEdit) {
+                  if (pendingEdit === "org") {
+                    if (text.length < 2) {
+                      const msg = "Ese nombre es muy corto. Escribe un nombre más descriptivo, por favor.";
+                      setMessages((p) => [...p, { id: `${Date.now()}-porgx`, role: "ai", text: msg }]);
+                      speak(msg);
+                      return;
+                    }
+                    setOrgDraft({ name: text });
+                    const msg = `Nuevo dato guardado: organización = ${text}.`;
+                    setMessages((p) => [...p, { id: `${Date.now()}-porg`, role: "ai", text: msg }]);
+                    speak(msg);
+                  }
+                  if (pendingEdit === "farmName") {
+                    if (text.length < 2) {
+                      const msg = "Ese nombre es muy corto. Inténtalo nuevamente.";
+                      setMessages((p) => [...p, { id: `${Date.now()}-pfnamex`, role: "ai", text: msg }]);
+                      speak(msg);
+                      return;
+                    }
+                    setFarmDraft((prev) => ({ ...prev, name: text }));
+                    const msg = `Nuevo dato guardado: nombre de la finca = ${text}.`;
+                    setMessages((p) => [...p, { id: `${Date.now()}-pfname`, role: "ai", text: msg }]);
+                    speak(msg);
+                  }
+                  if (pendingEdit === "farmCode") {
+                    const code = text.toLowerCase();
+                    if (!/^fn-[a-z0-9-]{3,}$/.test(code)) {
+                      const msg = "El código debe iniciar con fn- y usar solo letras, números y guiones.";
+                      setMessages((p) => [...p, { id: `${Date.now()}-pfcodex`, role: "ai", text: msg }]);
+                      speak(msg);
+                      return;
+                    }
+                    setFarmDraft((prev) => ({ ...prev, code }));
+                    const msg = `Nuevo dato guardado: código de la finca = ${code}.`;
+                    setMessages((p) => [...p, { id: `${Date.now()}-pfcode`, role: "ai", text: msg }]);
+                    speak(msg);
+                  }
+                  setPendingEdit(null);
+                  // Continuar con faltantes o resumen
+                  if (!orgDraft.name && !alreadyHasOrg) {
+                    const ask = "Escribe el nombre de tu organización.";
+                    setMessages((p) => [...p, { id: `${Date.now()}-next1b`, role: "ai", text: ask }]);
+                    speak(ask);
+                    setCurrent("org");
+                    setLocked(false);
+                    return;
+                  }
+                  if (!farmDraft.name) {
+                    const ask = "Ahora dime el nombre de tu finca.";
+                    setMessages((p) => [...p, { id: `${Date.now()}-next2b`, role: "ai", text: ask }]);
+                    speak(ask);
+                    setCurrent("farm");
+                    setLocked(false);
+                    return;
+                  }
+                  if (!farmDraft.code) {
+                    const ask = "Escribe el código de tu finca (ej. fn-mi-finca).";
+                    setMessages((p) => [...p, { id: `${Date.now()}-next3b`, role: "ai", text: ask }]);
+                    speak(ask);
+                    setCurrent("farm");
+                    setLocked(false);
+                    return;
+                  }
+                  const summary3 = `Organización: ${alreadyHasOrg ? (myOrgs?.[0]?.name ?? orgDraft.name) : orgDraft.name}\nFinca: ${farmDraft.name}\nCódigo: ${farmDraft.code}`;
+                  setMessages((p) => [...p,
+                    { id: `${Date.now()}-sum4`, role: "ai", text: "Actualicé tus respuestas. Este es el resumen:" },
+                    { id: `${Date.now()}-sum5`, role: "ai", text: summary3 },
+                    { id: `${Date.now()}-sum6`, role: "ai", text: "Confirma para continuar o dime si quieres editar algo más." },
+                  ]);
+                  speak("Actualicé tus respuestas. Revisa el resumen y confirma para continuar.");
+                  setLocked(true);
+                  return;
+                }
+
                 // reglas simples de validación/onboarding guiado
                 const step = current;
                 if (step === "org" && !alreadyHasOrg) {
