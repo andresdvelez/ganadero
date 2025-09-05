@@ -14,7 +14,7 @@ import { HeroModal } from "@/components/ui/hero-modal";
 import { Input } from "@/components/ui/input";
 import { useUser } from "@clerk/nextjs";
 import { provisionFromClerk, bindDeviceLocally, hasOfflineIdentity, lock } from "@/lib/auth/offline-auth";
-import { robustDeviceId } from "@/lib/utils";
+import { robustDeviceId, isAppInstalledRuntime } from "@/lib/utils";
 import { db } from "@/lib/dexie";
 import { Home, Bot, Compass, CreditCard, Apple, Laptop, ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -154,25 +154,31 @@ export function DashboardLayout({
                   <a className="text-sm text-primary-600 hover:underline" href="/ai-assistant?history=1">Ver todo</a>
                 </div>
               </div>
-              <div className="mt-auto pt-2 border-t">
-                <div className="text-xs uppercase tracking-wide text-neutral-500 px-1 mb-2">Descargas</div>
-                {(() => {
-                  const macUrl = process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_URL || "/download";
-                  const winUrl = process.env.NEXT_PUBLIC_DESKTOP_WIN_DOWNLOAD_URL || "/download";
-                  return (
-                    <div className="flex flex-col gap-2">
-                      <a className="px-3 py-2 rounded-full bg-black text-white text-sm shadow hover:opacity-90 flex items-center gap-2" href={macUrl} target="_blank" rel="noreferrer">
-                        <img src="/brand/apple-logo.svg" alt="Apple" className="w-4 h-4" />
-                        <span>Descargar para macOS</span>
-                      </a>
-                      <a className="px-3 py-2 rounded-full bg-neutral-900 text-white text-sm shadow hover:opacity-90 flex items-center gap-2" href={winUrl} target="_blank" rel="noreferrer">
-                        <img src="/brand/windows-logo.svg" alt="Windows" className="w-4 h-4" />
-                        <span>Descargar para Windows</span>
-                      </a>
-                    </div>
-                  );
-                })()}
-              </div>
+              {(() => {
+                const installed = isAppInstalledRuntime();
+                if (installed) return null;
+                return (
+                  <div className="mt-auto pt-2 border-t">
+                    <div className="text-xs uppercase tracking-wide text-neutral-500 px-1 mb-2">Descargas</div>
+                    {(() => {
+                      const macUrl = process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_URL || "/download";
+                      const winUrl = process.env.NEXT_PUBLIC_DESKTOP_WIN_DOWNLOAD_URL || "/download";
+                      return (
+                        <div className="flex flex-col gap-2">
+                          <a className="px-3 py-2 rounded-full bg-black text-white text-sm shadow hover:opacity-90 flex items-center gap-2" href={macUrl} target="_blank" rel="noreferrer">
+                            <img src="/brand/apple-logo.svg" alt="Apple" className="w-4 h-4" />
+                            <span>Descargar para macOS</span>
+                          </a>
+                          <a className="px-3 py-2 rounded-full bg-neutral-900 text-white text-sm shadow hover:opacity-90 flex items-center gap-2" href={winUrl} target="_blank" rel="noreferrer">
+                            <img src="/brand/windows-logo.svg" alt="Windows" className="w-4 h-4" />
+                            <span>Descargar para Windows</span>
+                          </a>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                );
+              })()}
             </>
           )}
         </aside>
