@@ -12,7 +12,7 @@ import { addToast } from "@/components/ui/toast";
 import { robustDeviceId } from "@/lib/utils";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, MicOff, ArrowUp, Plus, Copy, Edit3, X, Image as ImageIcon } from "lucide-react";
+import { Mic, MicOff, ArrowUp, Plus, Copy, Edit3, X, Image as ImageIcon, Bot } from "lucide-react";
 import { AIInputBar } from "@/components/ai/ai-input-bar";
 import { useDropzone } from "react-dropzone";
 
@@ -90,7 +90,8 @@ export default function OnboardingPage() {
     id: string;
     role: "ai" | "user";
     text?: string;
-    kind?: "logo-drop";
+    kind?: "logo-drop" | "summary";
+    summary?: { org: string; farm: string; code: string };
   };
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [inputText, setInputText] = useState("");
@@ -98,6 +99,7 @@ export default function OnboardingPage() {
   const [pendingEdit, setPendingEdit] = useState<null | "org" | "farmName" | "farmCode">(null);
   const endRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), [messages]);
+  const [isTyping, setIsTyping] = useState(false);
   const [isDesktopApp, setIsDesktopApp] = useState(false);
   const [os, setOs] = useState<"mac" | "windows" | "other">("other");
   useEffect(() => {
@@ -187,6 +189,35 @@ export default function OnboardingPage() {
     const msg = variants[Math.floor(Math.random() * variants.length)];
     setMessages((p) => [...p, { id: `${Date.now()}-pers-${kind}` as any, role: "ai", text: msg }]);
     speak(msg);
+  }
+
+  // Parseo robusto de órdenes de edición: "cambiar/editar/modificar ... por X" (tolera typos comunes)
+  function parseEditCommand(raw: string): null | { field: "org" | "farmName" | "farmCode"; value: string } {
+    // Eliminar tildes sin usar propiedades Unicode (compatibilidad amplia)
+    const t = raw
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+    const wantsEdit = /(cambiar|cambir|editar|edite|edites|modificar|modifiques|modifique|actualizar|actualices|actualice|cambies)\b/.test(t);
+    if (!wantsEdit) return null;
+
+    let field: null | "org" | "farmName" | "farmCode" = null;
+    if (/(organizacion|organizacion|org|empresa)\b/.test(t)) field = "org";
+    if (/(finca|nombre\s+de\s+la\s+finca)\b/.test(t)) field = field || "farmName";
+    if (/(codigo|c[oó]digo|code)\b/.test(t)) field = "farmCode";
+    if (!field) return null;
+
+    // extraer valor después de "por" o "a" o comillas
+    let m = raw.match(/\bpor\s+"?([^\"\n]+)\"?$/i) || raw.match(/\ba\s+"?([^\"\n]+)\"?$/i);
+    let value = m ? m[1].trim() : "";
+    if (!value) {
+      // fallback: última frase después del campo
+      const idx = t.indexOf("por ");
+      if (idx >= 0) value = raw.slice(idx + 4).trim();
+    }
+    value = value.replace(/^el\s+|^la\s+/i, "").trim();
+    if (!value) return { field, value: "" };
+    return { field, value };
   }
 
   // Heurísticas para diferenciar respuesta vs. aclaración/pregunta
@@ -304,18 +335,84 @@ export default function OnboardingPage() {
   };
 
   const handleSend = () => {
+    setIsTyping(true);
+    try {
     const text = inputText.trim();
     if (!text) return;
     // Si estamos esperando el logo, interpretar intención de omitir/continuar
     if (awaitingLogoFor) {
       const lower = text.toLowerCase();
       const wantsSkip = isSkipLogoIntent(lower);
+      const parsedWhileAwaiting = parseEditCommand(text);
       if (wantsSkip) {
         // Continuar sin logo
         setInputText("");
         setAwaitingLogoFor(null);
         setMessages((p) => [...p, { id: `${Date.now()}-u`, role: "user", text }]);
         proceedToFarm();
+        return;
+      }
+      if (parsedWhileAwaiting) {
+        // Permitir editar aunque aún esté visible el dropzone
+        setMessages((p) => [...p, { id: `${Date.now()}-u`, role: "user", text }]);
+        setAwaitingLogoFor(null);
+        if (parsedWhileAwaiting.field === "org") {
+          if (parsedWhileAwaiting.value) {
+            const v = validateNameLike(parsedWhileAwaiting.value, { minLen: 3, kindLabel: "organización" });
+            if (!v.ok) {
+              setMessages((p) => [...p, { id: `${Date.now()}-await-orgx`, role: "ai", text: v.reason || "Ese nombre no parece válido." }]);
+            } else {
+              setOrgDraft({ name: v.cleaned });
+              const summaryBlock: ChatMsg = { id: `${Date.now()}-await-sum-org`, role: "ai", kind: "summary", summary: { org: v.cleaned, farm: farmDraft.name, code: farmDraft.code } };
+              setMessages((p) => [
+                ...p,
+                { id: `${Date.now()}-await-org2`, role: "ai", text: `He actualizado la organización a ${v.cleaned}.` },
+                { id: `${Date.now()}-await-orgtxt`, role: "ai", text: "Este es el resumen actualizado:" },
+                summaryBlock,
+                { id: `${Date.now()}-await-orgcta`, role: "ai", text: "Confirma para continuar o dime si quieres editar algo más." },
+              ]);
+              setLocked(true);
+            }
+          } else {
+            respondToClarification("org");
+          }
+        } else if (parsedWhileAwaiting.field === "farmName") {
+          if (parsedWhileAwaiting.value) {
+            const v = validateNameLike(parsedWhileAwaiting.value, { minLen: 2, kindLabel: "finca" });
+            if (!v.ok) {
+              setMessages((p) => [...p, { id: `${Date.now()}-await-farmx`, role: "ai", text: v.reason || "Ese nombre no parece válido." }]);
+            } else {
+              setFarmDraft((prev) => ({ ...prev, name: v.cleaned }));
+              const summaryBlock: ChatMsg = { id: `${Date.now()}-await-sum-farm`, role: "ai", kind: "summary", summary: { org: alreadyHasOrg ? (myOrgs?.[0]?.name ?? orgDraft.name) : orgDraft.name, farm: v.cleaned, code: farmDraft.code } };
+              setMessages((p) => [
+                ...p,
+                { id: `${Date.now()}-await-farm2`, role: "ai", text: `He actualizado el nombre de la finca a ${v.cleaned}.` },
+                { id: `${Date.now()}-await-farmtxt`, role: "ai", text: "Este es el resumen actualizado:" },
+                summaryBlock,
+                { id: `${Date.now()}-await-farmcta`, role: "ai", text: "Confirma para continuar o dime si quieres editar algo más." },
+              ]);
+              setLocked(true);
+            }
+          } else {
+            respondToClarification("farm");
+          }
+        } else if (parsedWhileAwaiting.field === "farmCode") {
+          const code = (parsedWhileAwaiting.value || "").toLowerCase();
+          if (!/^fn-[a-z0-9-]{3,}$/.test(code)) {
+            setMessages((p) => [...p, { id: `${Date.now()}-await-codex`, role: "ai", text: "El código debe iniciar con fn- y usar solo letras, números y guiones." }]);
+          } else {
+            setFarmDraft((prev) => ({ ...prev, code }));
+            const summaryBlock: ChatMsg = { id: `${Date.now()}-await-sum-code`, role: "ai", kind: "summary", summary: { org: alreadyHasOrg ? (myOrgs?.[0]?.name ?? orgDraft.name) : orgDraft.name, farm: farmDraft.name, code } };
+            setMessages((p) => [
+              ...p,
+              { id: `${Date.now()}-await-code2`, role: "ai", text: `He actualizado el código de la finca a ${code}.` },
+              { id: `${Date.now()}-await-codetxt`, role: "ai", text: "Este es el resumen actualizado:" },
+              summaryBlock,
+              { id: `${Date.now()}-await-codecta`, role: "ai", text: "Confirma para continuar o dime si quieres editar algo más." },
+            ]);
+            setLocked(true);
+          }
+        }
         return;
       }
       // Guía mientras esperamos logo
@@ -327,6 +424,72 @@ export default function OnboardingPage() {
     }
     setMessages((p) => [...p, { id: `${Date.now()}-u`, role: "user", text }]);
     setInputText("");
+    // Intento directo de edición en cualquier estado (ej.: "cambia/cambies/edita/edites ... por X")
+    const parsedGlobal = parseEditCommand(text);
+    if (parsedGlobal) {
+      if (parsedGlobal.field === "org") {
+        if (parsedGlobal.value) {
+          const v = validateNameLike(parsedGlobal.value, { minLen: 3, kindLabel: "organización" });
+          if (!v.ok) {
+            setMessages((p) => [...p, { id: `${Date.now()}-g-orgx`, role: "ai", text: v.reason || "Ese nombre no parece válido." }]);
+          } else {
+            setOrgDraft({ name: v.cleaned });
+            const summaryBlock: ChatMsg = { id: `${Date.now()}-g-sum-org`, role: "ai", kind: "summary", summary: { org: v.cleaned, farm: farmDraft.name, code: farmDraft.code } };
+            setMessages((p) => [
+              ...p,
+              { id: `${Date.now()}-g-org2`, role: "ai", text: `He actualizado la organización a ${v.cleaned}.` },
+              { id: `${Date.now()}-g-orgtxt`, role: "ai", text: "Este es el resumen actualizado:" },
+              summaryBlock,
+              { id: `${Date.now()}-g-orgcta`, role: "ai", text: "Confirma para continuar o dime si quieres editar algo más." },
+            ]);
+            setLocked(true);
+          }
+        } else {
+          respondToClarification("org");
+        }
+        return;
+      }
+      if (parsedGlobal.field === "farmName") {
+        if (parsedGlobal.value) {
+          const v = validateNameLike(parsedGlobal.value, { minLen: 2, kindLabel: "finca" });
+          if (!v.ok) {
+            setMessages((p) => [...p, { id: `${Date.now()}-g-farmx`, role: "ai", text: v.reason || "Ese nombre no parece válido." }]);
+          } else {
+            setFarmDraft((prev) => ({ ...prev, name: v.cleaned }));
+            const summaryBlock: ChatMsg = { id: `${Date.now()}-g-sum-farm`, role: "ai", kind: "summary", summary: { org: alreadyHasOrg ? (myOrgs?.[0]?.name ?? orgDraft.name) : orgDraft.name, farm: v.cleaned, code: farmDraft.code } };
+            setMessages((p) => [
+              ...p,
+              { id: `${Date.now()}-g-farm2`, role: "ai", text: `He actualizado el nombre de la finca a ${v.cleaned}.` },
+              { id: `${Date.now()}-g-farmtxt`, role: "ai", text: "Este es el resumen actualizado:" },
+              summaryBlock,
+              { id: `${Date.now()}-g-farmcta`, role: "ai", text: "Confirma para continuar o dime si quieres editar algo más." },
+            ]);
+            setLocked(true);
+          }
+        } else {
+          respondToClarification("farm");
+        }
+        return;
+      }
+      if (parsedGlobal.field === "farmCode") {
+        const code = (parsedGlobal.value || "").toLowerCase();
+        if (!/^fn-[a-z0-9-]{3,}$/.test(code)) {
+          setMessages((p) => [...p, { id: `${Date.now()}-g-codex`, role: "ai", text: "El código debe iniciar con fn- y usar solo letras, números y guiones." }]);
+        } else {
+          setFarmDraft((prev) => ({ ...prev, code }));
+          const summaryBlock: ChatMsg = { id: `${Date.now()}-g-sum-code`, role: "ai", kind: "summary", summary: { org: alreadyHasOrg ? (myOrgs?.[0]?.name ?? orgDraft.name) : orgDraft.name, farm: farmDraft.name, code } };
+          setMessages((p) => [
+            ...p,
+            { id: `${Date.now()}-g-code2`, role: "ai", text: `He actualizado el código de la finca a ${code}.` },
+            { id: `${Date.now()}-g-codetxt`, role: "ai", text: "Este es el resumen actualizado:" },
+            summaryBlock,
+            { id: `${Date.now()}-g-codecta`, role: "ai", text: "Confirma para continuar o dime si quieres editar algo más." },
+          ]);
+          setLocked(true);
+        }
+        return;
+      }
+    }
     // Intento de edición directa: "cambiar/editar <campo> a <valor>"
     const low = text.toLowerCase();
     const wantsChange = /\b(cambiar|editar)\b/.test(low);
@@ -409,11 +572,18 @@ export default function OnboardingPage() {
         setLocked(false);
         return;
       }
-      // Todo completo → mostrar resumen y bloquear
-      const summary2 = `Organización: ${alreadyHasOrg ? (myOrgs?.[0]?.name ?? orgDraft.name) : orgDraft.name}\nFinca: ${farmDraft.name}\nCódigo: ${farmDraft.code}`;
-      setMessages((p) => [...p,
+      // Todo completo → mostrar resumen y bloquear (como bloque con estilo)
+      const currentOrgName = alreadyHasOrg ? (myOrgs?.[0]?.name ?? orgDraft.name) : orgDraft.name;
+      const summaryBlock: ChatMsg = {
+        id: `${Date.now()}-sumblock`,
+        role: "ai",
+        kind: "summary",
+        summary: { org: currentOrgName, farm: farmDraft.name, code: farmDraft.code },
+      };
+      setMessages((p) => [
+        ...p,
         { id: `${Date.now()}-sum1`, role: "ai", text: "Perfecto, actualicé tus datos. Este es el resumen actualizado:" },
-        { id: `${Date.now()}-sum2`, role: "ai", text: summary2 },
+        summaryBlock,
         { id: `${Date.now()}-sum3`, role: "ai", text: "Confirma para continuar o indica qué deseas editar." },
       ]);
       speak("Perfecto, actualicé tus datos. Revisa el resumen y confirma para continuar.");
@@ -438,7 +608,7 @@ export default function OnboardingPage() {
           return;
         }
         setOrgDraft({ name: v.cleaned });
-        const msg = `Nuevo dato guardado: organización = ${text}.`;
+        const msg = `Nuevo dato guardado: organización = ${v.cleaned}.`;
         setMessages((p) => [...p, { id: `${Date.now()}-porg`, role: "ai", text: msg }]);
         speak(msg);
       }
@@ -457,7 +627,7 @@ export default function OnboardingPage() {
           return;
         }
         setFarmDraft((prev) => ({ ...prev, name: v.cleaned }));
-        const msg = `Nuevo dato guardado: nombre de la finca = ${text}.`;
+        const msg = `Nuevo dato guardado: nombre de la finca = ${v.cleaned}.`;
         setMessages((p) => [...p, { id: `${Date.now()}-pfname`, role: "ai", text: msg }]);
         speak(msg);
       }
@@ -500,10 +670,17 @@ export default function OnboardingPage() {
         setLocked(false);
         return;
       }
-      const summary3 = `Organización: ${alreadyHasOrg ? (myOrgs?.[0]?.name ?? orgDraft.name) : orgDraft.name}\nFinca: ${farmDraft.name}\nCódigo: ${farmDraft.code}`;
-      setMessages((p) => [...p,
+      const currentOrgName2 = alreadyHasOrg ? (myOrgs?.[0]?.name ?? orgDraft.name) : orgDraft.name;
+      const summaryBlock2: ChatMsg = {
+        id: `${Date.now()}-sumblock2`,
+        role: "ai",
+        kind: "summary",
+        summary: { org: currentOrgName2, farm: farmDraft.name, code: farmDraft.code },
+      };
+      setMessages((p) => [
+        ...p,
         { id: `${Date.now()}-sum4`, role: "ai", text: "Actualicé tus respuestas. Este es el resumen:" },
-        { id: `${Date.now()}-sum5`, role: "ai", text: summary3 },
+        summaryBlock2,
         { id: `${Date.now()}-sum6`, role: "ai", text: "Confirma para continuar o dime si quieres editar algo más." },
       ]);
       speak("Actualicé tus respuestas. Revisa el resumen y confirma para continuar.");
@@ -587,8 +764,89 @@ export default function OnboardingPage() {
       }
     }
     if (locked) {
-      // Edición guiada
+      // Edición guiada (acepta comandos tipo "cambiar ... por X")
       const lower = text.toLowerCase();
+      const parsed = parseEditCommand(text);
+      if (parsed) {
+        if (parsed.field === "org") {
+          if (parsed.value) {
+            const v = validateNameLike(parsed.value, { minLen: 3, kindLabel: "organización" });
+            if (!v.ok) {
+              setMessages((p) => [...p, { id: `${Date.now()}-clar-orgx`, role: "ai", text: v.reason || "Ese nombre no parece válido." }]);
+            } else {
+              setOrgDraft({ name: v.cleaned });
+              const currentOrgName = v.cleaned;
+              const summaryBlock: ChatMsg = {
+                id: `${Date.now()}-sumlock-org`,
+                role: "ai",
+                kind: "summary",
+                summary: { org: currentOrgName, farm: farmDraft.name, code: farmDraft.code },
+              };
+              setMessages((p) => [
+                ...p,
+                { id: `${Date.now()}-clar-org2`, role: "ai", text: `He actualizado la organización a ${v.cleaned}.` },
+                { id: `${Date.now()}-sumlock-orgtxt`, role: "ai", text: "Este es el resumen actualizado:" },
+                summaryBlock,
+                { id: `${Date.now()}-sumlock-orgcta`, role: "ai", text: "Confirma para continuar o dime si quieres editar algo más." },
+              ]);
+              setLocked(true);
+            }
+          } else {
+            respondToClarification("org");
+          }
+          return;
+        }
+        if (parsed.field === "farmName") {
+          if (parsed.value) {
+            const v = validateNameLike(parsed.value, { minLen: 2, kindLabel: "finca" });
+            if (!v.ok) {
+              setMessages((p) => [...p, { id: `${Date.now()}-clar-farmx`, role: "ai", text: v.reason || "Ese nombre no parece válido." }]);
+            } else {
+              setFarmDraft((prev) => ({ ...prev, name: v.cleaned }));
+              const summaryBlock: ChatMsg = {
+                id: `${Date.now()}-sumlock-farm`,
+                role: "ai",
+                kind: "summary",
+                summary: { org: alreadyHasOrg ? (myOrgs?.[0]?.name ?? orgDraft.name) : orgDraft.name, farm: v.cleaned, code: farmDraft.code },
+              };
+              setMessages((p) => [
+                ...p,
+                { id: `${Date.now()}-clar-farm2`, role: "ai", text: `He actualizado el nombre de la finca a ${v.cleaned}.` },
+                { id: `${Date.now()}-sumlock-farmtxt`, role: "ai", text: "Este es el resumen actualizado:" },
+                summaryBlock,
+                { id: `${Date.now()}-sumlock-farmcta`, role: "ai", text: "Confirma para continuar o dime si quieres editar algo más." },
+              ]);
+              setLocked(true);
+            }
+          } else {
+            respondToClarification("farm");
+          }
+          return;
+        }
+        if (parsed.field === "farmCode") {
+          const code = (parsed.value || "").toLowerCase();
+          if (!/^fn-[a-z0-9-]{3,}$/.test(code)) {
+            setMessages((p) => [...p, { id: `${Date.now()}-clar-codex`, role: "ai", text: "El código debe iniciar con fn- y usar solo letras, números y guiones." }]);
+          } else {
+            setFarmDraft((prev) => ({ ...prev, code }));
+            const summaryBlock: ChatMsg = {
+              id: `${Date.now()}-sumlock-code`,
+              role: "ai",
+              kind: "summary",
+              summary: { org: alreadyHasOrg ? (myOrgs?.[0]?.name ?? orgDraft.name) : orgDraft.name, farm: farmDraft.name, code },
+            };
+            setMessages((p) => [
+              ...p,
+              { id: `${Date.now()}-clar-code2`, role: "ai", text: `He actualizado el código de la finca a ${code}.` },
+              { id: `${Date.now()}-sumlock-codetxt`, role: "ai", text: "Este es el resumen actualizado:" },
+              summaryBlock,
+              { id: `${Date.now()}-sumlock-codecta`, role: "ai", text: "Confirma para continuar o dime si quieres editar algo más." },
+            ]);
+            setLocked(true);
+          }
+          return;
+        }
+      }
       if (/organ/i.test(lower)) {
         setLocked(false);
         setCurrent("org");
@@ -617,6 +875,9 @@ export default function OnboardingPage() {
       const msg12 = "Sigamos enfocados en el onboarding. Dime si quieres editar organización, nombre de la finca o su código.";
       setMessages((p) => [...p, { id: `${Date.now()}-ai12`, role: "ai", text: msg12 }]);
       speak(msg12);
+    }
+    } finally {
+      setIsTyping(false);
     }
   };
 
@@ -783,6 +1044,14 @@ export default function OnboardingPage() {
         </div>
         {/* Contenedor de chat tipo isla */}
         <div className="island p-4 md:p-6">
+          <style>{`
+            .dot1{animation:visibility 3s linear infinite}
+            @keyframes visibility{0%{opacity:1}65%{opacity:1}66%{opacity:0}100%{opacity:0}}
+            .dot2{animation:visibility2 3s linear infinite}
+            @keyframes visibility2{0%{opacity:0}21%{opacity:0}22%{opacity:1}65%{opacity:1}66%{opacity:0}100%{opacity:0}}
+            .dot3{animation:visibility3 3s linear infinite}
+            @keyframes visibility3{0%{opacity:0}43%{opacity:0}44%{opacity:1}65%{opacity:1}66%{opacity:0}100%{opacity:0}}
+          `}</style>
           <div className="text-lg font-semibold mb-1">¡Hola{user?.firstName ? `, ${user.firstName}` : ""}! Bienvenido a Ganado.co</div>
           <div className="text-sm text-neutral-600 mb-4">Soy tu asistente de configuración. Juntos vamos a preparar tu espacio. Te haré preguntas cortas y te iré guiando. Si tienes dudas, pregúntame “¿para qué sirve esto?” y te explico. Puedes responder por texto o usando tu voz.</div>
           {/* Progreso */}
@@ -854,6 +1123,33 @@ export default function OnboardingPage() {
                       }}
                       awaitingFor={awaitingLogoFor}
                     />
+                  ) : m.kind === "summary" && m.summary ? (
+                    <div className="max-w-[85%] w-full">
+                      <div className="rounded-xl border border-neutral-200 bg-white/70 p-3 shadow-sm">
+                        <div className="flex items-center gap-2 mb-2 text-neutral-700">
+                          <Bot className="w-4 h-4" />
+                          <span className="text-xs uppercase tracking-wide">Generado por AI</span>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <tbody>
+                              <tr>
+                                <td className="py-1 pr-3 text-neutral-500">Organización</td>
+                                <td className="py-1 font-medium text-neutral-900">{m.summary.org}</td>
+                              </tr>
+                              <tr>
+                                <td className="py-1 pr-3 text-neutral-500">Finca</td>
+                                <td className="py-1 font-medium text-neutral-900">{m.summary.farm}</td>
+                              </tr>
+                              <tr>
+                                <td className="py-1 pr-3 text-neutral-500">Código</td>
+                                <td className="py-1 font-mono text-neutral-900">{m.summary.code}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
                   ) : (
                     <div className="max-w:[85%] max-w-[85%] text-[15px] leading-relaxed whitespace-pre-wrap text-neutral-800">
                       {m.text}
@@ -863,42 +1159,51 @@ export default function OnboardingPage() {
               ))}
             </AnimatePresence>
             <div ref={endRef} />
+            {isTyping && (
+              <div className="max-w-[85%] text-[15px] text-neutral-600 select-none">
+                <span className="inline-block align-middle">Escribiendo</span>
+                <span className="inline-block align-middle ml-1">
+                  <span className="dot1">.</span>
+                  <span className="dot2">.</span>
+                  <span className="dot3">.</span>
+                </span>
+              </div>
+            )}
           </div>
-          {/* Input unificado del asistente */}
+          {/* Input unificado del asistente o solo acciones si está bloqueado */}
           <div className="mt-4">
-            {(() => {
-              // Determinar placeholder contextual
-              let ph = "Escribe una respuesta o una pregunta…";
-              if (awaitingLogoFor) {
-                ph = "Sube el logo en el recuadro o escribe 'Subir después' para continuar";
-              } else if (locked) {
-                ph = "Escribe 'editar organización / finca / código' o 'confirmar'";
-              } else if (pendingEdit === "org") {
-                ph = "Nombre de la organización (Ej.: Ganadería La Esperanza)";
-              } else if (pendingEdit === "farmName") {
-                ph = "Nombre de la finca (Ej.: La Primavera)";
-              } else if (pendingEdit === "farmCode") {
-                ph = "Código de la finca (Ej.: fn-mi-finca)";
-              } else if (current === "org" && !alreadyHasOrg) {
-                ph = "Nombre de la organización (Ej.: Ganadería La Esperanza)";
-              } else if (current === "farm" && !farmDraft.name) {
-                ph = "Nombre de la finca (Ej.: La Primavera)";
-              }
-              return (
-                <AIInputBar
-                  value={inputText}
-                  onChange={(v) => setInputText(v)}
-                  onSend={handleSend}
-                  onMic={() => (isListening ? stopListening() : startListening())}
-                  isListening={isListening}
-                  disabled={locked}
-                  placeholder={ph}
-                  hideWebSearchToggle
-                />
-              );
-            })()}
-            {locked && (
-              <div className="mt-2 flex gap-2">
+            {!locked ? (
+              (() => {
+                // Determinar placeholder contextual
+                let ph = "Escribe una respuesta o una pregunta…";
+                if (awaitingLogoFor) {
+                  ph = "Sube el logo en el recuadro o escribe 'Subir después' para continuar";
+                } else if (pendingEdit === "org") {
+                  ph = "Nombre de la organización (Ej.: Ganadería La Esperanza)";
+                } else if (pendingEdit === "farmName") {
+                  ph = "Nombre de la finca (Ej.: La Primavera)";
+                } else if (pendingEdit === "farmCode") {
+                  ph = "Código de la finca (Ej.: fn-mi-finca)";
+                } else if (current === "org" && !alreadyHasOrg) {
+                  ph = "Nombre de la organización (Ej.: Ganadería La Esperanza)";
+                } else if (current === "farm" && !farmDraft.name) {
+                  ph = "Nombre de la finca (Ej.: La Primavera)";
+                }
+                return (
+                  <AIInputBar
+                    value={inputText}
+                    onChange={(v) => setInputText(v)}
+                    onSend={handleSend}
+                    onMic={() => (isListening ? stopListening() : startListening())}
+                    isListening={isListening}
+                    disabled={false}
+                    placeholder={ph}
+                    hideWebSearchToggle
+                  />
+                );
+              })()
+            ) : (
+              <div className="flex gap-2">
                 <Button color="primary" onPress={handleConfirmAndCreate} isLoading={createOrg.isPending || createFarm.isPending}>Confirmar y continuar</Button>
                 <Button variant="flat" onPress={() => { setLocked(false); setMessages((p) => [...p, { id: `${Date.now()}-ai13`, role: "ai", text: "¿Qué deseas editar de tu información ingresada?" }]); }}>Seguir editando</Button>
               </div>
