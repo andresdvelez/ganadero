@@ -24,6 +24,48 @@ const farmInput = z.object({
 });
 
 export const farmRouter = createTRPCRouter({
+  getAll: protectedProcedure
+    .query(async ({ ctx }) => {
+      const me = await prisma.user.findUnique({
+        where: { clerkId: ctx.userId! },
+      });
+      if (!me) throw new Error("Usuario no encontrado");
+      
+      const memberships = await prisma.organizationMembership.findMany({
+        where: { userId: me.id },
+        select: { orgId: true },
+      });
+      
+      const orgIds = memberships.map(m => m.orgId);
+      
+      return prisma.farm.findMany({
+        where: { orgId: { in: orgIds } },
+        orderBy: { createdAt: "desc" },
+      });
+    }),
+
+  getById: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const me = await prisma.user.findUnique({
+        where: { clerkId: ctx.userId! },
+      });
+      if (!me) throw new Error("Usuario no encontrado");
+      
+      const farm = await prisma.farm.findUnique({ 
+        where: { id: input.id } 
+      });
+      
+      if (!farm) throw new Error("Finca no encontrada");
+      
+      const membership = await prisma.organizationMembership.findFirst({
+        where: { orgId: farm.orgId, userId: me.id },
+      });
+      if (!membership) throw new Error("No perteneces a esa organización");
+      
+      return farm;
+    }),
+
   list: protectedProcedure
     .input(z.object({ orgId: z.string() }))
     .query(async ({ ctx, input }) => {

@@ -263,4 +263,25 @@ export const moduleRegistry: Record<string, RanchModule> = {
       },
     },
   },
+  ranches: {
+    id: "ranches",
+    name: "Haciendas",
+    category: "Administración",
+    path: "/ranches",
+    tags: ["fincas", "propiedades", "gestión"],
+    actions: {
+      list: {
+        label: "Ver haciendas",
+        async run() {
+          return { navigateTo: "/ranches" };
+        },
+      },
+      create: {
+        label: "Nueva hacienda",
+        async run() {
+          return { navigateTo: "/ranches/new" };
+        },
+      },
+    },
+  },
 };
