@@ -9,29 +9,34 @@ export function AuthGate() {
   const router = useRouter();
   const pathname = usePathname();
   const { isSignedIn, isLoaded } = useAuth();
+  const isTauri = typeof window !== "undefined" && (window as any).__TAURI__;
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      // Allow public auth pages
+      // Páginas públicas
       if (
         pathname?.startsWith("/sign-in") ||
         pathname?.startsWith("/sign-up") ||
         pathname?.startsWith("/device-unlock") ||
         pathname?.startsWith("/offline")
       ) {
-        return;
-      }
-
-      if (typeof navigator !== "undefined" && navigator.onLine) {
-        // Online: require Clerk session
-        if (isLoaded && !isSignedIn) {
-          router.replace("/sign-in");
+        // Si Tauri está offline, forzar flujo offline
+        if (isTauri && typeof navigator !== "undefined" && !navigator.onLine) {
+          if (pathname?.startsWith("/sign-in") || pathname?.startsWith("/sign-up")) {
+            router.replace("/offline");
+          }
         }
         return;
       }
 
-      // Offline: require identity + unlock, or show offline help
+      // Con Internet (web o Tauri): requerir sesión de Clerk
+      if (typeof navigator !== "undefined" && navigator.onLine) {
+        if (isLoaded && !isSignedIn) router.replace("/sign-in");
+        return;
+      }
+
+      // Modo offline: requerir identidad + desbloqueo, o mostrar ayuda offline
       const hasIdentity = await hasOfflineIdentity();
       if (cancelled) return;
       if (hasIdentity) {
@@ -44,7 +49,7 @@ export function AuthGate() {
     return () => {
       cancelled = true;
     };
-  }, [pathname, router, isLoaded, isSignedIn]);
+  }, [pathname, router, isLoaded, isSignedIn, isTauri]);
 
   return null;
 }

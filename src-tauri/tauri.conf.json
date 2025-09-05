@@ -20,7 +20,7 @@
         ".next/static/**",
         ".next/standalone/server.js",
         ".env",
-        "models/**"
+        "models"
       ],
       "externalBin": [
         "sidecar/node"

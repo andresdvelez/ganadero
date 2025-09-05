@@ -6,6 +6,7 @@ const projectRoot = path.resolve(process.cwd());
 const appDir = path.join(projectRoot, 'src', 'app');
 const publicDir = path.join(projectRoot, 'public');
 const tauriDistDir = path.join(projectRoot, 'src-tauri', 'dist');
+const tauriModelsDir = path.join(projectRoot, 'src-tauri', 'models');
 
 // Ya no movemos rutas fuera antes del build. Mantener todo dentro para que Next standalone
 // incluya API, auth y páginas offline en el paquete de Tauri.
@@ -33,6 +34,7 @@ if (process.env.TAURI !== '1' && process.env.TAURI !== 'true') {
 // Copiar recursos necesarios a dist para la splash offline
 try {
   fs.mkdirSync(tauriDistDir, { recursive: true });
+  fs.mkdirSync(tauriModelsDir, { recursive: true });
   const splashSrc = path.join(publicDir, 'brand', 'splash-screen.jpeg');
   const splashDst = path.join(tauriDistDir, 'splash-screen.jpeg');
   if (fs.existsSync(splashSrc)) {
