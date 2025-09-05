@@ -21,6 +21,7 @@ export function AIInputBar({
   webSearch,
   onToggleWebSearch,
   analyser,
+  hideWebSearchToggle,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -35,6 +36,7 @@ export function AIInputBar({
   webSearch?: boolean;
   onToggleWebSearch?: (v: boolean) => void;
   analyser?: AnalyserNode | null;
+  hideWebSearchToggle?: boolean;
 }) {
   const hasText = (value || "").trim().length > 0;
   const timeLabel = useMemo(() => {
@@ -167,24 +169,26 @@ export function AIInputBar({
           classNames={
             {
               inputWrapper:
-                "h-16 rounded-[28px] bg-white border border-neutral-200 shadow-sm pr-44 pl-2 transition-all",
+                "h-16 rounded-[28px] bg-white border border-neutral-200 shadow-sm pr-44 pl-2 transition-all focus:outline-none focus:ring-0 focus-visible:ring-0 outline-none ring-0 data-[focus=true]:ring-0 data-[focus=true]:outline-none",
               input:
-                "h-12 rounded-[20px] bg-neutral-100 text-[16px] px-4 placeholder:text-neutral-500",
+                "h-12 rounded-[20px] bg-neutral-100 text-[16px] px-4 placeholder:text-neutral-500 focus:outline-none",
             } as any
           }
         />
       )}
 
       {/* Web search toggle */}
-      <div className="absolute right-[6.5rem] top-1/2 -translate-y-1/2 flex items-center gap-2 text-neutral-600 select-none">
-        <span className="hidden sm:inline text-sm">Búsqueda web</span>
-        <Switch
-          size="sm"
-          isSelected={!!webSearch}
-          onValueChange={(v) => onToggleWebSearch?.(v)}
-          aria-label="Buscar en la web"
-        />
-      </div>
+      {!hideWebSearchToggle && (
+        <div className="absolute right-[6.5rem] top-1/2 -translate-y-1/2 flex items-center gap-2 text-neutral-600 select-none">
+          <span className="hidden sm:inline text-sm">Búsqueda web</span>
+          <Switch
+            size="sm"
+            isSelected={!!webSearch}
+            onValueChange={(v) => onToggleWebSearch?.(v)}
+            aria-label="Buscar en la web"
+          />
+        </div>
+      )}
 
       {/* Mic button moves when send appears (send hidden during listening) */}
       <Button

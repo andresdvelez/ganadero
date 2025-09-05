@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useClerk } from "@clerk/nextjs";
 import { trpc } from "@/lib/trpc/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,9 @@ import { addToast } from "@/components/ui/toast";
 import { robustDeviceId } from "@/lib/utils";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, MicOff, ArrowUp, Plus } from "lucide-react";
+import { Mic, MicOff, ArrowUp, Plus, Copy, Edit3, X, Image as ImageIcon } from "lucide-react";
+import { AIInputBar } from "@/components/ai/ai-input-bar";
+import { useDropzone } from "react-dropzone";
 
 type WizardStep = "org" | "farm" | "confirm";
 
@@ -38,6 +40,7 @@ function slugify(input: string): string {
 export default function OnboardingPage() {
   const router = useRouter();
   const { isLoaded, user } = useUser();
+  const { signOut } = useClerk();
   const utils = trpc.useUtils();
 
   // Estado local (borradores) — no se crea nada hasta confirmar
@@ -83,7 +86,12 @@ export default function OnboardingPage() {
 
   const deviceId = useMemo(() => robustDeviceId(), []);
   // Chat state
-  type ChatMsg = { id: string; role: "ai" | "user"; text: string };
+  type ChatMsg = {
+    id: string;
+    role: "ai" | "user";
+    text?: string;
+    kind?: "logo-drop";
+  };
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [inputText, setInputText] = useState("");
   const [locked, setLocked] = useState(false); // lock after summary
@@ -143,9 +151,180 @@ export default function OnboardingPage() {
     setIsListening(false);
   };
 
+  // Logo de la organización (temporal en cliente)
+  const [orgLogo, setOrgLogo] = useState<{
+    dataUrl: string;
+    fileName?: string;
+  } | null>(null);
+  const [awaitingLogoFor, setAwaitingLogoFor] = useState<null | "org" | "farm">(null);
+
+  function proceedToFarm() {
+    const msg2 = "¡Perfecto! Ahora dime el nombre de tu primera finca.";
+    setMessages((p) => [...p, { id: `${Date.now()}-ai2`, role: "ai", text: msg2 }]);
+    speak(msg2);
+    setCurrent("farm");
+    setAwaitingLogoFor(null);
+  }
+
+  // Intenciones de omitir/continuar sin subir logo
+  function isSkipLogoIntent(t: string): boolean {
+    return /\b(omitir|omito|salt(ar|o)|continu(ar|o)|seguir|despues|después|mas tarde|más tarde|luego|no quiero subir|sin logo|subir(\s+)?despues|otro momento|después)\b/.test(t);
+  }
+
+  // Pequeñas charlas y saludos
+  function isGreetingOrSmalltalk(text: string): boolean {
+    const t = text.toLowerCase().trim();
+    return /(hola|buenas|buenos dias|buenas tardes|buenas noches|qué tal|que tal|hey|ola|gracias|ok|vale|listo|perfecto)/.test(t);
+  }
+
+  function persuasiveAsk(kind: "organización" | "finca" | "código", example: string) {
+    const article = kind === "código" ? "el" : "la";
+    const variants = [
+      `¡Gracias por tu mensaje! Para avanzar necesito ${article} ${kind}. Por favor escribe solo ${article} ${kind}. Ej.: ${example}.`,
+      `Entiendo, y para seguir configurando todo, requiero ${article} ${kind}. Escribe únicamente ${article} ${kind}. Ej.: ${example}.`,
+      `Sigamos paso a paso: compárteme ${article} ${kind}. Solo ${article} ${kind}, por favor. Ej.: ${example}.`,
+    ];
+    const msg = variants[Math.floor(Math.random() * variants.length)];
+    setMessages((p) => [...p, { id: `${Date.now()}-pers-${kind}` as any, role: "ai", text: msg }]);
+    speak(msg);
+  }
+
+  // Heurísticas para diferenciar respuesta vs. aclaración/pregunta
+  function isClarificationOrQuestion(text: string): boolean {
+    const t = text.toLowerCase().trim();
+    if (!t) return true;
+    if (/https?:\/\//i.test(t) || /@/.test(t)) return true; // enlaces/correos → no es un nombre
+    if (t.includes("?") || t.includes("¿")) return true;
+    // Interrogativos en cualquier posición (con o sin tilde) y motivos
+    if (/(por que|por qué|porque|para que|para qué|que|qué|como|cómo|donde|dónde|cuando|cuándo|cual|cuál|quien|quién)\b/.test(t)) return true;
+    // Peticiones de explicación/ayuda en diversas formas
+    if (/((me\s+)?puedes?\s+explicar|explicame|explícame|no\s+entiendo|ayuda|necesito\s+saber|me\s+puedes?\s+decir|por\s+favor\s+explica|razon|razón|motivo)/.test(t)) return true;
+    if (/^(si|sí|no|ok|vale|listo|dale|bien)$/i.test(t)) return true;
+    return false;
+  }
+
+  // Sanitización y validación de nombres para evitar entradas problemáticas
+  function sanitizeName(input: string): string {
+    const normalized = (input || "").normalize("NFC");
+    const removedBad = normalized.replace(/[^A-Za-z0-9 \u00C0-\u017F\.\-&'_]/g, "");
+    return removedBad.replace(/\s+/g, " ").trim();
+  }
+
+  function validateNameLike(
+    raw: string,
+    opts: { minLen: number; kindLabel: string }
+  ): { ok: boolean; cleaned: string; reason?: string } {
+    const cleaned = sanitizeName(raw);
+    if (!/[A-Za-z\u00C0-\u017F]/.test(cleaned)) {
+      return {
+        ok: false,
+        cleaned,
+        reason: `Escribe solo el nombre (${opts.kindLabel}) con letras. Ej.: "Ganadería La Esperanza"`,
+      };
+    }
+    if (/https?:\/\//i.test(raw) || /@/.test(raw)) {
+      return {
+        ok: false,
+        cleaned,
+        reason: "No incluyas enlaces ni correos. Escribe solo el nombre.",
+      };
+    }
+    if (cleaned.replace(/\s+/g, "").length < opts.minLen) {
+      return {
+        ok: false,
+        cleaned,
+        reason: `El nombre (${opts.kindLabel}) debe tener al menos ${opts.minLen} caracteres.`,
+      };
+    }
+    if (cleaned.length > 120) {
+      return {
+        ok: false,
+        cleaned,
+        reason: "El nombre es muy largo. Usa máximo 120 caracteres.",
+      };
+    }
+    return { ok: true, cleaned };
+  }
+
+  function respondToClarification(step: WizardStep) {
+    if (step === "org") {
+      const variants = [
+        "Usamos el nombre para crear tu espacio de trabajo y vincular permisos, fincas y facturación a tu organización.",
+        "El nombre identifica tu empresa en Ganado.co y evita mezclar datos con otras organizaciones.",
+        "Con el nombre configuramos acceso offline y servicios como alertas, reportes y sincronización.",
+      ];
+      const hint = "Por favor, escribe solo el nombre. Ej.: 'Ganadería La Esperanza'.";
+      const msg = `${variants[Math.floor(Math.random() * variants.length)]} ${hint}`;
+      setMessages((p) => [...p, { id: `${Date.now()}-clar-org`, role: "ai", text: msg }]);
+      speak(msg);
+      return;
+    }
+    if (step === "farm") {
+      const msg = "Para completar tu espacio necesitamos al menos una finca. Escribe el nombre, por ejemplo: 'La Primavera'.";
+      setMessages((p) => [...p, { id: `${Date.now()}-clar-farm`, role: "ai", text: msg }]);
+      speak(msg);
+      return;
+    }
+    const msg = "Estamos en la etapa de confirmación. Puedes confirmar o decirme qué deseas editar (organización, nombre o código de la finca).";
+    setMessages((p) => [...p, { id: `${Date.now()}-clar-conf`, role: "ai", text: msg }]);
+    speak(msg);
+  }
+
+  // Heurística simple para detectar frases fuera de tema (no parecen nombre propio)
+  function isLikelyOffTopicSentence(input: string): boolean {
+    const t = (input || "").toLowerCase();
+    // Palabras de tiempo o contexto narrativo
+    if (/(ayer|hoy|mañana|lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo|semana|mes|año)/.test(t)) return true;
+    // Verbos comunes en pasado/presente que sugieren relato de acciones
+    if (/(compr[ée]|compre|compraba|lleg[oó]|llego|llegaba|fui|estaba|hice|tenia|tenía|queria|quería|necesit[oó]|necesito|pedi|pedí|pedi[aá]|pediamos)/.test(t)) return true;
+    // Demasiadas palabras para un nombre
+    const words = t.trim().split(/\s+/).filter(Boolean);
+    if (words.length >= 9) return true;
+    // Tiene puntuación de frase
+    if (/[\.!?;,]/.test(t)) return true;
+    return false;
+  }
+
+  // Acciones estilo ChatGPT
+  const handleCopyMessage = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      addToast({ variant: "success", title: "Mensaje copiado" });
+    } catch {
+      addToast({ variant: "warning", title: "No se pudo copiar" });
+    }
+  };
+
+  const handleEditMessage = (id: string) => {
+    const msg = messages.find((m) => m.id === id && m.role === "user");
+    if (!msg) return;
+    setInputText(msg.text || "");
+    setMessages((prev) => prev.filter((m) => m.id !== id));
+    setLocked(false);
+  };
+
   const handleSend = () => {
     const text = inputText.trim();
     if (!text) return;
+    // Si estamos esperando el logo, interpretar intención de omitir/continuar
+    if (awaitingLogoFor) {
+      const lower = text.toLowerCase();
+      const wantsSkip = isSkipLogoIntent(lower);
+      if (wantsSkip) {
+        // Continuar sin logo
+        setInputText("");
+        setAwaitingLogoFor(null);
+        setMessages((p) => [...p, { id: `${Date.now()}-u`, role: "user", text }]);
+        proceedToFarm();
+        return;
+      }
+      // Guía mientras esperamos logo
+      const hint = "Para continuar, sube el logo aquí o escribe 'Subir después' (puedes decir: continuar, seguir, omitir logo, más tarde).";
+      setInputText("");
+      setMessages((p) => [...p, { id: `${Date.now()}-logo-hint`, role: "ai", text: hint }]);
+      speak(hint);
+      return;
+    }
     setMessages((p) => [...p, { id: `${Date.now()}-u`, role: "user", text }]);
     setInputText("");
     // Intento de edición directa: "cambiar/editar <campo> a <valor>"
@@ -245,25 +424,39 @@ export default function OnboardingPage() {
     // Si hay una edición pendiente (preguntamos por el nuevo valor)
     if (pendingEdit) {
       if (pendingEdit === "org") {
-        if (text.length < 2) {
+        if (isClarificationOrQuestion(text) || text.length < 2) {
           const msg = "Ese nombre es muy corto. Escribe un nombre más descriptivo, por favor.";
           setMessages((p) => [...p, { id: `${Date.now()}-porgx`, role: "ai", text: msg }]);
           speak(msg);
           return;
         }
-        setOrgDraft({ name: text });
+        const v = validateNameLike(text, { minLen: 3, kindLabel: "organización" });
+        if (!v.ok) {
+          const msg = v.reason || "El nombre de tu organización no parece válido.";
+          setMessages((p) => [...p, { id: `${Date.now()}-porgx2`, role: "ai", text: msg }]);
+          speak(msg);
+          return;
+        }
+        setOrgDraft({ name: v.cleaned });
         const msg = `Nuevo dato guardado: organización = ${text}.`;
         setMessages((p) => [...p, { id: `${Date.now()}-porg`, role: "ai", text: msg }]);
         speak(msg);
       }
       if (pendingEdit === "farmName") {
-        if (text.length < 2) {
+        if (isClarificationOrQuestion(text) || text.length < 2) {
           const msg = "Ese nombre es muy corto. Inténtalo nuevamente.";
           setMessages((p) => [...p, { id: `${Date.now()}-pfnamex`, role: "ai", text: msg }]);
           speak(msg);
           return;
         }
-        setFarmDraft((prev) => ({ ...prev, name: text }));
+        const v = validateNameLike(text, { minLen: 2, kindLabel: "finca" });
+        if (!v.ok) {
+          const msg = v.reason || "Ese nombre no parece válido. Inténtalo nuevamente.";
+          setMessages((p) => [...p, { id: `${Date.now()}-pfnamex2`, role: "ai", text: msg }]);
+          speak(msg);
+          return;
+        }
+        setFarmDraft((prev) => ({ ...prev, name: v.cleaned }));
         const msg = `Nuevo dato guardado: nombre de la finca = ${text}.`;
         setMessages((p) => [...p, { id: `${Date.now()}-pfname`, role: "ai", text: msg }]);
         speak(msg);
@@ -321,31 +514,66 @@ export default function OnboardingPage() {
     // reglas simples de validación/onboarding guiado
     const step = current;
     if (step === "org" && !alreadyHasOrg) {
-      if (text.length < 2) {
-        const msg = "Ese nombre es muy corto. Escribe el nombre completo de tu organización, por favor.";
+      if (isGreetingOrSmalltalk(text)) {
+        persuasiveAsk("organización", "Ganadería La Esperanza");
+        return;
+      }
+      if (isClarificationOrQuestion(text)) {
+        respondToClarification("org");
+        return;
+      }
+      // Si parece claramente fuera de tema, pedir confirmación explícita
+      if (isLikelyOffTopicSentence(text)) {
+        const msgc = "Lo que escribiste parece una frase y no un nombre. ¿Es realmente el nombre de tu organización? Si no, por favor escribe solo el nombre (ej.: Ganadería La Esperanza).";
+        setMessages((p) => [...p, { id: `${Date.now()}-ai1c`, role: "ai", text: msgc }]);
+        speak(msgc);
+        return;
+      }
+      const v = validateNameLike(text, { minLen: 3, kindLabel: "organización" });
+      if (!v.ok) {
+        const msg = v.reason || "El nombre de tu organización no parece válido.";
         setMessages((p) => [...p, { id: `${Date.now()}-ai1`, role: "ai", text: msg }]);
         speak(msg);
         return;
       }
-      setOrgDraft({ name: text });
-      const msg2 = "¡Perfecto! Ahora dime el nombre de tu primera finca.";
-      setMessages((p) => [...p, { id: `${Date.now()}-ai2`, role: "ai", text: msg2 }]);
-      speak(msg2);
-      setCurrent("farm");
+      setOrgDraft({ name: v.cleaned });
+      const msgLogo = "¿Quieres subir el logo de tu organización? Puedes arrastrarlo aquí o continuar sin logo.";
+      setMessages((p) => [
+        ...p,
+        { id: `${Date.now()}-ai2a`, role: "ai", text: msgLogo },
+        { id: `${Date.now()}-logo`, role: "ai", kind: "logo-drop" },
+      ]);
+      speak(msgLogo);
+      setAwaitingLogoFor("org");
       return;
     }
     if (step === "farm") {
       if (!farmDraft.name) {
-        if (text.length < 2) {
-          const msg3 = "Ese nombre parece corto. ¿Cómo se llama tu finca?";
+        if (isGreetingOrSmalltalk(text)) {
+          persuasiveAsk("finca", "La Primavera");
+          return;
+        }
+        if (isClarificationOrQuestion(text)) {
+          respondToClarification("farm");
+          return;
+        }
+        if (isLikelyOffTopicSentence(text)) {
+          const msgc = "Parece una frase y no un nombre de finca. Escribe solo el nombre (ej.: La Primavera).";
+          setMessages((p) => [...p, { id: `${Date.now()}-ai3c`, role: "ai", text: msgc }]);
+          speak(msgc);
+          return;
+        }
+        const v = validateNameLike(text, { minLen: 2, kindLabel: "finca" });
+        if (!v.ok) {
+          const msg3 = v.reason || "Ese nombre no parece válido. Inténtalo nuevamente.";
           setMessages((p) => [...p, { id: `${Date.now()}-ai3`, role: "ai", text: msg3 }]);
           speak(msg3);
           return;
         }
-        const genCode = `fn-${slugify(text)}`;
-        setFarmDraft((prev) => ({ ...prev, name: text, code: genCode }));
+        const genCode = `fn-${slugify(v.cleaned)}`;
+        setFarmDraft((prev) => ({ ...prev, name: v.cleaned, code: genCode }));
         setCurrent("confirm");
-        const summary = `Organización: ${alreadyHasOrg ? (myOrgs?.[0]?.name ?? orgDraft.name) : orgDraft.name}\nFinca: ${text}\nCódigo asignado: ${genCode}`;
+        const summary = `Organización: ${alreadyHasOrg ? (myOrgs?.[0]?.name ?? orgDraft.name) : orgDraft.name}\nFinca: ${v.cleaned}\nCódigo asignado: ${genCode}`;
         const nextMsgs: ChatMsg[] = [
           ...messages,
           { id: `${Date.now()}-ai6`, role: "ai", text: "He asignado automáticamente un código a tu finca." },
@@ -575,65 +803,109 @@ export default function OnboardingPage() {
               </div>
             );
           })()}
-          {/* Mensajes */}
+          {/* Mensajes (estilo ChatGPT) */}
           <div className="space-y-3 max-h-[52vh] overflow-auto pr-1">
             <AnimatePresence>
               {messages.map((m) => (
-                <motion.div key={m.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                  <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${m.role === "ai" ? "bg-white/70 border border-neutral-200/60" : "bg-neutral-900 text-white ml-auto"}`}>
-                    {m.text}
-                  </div>
+                <motion.div
+                  key={m.id}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                >
+                  {m.role === "user" ? (
+                    <div className="ml-auto max-w-[75%]">
+                      <div className="rounded-2xl border border-neutral-200 bg-neutral-100 text-neutral-900 px-3 py-2 text-[15px] leading-relaxed whitespace-pre-wrap shadow-sm">
+                        {m.text}
+                      </div>
+                      <div className="mt-1 flex items-center justify-end gap-2 text-neutral-500">
+                        <button
+                          type="button"
+                          aria-label="Copiar mensaje"
+                          className="p-1 rounded hover:bg-neutral-200/60"
+                          onClick={() => handleCopyMessage(m.text || "")}
+                          title="Copiar"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Editar y reenviar"
+                          className="p-1 rounded hover:bg-neutral-200/60"
+                          onClick={() => handleEditMessage(m.id)}
+                          title="Editar"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : m.kind === "logo-drop" ? (
+                    <LogoDropMessage
+                      onUploaded={(d) => {
+                        setOrgLogo(d);
+                        // Avanzar automáticamente a la siguiente indicación
+                        proceedToFarm();
+                      }}
+                      current={orgLogo}
+                      onClear={() => {
+                        setOrgLogo(null);
+                        // El usuario decide subir después
+                        proceedToFarm();
+                      }}
+                      awaitingFor={awaitingLogoFor}
+                    />
+                  ) : (
+                    <div className="max-w:[85%] max-w-[85%] text-[15px] leading-relaxed whitespace-pre-wrap text-neutral-800">
+                      {m.text}
+                    </div>
+                  )}
                 </motion.div>
               ))}
             </AnimatePresence>
             <div ref={endRef} />
           </div>
-          {/* Input estilo pill con íconos internos */}
-          <div className="mt-4 relative">
-            <input
-              placeholder="Pregunta lo que quieras"
-              value={inputText}
-              onChange={(e) => setInputText((e.target as HTMLInputElement).value)}
-              disabled={locked}
-              className="w-full h-12 rounded-full border border-neutral-200 bg-white/70 pl-10 pr-28 text-sm placeholder-neutral-500 outline-none"
-            />
-            <Plus className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-700" />
-            <span className={`absolute right-16 top-1/2 -translate-y-1/2 inline-block w-2 h-2 rounded-full ${isListening ? "bg-emerald-500" : "bg-emerald-400"}`} />
-            <Button
-              aria-label={isListening ? "Detener micrófono" : "Hablar"}
-              variant="flat"
-              onPress={() => (isListening ? stopListening() : startListening())}
-              disabled={locked}
-              isIconOnly
-              className="absolute right-9 top-1/2 -translate-y-1/2 rounded-full"
-            >
-              {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-            </Button>
-            <AnimatePresence>
-              {inputText.trim() && (
-                <motion.button
-                  key="send"
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  transition={{ duration: 0.12 }}
-                  aria-label="Enviar"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-black text-white rounded-full w-10 h-10 grid place-items-center"
-                  onClick={handleSend}
-                >
-                  <ArrowUp className="w-4 h-4" />
-                </motion.button>
-              )}
-            </AnimatePresence>
-            {/* acciones duplicadas eliminadas y control Volume2 removido para evitar ReferenceError */}
+          {/* Input unificado del asistente */}
+          <div className="mt-4">
+            {(() => {
+              // Determinar placeholder contextual
+              let ph = "Escribe una respuesta o una pregunta…";
+              if (awaitingLogoFor) {
+                ph = "Sube el logo en el recuadro o escribe 'Subir después' para continuar";
+              } else if (locked) {
+                ph = "Escribe 'editar organización / finca / código' o 'confirmar'";
+              } else if (pendingEdit === "org") {
+                ph = "Nombre de la organización (Ej.: Ganadería La Esperanza)";
+              } else if (pendingEdit === "farmName") {
+                ph = "Nombre de la finca (Ej.: La Primavera)";
+              } else if (pendingEdit === "farmCode") {
+                ph = "Código de la finca (Ej.: fn-mi-finca)";
+              } else if (current === "org" && !alreadyHasOrg) {
+                ph = "Nombre de la organización (Ej.: Ganadería La Esperanza)";
+              } else if (current === "farm" && !farmDraft.name) {
+                ph = "Nombre de la finca (Ej.: La Primavera)";
+              }
+              return (
+                <AIInputBar
+                  value={inputText}
+                  onChange={(v) => setInputText(v)}
+                  onSend={handleSend}
+                  onMic={() => (isListening ? stopListening() : startListening())}
+                  isListening={isListening}
+                  disabled={locked}
+                  placeholder={ph}
+                  hideWebSearchToggle
+                />
+              );
+            })()}
             {locked && (
-              <div className="flex gap-2">
+              <div className="mt-2 flex gap-2">
                 <Button color="primary" onPress={handleConfirmAndCreate} isLoading={createOrg.isPending || createFarm.isPending}>Confirmar y continuar</Button>
                 <Button variant="flat" onPress={() => { setLocked(false); setMessages((p) => [...p, { id: `${Date.now()}-ai13`, role: "ai", text: "¿Qué deseas editar de tu información ingresada?" }]); }}>Seguir editando</Button>
-                          </div>
-                        )}
-                      </div>
-                      </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
         {/* Bloque opcional: vinculación de dispositivo como isla aparte cuando current === "confirm" y no locked */}
         {current === "confirm" && !created && (
@@ -663,6 +935,93 @@ export default function OnboardingPage() {
                         </div>
                       )}
                     </div>
+        )}
+        {/* Botón secundario: cerrar sesión */}
+        <div className="mt-8 flex justify-center">
+          <Button
+            variant="flat"
+            onPress={() => {
+              try {
+                signOut({ redirectUrl: "/" });
+              } catch {}
+            }}
+          >
+            Salir y cerrar sesión
+          </Button>
+        </div>
+      </div>
+  );
+}
+
+// --- Componente de mensaje especial para subir logo ---
+function LogoDropMessage({
+  onUploaded,
+  current,
+  onClear,
+  awaitingFor,
+}: {
+  onUploaded: (d: { dataUrl: string; fileName?: string }) => void;
+  current: { dataUrl: string; fileName?: string } | null;
+  onClear: () => void;
+  awaitingFor?: "org" | "farm" | null;
+}) {
+  const onDrop = (accepted: File[]) => {
+    if (!accepted || accepted.length === 0) return;
+    const file = accepted[0];
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const dataUrl = reader.result as string;
+      onUploaded({ dataUrl, fileName: file.name });
+    };
+    reader.readAsDataURL(file);
+  };
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: { "image/*": [".jpeg", ".jpg", ".png", ".webp", ".svg"] },
+    maxFiles: 1,
+  });
+
+  return (
+    <div className="max-w-[85%]">
+      <div className="text-[15px] text-neutral-800 mb-1">Logo de la organización</div>
+      <div
+        {...getRootProps()}
+        className="rounded-2xl border border-dashed border-neutral-300 bg-white/70 px-4 py-6 text-center cursor-pointer hover:border-neutral-400 transition-colors"
+      >
+        <input {...getInputProps()} />
+        {current?.dataUrl ? (
+          <div className="relative inline-block">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={current.dataUrl} alt="Logo" className="max-h-28 rounded-md shadow-sm" />
+            <button
+              type="button"
+              className="absolute -top-2 -right-2 bg-neutral-900 text-white rounded-full p-1"
+              onClick={(e) => { e.stopPropagation(); onClear(); }}
+              aria-label="Quitar logo"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2 text-neutral-600">
+            <ImageIcon className="w-8 h-8" />
+            <span className="text-sm">
+              {isDragActive ? "Suelta el archivo aquí" : "Arrastra o haz clic para subir tu logo"}
+            </span>
+            <span className="text-xs text-neutral-500">SVG, PNG o JPG (máx. 2MB)</span>
+          </div>
+        )}
+      </div>
+      <div className="mt-3 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={onClear}
+          className="px-3 py-1.5 rounded-full bg-neutral-900 text-white text-xs hover:opacity-90"
+        >
+          Subir después
+        </button>
+        {current?.dataUrl && (
+          <span className="text-xs text-green-700">Logo cargado ✓</span>
         )}
       </div>
     </div>
