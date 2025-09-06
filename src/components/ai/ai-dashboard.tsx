@@ -92,7 +92,7 @@ export function AIAssistantDashboard({
             onMic={onMic}
             isListening={isListening}
             elapsedMs={listenElapsedMs}
-            disabled={overlayActive}
+            disabled={false}
             levels={levels}
             webSearch={webSearch}
             onToggleWebSearch={onToggleWebSearch}
