@@ -326,11 +326,43 @@ export default function AIAssistantPage() {
   // FAB para nuevo chat (UX: esquina inferior derecha)
   const FabNewChat = () => (
     <button
-      className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-neutral-900 text-white shadow-lg hover:scale-105 active:scale-95 transition-all ios-surface"
+      className="fixed bottom-6 right-6 z-40 h-14 px-5 rounded-full bg-neutral-900 text-white shadow-lg hover:scale-105 active:scale-95 transition-all ios-surface flex items-center gap-3"
       title="Nuevo chat"
-      onClick={() => window.dispatchEvent(new Event("ai-new-chat"))}
+      onClick={async () => {
+        try {
+          // Guardar el chat actual en historial (si hay contenido)
+          if (messages.length > 0) {
+            const id = chatUuid || generateUUID();
+            const title = (messages.find((m) => m.role === "user")?.content || messages[0]?.content || "Nuevo chat").slice(0, 60);
+            const now = new Date();
+            await db.chats.put({
+              uuid: id,
+              title,
+              createdAt: now,
+              updatedAt: now,
+            } as any);
+            await Promise.all(
+              messages.map((m) =>
+                db.chatMessages.add({
+                  chatUuid: id,
+                  role: m.role,
+                  content: m.content,
+                  createdAt: m.timestamp || new Date(),
+                } as any)
+              )
+            );
+          }
+        } catch {}
+        // Disparar evento para resetear hilo y refrescar historial
+        window.dispatchEvent(new Event("ai-new-chat"));
+        try {
+          const items = await db.chats.orderBy("updatedAt").reverse().limit(20).toArray();
+          setChatList(items);
+        } catch {}
+      }}
     >
       <span className="text-2xl leading-none">+</span>
+      <span className="text-sm font-medium">Nuevo chat</span>
     </button>
   );
 
