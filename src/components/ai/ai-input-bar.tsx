@@ -68,10 +68,10 @@ export function AIInputBar({
     if (!ctx) return;
     const context = ctx as CanvasRenderingContext2D;
     analyser.fftSize = 2048;
-    analyser.smoothingTimeConstant = 0.86;
+    analyser.smoothingTimeConstant = 0.7;
     try {
-      analyser.minDecibels = -100;
-      analyser.maxDecibels = -20;
+      analyser.minDecibels = -110;
+      analyser.maxDecibels = -10;
     } catch {}
     const bufferLength = analyser.frequencyBinCount;
     const freqArray = new Uint8Array(bufferLength);
@@ -98,20 +98,25 @@ export function AIInputBar({
       const mid = (start + end) / 2;
       let weighted = 0;
       let weightSum = 0.0001;
+      let peak = 0;
       for (let i = start; i < end; i++) {
         const t = Math.abs(i - mid) / (end - start);
         const w = Math.max(0, 1 - t * 2); // triangular window peaking at mid
         weighted += freqArray[i] * w;
         weightSum += w;
+        if (freqArray[i] > peak) peak = freqArray[i];
       }
       const avg = weighted / weightSum; // 0..255
-      const energy = avg / 255; // 0..1
+      // Combine average with instantaneous peak to increase responsiveness
+      const energyLin = 0.65 * (avg / 255) + 0.35 * (peak / 255);
+      // Non-linear mapping to expand low-level variations
+      const energy = Math.pow(Math.max(0, Math.min(1, energyLin)), 0.5);
 
       // push into history (timeline of bars)
       const WIDTH = canvas.clientWidth;
       const HEIGHT = canvas.clientHeight;
-      const barWidth = 3; // px
-      const gap = 1; // px
+      const barWidth = 1; // px (delgadas)
+      const gap = 1; // px (muchas barras)
       const step = barWidth + gap;
       const maxBars = Math.max(4, Math.floor(WIDTH / step));
       const hist = freqHistoryRef.current;
@@ -130,9 +135,9 @@ export function AIInputBar({
       context.setLineDash([]);
 
       // auto-gain smoothing
-      const targetFill = 0.9; // portion of half-height
-      const proposedScale = Math.min(6, Math.max(0.5, targetFill / Math.max(0.08, energy)));
-      scaleRef.current = scaleRef.current + (proposedScale - scaleRef.current) * 0.1;
+      const targetFill = 0.98; // portion of half-height (barras largas)
+      const proposedScale = Math.min(12, Math.max(0.5, targetFill / Math.max(0.04, energy)));
+      scaleRef.current = scaleRef.current + (proposedScale - scaleRef.current) * 0.18;
 
       // draw bars centered around baseline
       const centerY = HEIGHT / 2;
