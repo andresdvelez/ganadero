@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import { db, OfflineIdentity, DeviceInfo } from "@/lib/dexie";
+import { robustDeviceId } from "@/lib/utils";
 import {
   generateKey,
   generateSalt,
@@ -90,14 +91,29 @@ export async function bindDeviceLocally(params: {
   }
 }
 
-export async function getBoundDevice(): Promise<DeviceInfo | undefined> {
+export async function getBoundDevice(
+  deviceId?: string
+): Promise<DeviceInfo | undefined> {
+  if (deviceId) {
+    return await db.deviceInfo.where({ deviceId }).first();
+  }
+  try {
+    const id = robustDeviceId();
+    const rec = await db.deviceInfo.where({ deviceId: id }).first();
+    if (rec) return rec;
+  } catch {}
+  // Fallback (legacy): primer registro
   return await db.deviceInfo.toCollection().first();
 }
 
 export async function unlock(passcode: string): Promise<void> {
   const identity = await getOfflineIdentity();
   if (!identity) throw new Error("No hay identidad offline configurada");
-  const device = await getBoundDevice();
+  let currentId: string | undefined;
+  try {
+    currentId = robustDeviceId();
+  } catch {}
+  const device = await getBoundDevice(currentId);
   if (device && device.boundClerkId !== identity.clerkId) {
     throw new Error("Este dispositivo está vinculado a otra cuenta");
   }
