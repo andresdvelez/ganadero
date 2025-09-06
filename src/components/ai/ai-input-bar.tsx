@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Mic, ArrowUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEffect, useMemo, useRef } from "react";
+import { addToast } from "@/components/ui/toast";
 import { Switch } from "@heroui/react";
 
 export function AIInputBar({
@@ -194,8 +195,27 @@ export function AIInputBar({
       <Button
         isIconOnly
         aria-label="Hablar"
-        onPress={onMic}
-        disabled={disabled || (typeof window !== "undefined" && !((window as any).webkitSpeechRecognition || (window as any).SpeechRecognition))}
+        onPress={async () => {
+          try {
+            if (
+              typeof navigator !== "undefined" &&
+              navigator.mediaDevices?.getUserMedia
+            ) {
+              const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+              try { stream.getTracks().forEach((t) => t.stop()); } catch {}
+            }
+          } catch (err) {
+            addToast({
+              variant: "warning",
+              title: "Permiso de micrófono requerido",
+              description:
+                "Autoriza el micrófono cuando aparezca el diálogo. Si fue denegado, habilítalo en Preferencias del Sistema > Privacidad > Micrófono.",
+            });
+          } finally {
+            try { onMic(); } catch {}
+          }
+        }}
+        disabled={disabled}
         className={cn(
           "absolute top-1/2 -translate-y-1/2 rounded-full bg-white text-neutral-700 shadow-sm border border-neutral-200 h-10 w-10 transition-all",
           isListening ? "right-2" : hasText ? "right-[3.75rem]" : "right-2"
