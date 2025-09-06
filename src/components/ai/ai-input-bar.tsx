@@ -56,6 +56,9 @@ export function AIInputBar({
   const rafRef = useRef<number | null>(null);
   const scaleRef = useRef<number>(1.0);
   const freqHistoryRef = useRef<number[]>([]);
+  const noiseFloorRef = useRef<number>(0.03); // energía en silencio
+  const speechCeilRef = useRef<number>(0.5);  // energía pico esperada hablando
+  const envRef = useRef<number>(0); // seguidor de envolvente para estabilidad
 
   useEffect(() => {
     if (!isListening || !analyser || !canvasRef.current) {
@@ -68,7 +71,7 @@ export function AIInputBar({
     if (!ctx) return;
     const context = ctx as CanvasRenderingContext2D;
     analyser.fftSize = 2048;
-    analyser.smoothingTimeConstant = 0.7;
+    analyser.smoothingTimeConstant = 0.6;
     try {
       analyser.minDecibels = -110;
       analyser.maxDecibels = -10;
@@ -109,8 +112,24 @@ export function AIInputBar({
       const avg = weighted / weightSum; // 0..255
       // Combine average with instantaneous peak to increase responsiveness
       const energyLin = 0.65 * (avg / 255) + 0.35 * (peak / 255);
-      // Non-linear mapping to expand low-level variations
-      const energy = Math.pow(Math.max(0, Math.min(1, energyLin)), 0.5);
+      const energyRaw = Math.max(0, Math.min(1, energyLin));
+
+      // Adaptive baseline and ceiling
+      const nf = noiseFloorRef.current;
+      const sc = speechCeilRef.current;
+      // Actualizar piso de ruido (baja cuando hay silencio, sube muy lento)
+      const newNf = energyRaw < nf
+        ? nf + (energyRaw - nf) * 0.25
+        : nf + (Math.max(0.01, nf * 0.98) - nf) * 0.005;
+      noiseFloorRef.current = Math.max(0.005, Math.min(0.2, newNf));
+      // Actualizar techo (sube rápido en picos, decae suave)
+      const newSc = energyRaw > sc ? sc + (energyRaw - sc) * 0.35 : sc * 0.995;
+      speechCeilRef.current = Math.max(noiseFloorRef.current + 0.08, Math.min(1, newSc));
+
+      // Normalizar entre piso y techo
+      const normalized = (energyRaw - noiseFloorRef.current) / Math.max(0.001, (speechCeilRef.current - noiseFloorRef.current));
+      // Mapeo no lineal para expandir diferencias pequeñas
+      const energy = Math.pow(Math.max(0, Math.min(1, normalized)), 0.6);
 
       // push into history (timeline of bars)
       const WIDTH = canvas.clientWidth;
@@ -135,15 +154,15 @@ export function AIInputBar({
       context.setLineDash([]);
 
       // auto-gain smoothing
-      const targetFill = 0.98; // portion of half-height (barras largas)
-      const proposedScale = Math.min(12, Math.max(0.5, targetFill / Math.max(0.04, energy)));
-      scaleRef.current = scaleRef.current + (proposedScale - scaleRef.current) * 0.18;
+      // Seguidor de envolvente para barras más estables pero reactivas
+      envRef.current = envRef.current + (energy - envRef.current) * (energy > envRef.current ? 0.35 : 0.15);
 
       // draw bars centered around baseline
       const centerY = HEIGHT / 2;
       context.fillStyle = "#111827"; // neutral-900 for crisp bars
       for (let i = 0; i < hist.length; i++) {
-        const v = Math.max(0, Math.min(1, hist[i] * scaleRef.current));
+        const vEnv = envRef.current * 0.5 + hist[i] * 0.5;
+        const v = Math.max(0, Math.min(1, vEnv * scaleRef.current));
         const h = Math.max(2, v * (HEIGHT * 0.9));
         const x = i * step;
         const y = centerY - h / 2;
