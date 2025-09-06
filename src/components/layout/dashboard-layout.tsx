@@ -13,10 +13,24 @@ import { Select, SelectItem } from "@/components/ui/select";
 import { HeroModal } from "@/components/ui/hero-modal";
 import { Input } from "@/components/ui/input";
 import { useUser } from "@clerk/nextjs";
-import { provisionFromClerk, bindDeviceLocally, hasOfflineIdentity, lock } from "@/lib/auth/offline-auth";
+import {
+  provisionFromClerk,
+  bindDeviceLocally,
+  hasOfflineIdentity,
+  lock,
+} from "@/lib/auth/offline-auth";
 import { robustDeviceId, isAppInstalledRuntime } from "@/lib/utils";
 import { db } from "@/lib/dexie";
-import { Home, Bot, Compass, CreditCard, Apple, Laptop, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Home,
+  Bot,
+  Compass,
+  CreditCard,
+  Apple,
+  Laptop,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -97,11 +111,14 @@ export function DashboardLayout({
   const sidebarLeft = 8; // px gap para efecto flotante
 
   const navLinkClass = (href: string) => {
-    const isActive = pathname === href || (href !== "/" && pathname.startsWith(href));
+    const isActive =
+      pathname === href || (href !== "/" && pathname.startsWith(href));
     return (
       (collapsed ? "flex justify-center " : "flex items-center ") +
       "gap-2 px-3 py-2 rounded-full transition-colors " +
-      (isActive ? "bg-neutral-900 text-white" : "hover:bg-neutral-100 text-neutral-800")
+      (isActive
+        ? "bg-neutral-900 text-white"
+        : "hover:bg-neutral-100 text-neutral-800")
     );
   };
 
@@ -112,14 +129,32 @@ export function DashboardLayout({
         {/* Sidebar flotante de altura completa */}
         <aside
           className="fixed top-0 z-40 my-3 border border-neutral-200/60 bg-white/70 backdrop-blur-md shadow-lg p-3 flex flex-col gap-3 overflow-auto rounded-2xl"
-          style={{ width: sidebarWidth, left: sidebarLeft, height: "98dvh", transition: "width 260ms cubic-bezier(0.22,1,0.36,1), left 260ms cubic-bezier(0.22,1,0.36,1)" }}
+          style={{
+            width: sidebarWidth,
+            left: sidebarLeft,
+            height: "98dvh",
+            transition:
+              "width 260ms cubic-bezier(0.22,1,0.36,1), left 260ms cubic-bezier(0.22,1,0.36,1)",
+          }}
         >
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2 px-1">
               {collapsed ? (
-                <Image src="/brand/logotype-black-nobg.png" alt="Ganado" width={40} height={40} priority />
+                <Image
+                  src="/brand/logotype-black-nobg.png"
+                  alt="Ganado"
+                  width={40}
+                  height={40}
+                  priority
+                />
               ) : (
-                <Image src="/brand/full-logo-black-nobg.png" alt="Ganado" width={160} height={36} priority />
+                <Image
+                  src="/brand/full-logo-black-nobg.png"
+                  alt="Ganado"
+                  width={160}
+                  height={36}
+                  priority
+                />
               )}
             </div>
             {/* Botón interno opcional (no necesario, mantenemos foco en el flotante) */}
@@ -129,19 +164,32 @@ export function DashboardLayout({
               <Home className="w-4 h-4" />
               {!collapsed && <span>Inicio</span>}
             </Link>
-            <Link href="/ai-assistant" className={navLinkClass("/ai-assistant")} title="Asistente de AI">
+            <Link
+              href="/ai-assistant"
+              className={navLinkClass("/ai-assistant")}
+              title="Asistente de AI"
+            >
               <Bot className="w-4 h-4" />
               {!collapsed && <span>Asistente de AI</span>}
             </Link>
             <button
-              className={(collapsed ? "justify-center " : "") + "flex items-center gap-2 px-3 py-2 rounded-full hover:bg-neutral-100 text-neutral-800 w-full text-left"}
-              onClick={() => window.dispatchEvent(new CustomEvent("open-modules"))}
+              className={
+                (collapsed ? "justify-center " : "") +
+                "flex items-center gap-2 px-3 py-2 rounded-full hover:bg-neutral-100 text-neutral-800 w-full text-left"
+              }
+              onClick={() =>
+                window.dispatchEvent(new CustomEvent("open-modules"))
+              }
               title="Navegador de módulos"
             >
               <Compass className="w-4 h-4" />
               {!collapsed && <span>Navegador de módulos</span>}
             </button>
-            <Link href="/settings/billing" className={navLinkClass("/settings/billing")} title="Plan y facturación">
+            <Link
+              href="/settings/billing"
+              className={navLinkClass("/settings/billing")}
+              title="Plan y facturación"
+            >
               <CreditCard className="w-4 h-4" />
               {!collapsed && <span>Plan y facturación</span>}
             </Link>
@@ -149,10 +197,17 @@ export function DashboardLayout({
           {!collapsed && (
             <>
               <div className="mt-2">
-                <div className="text-xs uppercase tracking-wide text-neutral-500 px-1">Chats recientes</div>
+                <div className="text-xs uppercase tracking-wide text-neutral-500 px-1">
+                  Chats recientes
+                </div>
                 <RecentChats />
                 <div className="px-1 mt-2">
-                  <a className="text-sm text-primary-600 hover:underline" href="/ai-assistant?history=1">Ver todo</a>
+                  <a
+                    className="text-sm text-primary-600 hover:underline"
+                    href="/ai-assistant?history=1"
+                  >
+                    Ver todo
+                  </a>
                 </div>
               </div>
               {(() => {
@@ -160,18 +215,42 @@ export function DashboardLayout({
                 if (installed) return null;
                 return (
                   <div className="mt-auto pt-2 border-t">
-                    <div className="text-xs uppercase tracking-wide text-neutral-500 px-1 mb-2">Descargas</div>
+                    <div className="text-xs uppercase tracking-wide text-neutral-500 px-1 mb-2">
+                      Descargas
+                    </div>
                     {(() => {
-                      const macUrl = process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_URL || "/download";
-                      const winUrl = process.env.NEXT_PUBLIC_DESKTOP_WIN_DOWNLOAD_URL || "/download";
+                      const macUrl =
+                        process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_URL ||
+                        "/download";
+                      const winUrl =
+                        process.env.NEXT_PUBLIC_DESKTOP_WIN_DOWNLOAD_URL ||
+                        "/download";
                       return (
                         <div className="flex flex-col gap-2">
-                          <a className="px-3 py-2 rounded-full bg-black text-white text-sm shadow hover:opacity-90 flex items-center gap-2" href={macUrl} target="_blank" rel="noreferrer">
-                            <img src="/brand/apple-logo.svg" alt="Apple" className="w-4 h-4" />
+                          <a
+                            className="px-3 py-2 rounded-full bg-black text-white text-sm shadow hover:opacity-90 flex items-center gap-2"
+                            href={macUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            <img
+                              src="/brand/apple-logo.svg"
+                              alt="Apple"
+                              className="w-4 h-4"
+                            />
                             <span>Descargar para macOS</span>
                           </a>
-                          <a className="px-3 py-2 rounded-full bg-neutral-900 text-white text-sm shadow hover:opacity-90 flex items-center gap-2" href={winUrl} target="_blank" rel="noreferrer">
-                            <img src="/brand/windows-logo.svg" alt="Windows" className="w-4 h-4" />
+                          <a
+                            className="px-3 py-2 rounded-full bg-neutral-900 text-white text-sm shadow hover:opacity-90 flex items-center gap-2"
+                            href={winUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            <img
+                              src="/brand/windows-logo.svg"
+                              alt="Windows"
+                              className="w-4 h-4"
+                            />
                             <span>Descargar para Windows</span>
                           </a>
                         </div>
@@ -186,32 +265,84 @@ export function DashboardLayout({
         {/* Botón flotante fijo para plegar/expandir (siempre visible) */}
         <button
           className="fixed z-50 w-8 h-8 grid place-items-center rounded-full shadow bg-white/90 hover:bg-white text-neutral-700 border border-neutral-200/70"
-          style={{ top: 16, left: sidebarLeft + sidebarWidth - 12, transition: "left 260ms cubic-bezier(0.22,1,0.36,1)" }}
+          style={{
+            top: 16,
+            left: sidebarLeft + sidebarWidth - 12,
+            transition: "left 260ms cubic-bezier(0.22,1,0.36,1)",
+          }}
           onClick={() => setCollapsed((v) => !v)}
           title={collapsed ? "Expandir" : "Plegar"}
         >
-          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          {collapsed ? (
+            <ChevronRight className="w-4 h-4" />
+          ) : (
+            <ChevronLeft className="w-4 h-4" />
+          )}
         </button>
 
         {/* Área principal a la derecha del sidebar */}
-        <div className="transition-all" style={{ marginLeft: sidebarLeft + sidebarWidth, transition: "margin-left 260ms cubic-bezier(0.22,1,0.36,1)" }}>
+        <div
+          className="transition-all"
+          style={{
+            marginLeft: sidebarLeft + sidebarWidth,
+            transition: "margin-left 260ms cubic-bezier(0.22,1,0.36,1)",
+          }}
+        >
           <header className="flex items-center justify-between px-4 h-14 bg-transparent">
             <div className="flex items-center gap-3">
               <FarmSelector />
             </div>
             <nav className="flex items-center gap-3">
-          {hasConflicts && (
-            <div className="flex items-center gap-2">
+              {hasConflicts && (
+                <div className="flex items-center gap-2">
+                  <div
+                    className="text-xs px-2 py-1 rounded-full bg-red-50 text-red-700 border border-red-200"
+                    title="Existen conflictos pendientes por resolver"
+                  >
+                    Conflictos
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="light"
+                    onPress={async () => {
+                      const rows = await db.syncQueue
+                        .where("status")
+                        .anyOf(["conflict", "failed", "synced"])
+                        .reverse()
+                        .limit(20)
+                        .toArray();
+                      setConflicts(rows);
+                      setConflictsOpen(true);
+                    }}
+                  >
+                    Ver conflictos
+                  </Button>
+                </div>
+              )}
               <div
-                className="text-xs px-2 py-1 rounded-full bg-red-50 text-red-700 border border-red-200"
-                title="Existen conflictos pendientes por resolver"
+                className="text-xs px-2 py-1 rounded-full border"
+                title={
+                  syncStatus.online
+                    ? syncStatus.syncing
+                      ? "Sincronizando…"
+                      : "Sincronizado"
+                    : "Sin conexión"
+                }
               >
-                Conflictos
+                {syncStatus.online
+                  ? syncStatus.syncing
+                    ? "Sincronizando…"
+                    : syncStatus.pending > 0
+                    ? `Pendiente: ${syncStatus.pending}`
+                    : "Sincronizado"
+                  : "Offline"}
               </div>
               <Button
                 size="sm"
-                variant="light"
+                variant="flat"
                 onPress={async () => {
+                  const mgr = getSyncManager();
+                  await mgr.sync();
                   const rows = await db.syncQueue
                     .where("status")
                     .anyOf(["conflict", "failed", "synced"])
@@ -222,87 +353,53 @@ export function DashboardLayout({
                   setConflictsOpen(true);
                 }}
               >
-                Ver conflictos
+                Sincronizar ahora
               </Button>
-            </div>
-          )}
-          <div
-            className="text-xs px-2 py-1 rounded-full border"
-            title={
-              syncStatus.online
-                ? syncStatus.syncing
-                  ? "Sincronizando…"
-                  : "Sincronizado"
-                : "Sin conexión"
-            }
-          >
-            {syncStatus.online
-              ? syncStatus.syncing
-                ? "Sincronizando…"
-                : syncStatus.pending > 0
-                ? `Pendiente: ${syncStatus.pending}`
-                : "Sincronizado"
-              : "Offline"}
-          </div>
-          <Button
-            size="sm"
-            variant="flat"
-            onPress={async () => {
-              const mgr = getSyncManager();
-              await mgr.sync();
-              const rows = await db.syncQueue
-                .where("status")
-                .anyOf(["conflict", "failed", "synced"])
-                .reverse()
-                .limit(20)
-                .toArray();
-              setConflicts(rows);
-              setConflictsOpen(true);
-            }}
-          >
-            Sincronizar ahora
-          </Button>
-          {(() => {
-            const isDesktop =
-              typeof window !== "undefined" &&
-              (Boolean((window as any).__TAURI__) ||
-                (typeof navigator !== "undefined" && /Tauri/i.test(navigator.userAgent)));
-            if (!isDesktop) return null;
-            return (
-              <button
-                className="text-sm text-neutral-600 hover:text-neutral-900"
-                onClick={() => setOfflineModalOpen(true)}
-              >
-                Offline
-              </button>
-            );
-          })()}
-          {hasClerk && (
-            <div className="flex items-center gap-2">
-              <UserButton />
-              <Button
-                size="sm"
-                variant="light"
-                onPress={async () => {
-                  try {
-                    await signOut({ redirectUrl: "/sign-in" });
-                  } catch (e) {
-                    console.warn("Sign out failed, forcing redirect", e as any);
-                  } finally {
-                    try {
-                      // Limpieza defensiva del estado local
-                      window.localStorage.removeItem("ACTIVE_FARM_ID");
-                    } catch {}
-                    window.location.href = "/sign-in";
-                  }
-                }}
-                title="Cerrar sesión"
-              >
-                Cerrar sesión
-              </Button>
-            </div>
-          )}
-        </nav>
+              {(() => {
+                const isDesktop =
+                  typeof window !== "undefined" &&
+                  (Boolean((window as any).__TAURI__) ||
+                    (typeof navigator !== "undefined" &&
+                      /Tauri/i.test(navigator.userAgent)));
+                if (!isDesktop) return null;
+                return (
+                  <button
+                    className="text-sm text-neutral-600 hover:text-neutral-900"
+                    onClick={() => setOfflineModalOpen(true)}
+                  >
+                    Offline
+                  </button>
+                );
+              })()}
+              {hasClerk && (
+                <div className="flex items-center gap-2">
+                  <UserButton />
+                  <Button
+                    size="sm"
+                    variant="light"
+                    onPress={async () => {
+                      try {
+                        await signOut({ redirectUrl: "/sign-in" });
+                      } catch (e) {
+                        console.warn(
+                          "Sign out failed, forcing redirect",
+                          e as any
+                        );
+                      } finally {
+                        try {
+                          // Limpieza defensiva del estado local
+                          window.localStorage.removeItem("ACTIVE_FARM_ID");
+                        } catch {}
+                        window.location.href = "/sign-in";
+                      }
+                    }}
+                    title="Cerrar sesión"
+                  >
+                    Cerrar sesión
+                  </Button>
+                </div>
+              )}
+            </nav>
           </header>
           <main className="relative p-4 overflow-auto min-h-[100dvh] transition-all">
             {/* Puntos difuminados de fondo para reforzar efecto glass */}
@@ -311,9 +408,7 @@ export function DashboardLayout({
               <div className="absolute bottom-24 right-32 h-96 w-96 rounded-full bg-sky-200/20 blur-3xl" />
               <div className="absolute top-1/2 left-1/3 h-64 w-64 -translate-y-1/2 rounded-full bg-amber-200/20 blur-3xl" />
             </div>
-            <div className="max-w-[1400px] mx-auto space-y-4">
-              {children}
-            </div>
+            <div className="max-w-[1400px] mx-auto space-y-4">{children}</div>
           </main>
         </div>
       </div>
@@ -389,10 +484,16 @@ export function DashboardLayout({
           <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl p-4">
             <div className="flex items-center justify-between mb-2">
               <div className="font-semibold">Dispositivos y acceso offline</div>
-              <button className="text-sm" onClick={() => setOfflineModalOpen(false)}>Cerrar</button>
+              <button
+                className="text-sm"
+                onClick={() => setOfflineModalOpen(false)}
+              >
+                Cerrar
+              </button>
             </div>
             <div className="text-sm text-neutral-600 mb-3">
-              Administra los dispositivos vinculados a tu cuenta y el estado de su clave local.
+              Administra los dispositivos vinculados a tu cuenta y el estado de
+              su clave local.
             </div>
             <DevicesManager onClose={() => setOfflineModalOpen(false)} />
           </div>
@@ -403,28 +504,41 @@ export function DashboardLayout({
 }
 
 function RecentChats() {
-  const [items, setItems] = useState<Array<{ uuid: string; title: string; updatedAt: Date }>>([]);
+  const [items, setItems] = useState<
+    Array<{ uuid: string; title: string; updatedAt: Date }>
+  >([]);
   useEffect(() => {
     (async () => {
       try {
-        const rows = await db.chats.orderBy("updatedAt").reverse().limit(5).toArray();
+        const rows = await db.chats
+          .orderBy("updatedAt")
+          .reverse()
+          .limit(5)
+          .toArray();
         setItems(rows as any);
       } catch {}
     })();
   }, []);
-  if (!items.length) return (
-    <div className="text-sm text-neutral-500 px-2 py-3">Sin chats</div>
-  );
+  if (!items.length)
+    return <div className="text-sm text-neutral-500 px-2 py-3">Sin chats</div>;
   return (
     <div className="space-y-1 mt-1">
       {items.map((c) => (
         <button
           key={c.uuid}
           className="w-full text-left px-3 py-2 rounded-lg hover:bg-neutral-100"
-          onClick={() => window.dispatchEvent(new CustomEvent("ai-open-chat", { detail: { uuid: c.uuid } }))}
+          onClick={() =>
+            window.dispatchEvent(
+              new CustomEvent("ai-open-chat", { detail: { uuid: c.uuid } })
+            )
+          }
         >
-          <div className="text-sm font-medium text-neutral-800 line-clamp-2">{c.title}</div>
-          <div className="text-[11px] text-neutral-500">{new Date(c.updatedAt).toLocaleString()}</div>
+          <div className="text-sm font-medium text-neutral-800 line-clamp-2">
+            {c.title}
+          </div>
+          <div className="text-[11px] text-neutral-500">
+            {new Date(c.updatedAt).toLocaleString()}
+          </div>
         </button>
       ))}
     </div>
@@ -442,7 +556,11 @@ function DevicesManager({ onClose }: { onClose: () => void }) {
   });
   const reqReset = trpc.device.requestPasscodeReset.useMutation({
     onSuccess(res) {
-      addToast({ variant: "success", title: "Código enviado", description: `Código: ${res.code}` });
+      addToast({
+        variant: "success",
+        title: "Código enviado",
+        description: `Código: ${res.code}`,
+      });
       utils.device.myDevices.invalidate();
     },
   });
@@ -457,20 +575,36 @@ function DevicesManager({ onClose }: { onClose: () => void }) {
       utils.device.myDevices.invalidate();
     },
     onError(e) {
-      addToast({ variant: "error", title: "No se pudo vincular", description: e.message });
+      addToast({
+        variant: "error",
+        title: "No se pudo vincular",
+        description: e.message,
+      });
     },
   });
   const deleteDevice = trpc.device.delete.useMutation({
     onSuccess() {
       utils.device.myDevices.invalidate();
-      addToast({ variant: "success", title: "Dispositivo eliminado de la cuenta" });
+      addToast({
+        variant: "success",
+        title: "Dispositivo eliminado de la cuenta",
+      });
     },
     onError(e) {
-      addToast({ variant: "error", title: "No se pudo eliminar", description: e.message });
+      addToast({
+        variant: "error",
+        title: "No se pudo eliminar",
+        description: e.message,
+      });
     },
   });
 
-  const [editing, setEditing] = useState<{ deviceId: string; code: string; passA: string; passB: string } | null>(null);
+  const [editing, setEditing] = useState<{
+    deviceId: string;
+    code: string;
+    passA: string;
+    passB: string;
+  } | null>(null);
   const [currentId, setCurrentId] = useState<string>("");
   const [currentHasLocal, setCurrentHasLocal] = useState(false);
   useEffect(() => {
@@ -487,6 +621,7 @@ function DevicesManager({ onClose }: { onClose: () => void }) {
   const [linkPassA, setLinkPassA] = useState("");
   const [linkPassB, setLinkPassB] = useState("");
   const [linkName, setLinkName] = useState("");
+  const [linking, setLinking] = useState(false);
 
   if (devicesQ.isLoading) return <div className="text-sm">Cargando…</div>;
   const list = devicesQ.data || [];
@@ -501,66 +636,109 @@ function DevicesManager({ onClose }: { onClose: () => void }) {
               label="Nombre del dispositivo"
               placeholder="Ej. Mac oficina"
               value={linkName}
-              onChange={(e) => setLinkName((e.target as HTMLInputElement).value)}
+              onChange={(e) =>
+                setLinkName((e.target as HTMLInputElement).value)
+              }
             />
             <Input
               type="password"
               label="Clave local (opcional)"
               placeholder="••••••"
               value={linkPassA}
-              onChange={(e) => setLinkPassA((e.target as HTMLInputElement).value)}
+              onChange={(e) =>
+                setLinkPassA((e.target as HTMLInputElement).value)
+              }
             />
             <Input
               type="password"
               label="Confirmar clave"
               placeholder="••••••"
               value={linkPassB}
-              onChange={(e) => setLinkPassB((e.target as HTMLInputElement).value)}
+              onChange={(e) =>
+                setLinkPassB((e.target as HTMLInputElement).value)
+              }
             />
           </div>
           <div className="flex justify-end">
             <Button
               color="primary"
-              isLoading={registerDevice.isPending}
+              isLoading={registerDevice.isPending || linking}
               onPress={async () => {
-                if (!user) return addToast({ variant: "warning", title: "Inicia sesión" });
-                // Guardar identidad local si se ingresó clave
-                if (linkPassA || linkPassB) {
-                  if (linkPassA.length < 6) {
-                    addToast({ variant: "warning", title: "La clave debe tener al menos 6 caracteres" });
-                    return;
-                  }
-                  if (linkPassA !== linkPassB) {
-                    addToast({ variant: "warning", title: "Las claves no coinciden" });
-                    return;
-                  }
-                  await provisionFromClerk({
-                    clerkId: user.id,
-                    email: user.primaryEmailAddress?.emailAddress,
-                    name: user.fullName ?? undefined,
-                    avatarUrl: user.imageUrl,
-                    passcode: linkPassA,
+                if (!user)
+                  return addToast({
+                    variant: "warning",
+                    title: "Inicia sesión",
                   });
+                setLinking(true);
+                try {
+                  // Guardar identidad local si se ingresó clave
+                  if (linkPassA || linkPassB) {
+                    if (linkPassA.length < 6) {
+                      addToast({
+                        variant: "warning",
+                        title: "La clave debe tener al menos 6 caracteres",
+                      });
+                      setLinking(false);
+                      return;
+                    }
+                    if (linkPassA !== linkPassB) {
+                      addToast({
+                        variant: "warning",
+                        title: "Las claves no coinciden",
+                      });
+                      setLinking(false);
+                      return;
+                    }
+                    await provisionFromClerk({
+                      clerkId: user.id,
+                      email: user.primaryEmailAddress?.emailAddress,
+                      name: user.fullName ?? undefined,
+                      avatarUrl: user.imageUrl,
+                      passcode: linkPassA,
+                    });
+                  }
+                  await bindDeviceLocally({
+                    deviceId: currentId,
+                    clerkId: user.id,
+                    name: linkName || "Este equipo",
+                    platform:
+                      typeof navigator !== "undefined"
+                        ? navigator.platform
+                        : "web",
+                  });
+                  await registerDevice.mutateAsync({
+                    deviceId: currentId,
+                    name: linkName || "Este equipo",
+                    platform:
+                      typeof navigator !== "undefined"
+                        ? navigator.platform
+                        : "web",
+                  });
+                  if (linkPassA && linkPassA.length >= 6) {
+                    try {
+                      await setPassStatus.mutateAsync({
+                        deviceId: currentId,
+                        hasPasscode: true,
+                      });
+                    } catch {}
+                  }
+                  setCurrentHasLocal(true);
+                  setLinkPassA("");
+                  setLinkPassB("");
+                  setLinkName("");
+                  addToast({ variant: "success", title: "Equipo vinculado" });
+                } catch (e: any) {
+                  addToast({
+                    variant: "error",
+                    title: "No se pudo vincular",
+                    description: e?.message,
+                  });
+                } finally {
+                  setLinking(false);
+                  try {
+                    await utils.device.myDevices.invalidate();
+                  } catch {}
                 }
-                await bindDeviceLocally({
-                  deviceId: currentId,
-                  clerkId: user.id,
-                  name: linkName || "Este equipo",
-                  platform: typeof navigator !== "undefined" ? navigator.platform : "web",
-                });
-                await registerDevice.mutateAsync({
-                  deviceId: currentId,
-                  name: linkName || "Este equipo",
-                  platform: typeof navigator !== "undefined" ? navigator.platform : "web",
-                });
-                if (linkPassA && linkPassA.length >= 6) {
-                  try { await setPassStatus.mutateAsync({ deviceId: currentId, hasPasscode: true }); } catch {}
-                }
-                setCurrentHasLocal(true);
-                setLinkPassA("");
-                setLinkPassB("");
-                setLinkName("");
-                addToast({ variant: "success", title: "Equipo vinculado" });
               }}
             >
               Vincular este equipo
@@ -573,67 +751,133 @@ function DevicesManager({ onClose }: { onClose: () => void }) {
       ) : (
         <div className="divide-y">
           {list.map((d) => (
-            <div key={d.deviceId} className="py-3 flex items-start justify-between gap-4">
+            <div
+              key={d.deviceId}
+              className="py-3 flex items-start justify-between gap-4"
+            >
               <div>
                 <div className="font-medium flex items-center gap-2">
                   <span>{d.name || d.deviceId}</span>
                   {currentId === d.deviceId && (
-                    <span className="px-2 py-0.5 text-[10px] rounded-full bg-neutral-100 border text-neutral-600">Este equipo</span>
+                    <span className="px-2 py-0.5 text-[10px] rounded-full bg-neutral-100 border text-neutral-600">
+                      Este equipo
+                    </span>
                   )}
                 </div>
-                <div className="text-xs text-neutral-600">{d.platform || ""}</div>
+                <div className="text-xs text-neutral-600">
+                  {d.platform || ""}
+                </div>
                 <div className="text-xs mt-1">
-                  Estado: {d.hasPasscode || (currentId === d.deviceId && currentHasLocal) ? "Con clave local" : "Sin clave local"}
+                  Estado:{" "}
+                  {d.hasPasscode ||
+                  (currentId === d.deviceId && currentHasLocal)
+                    ? "Con clave local"
+                    : "Sin clave local"}
                   {d.resetPending ? " · reset pendiente" : ""}
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Button size="sm" variant="flat" onPress={() => setEditing({ deviceId: d.deviceId, code: "", passA: "", passB: "" })}>Editar clave</Button>
-                <Button size="sm" variant="light" onPress={async () => {
-                  if (currentId === d.deviceId && user) {
-                    // provisionar directamente para este equipo
-                    const pass = prompt("Nueva clave (mín. 6)") || "";
-                    if (pass.length < 6) return;
-                    await provisionFromClerk({
-                      clerkId: user.id,
-                      email: user.primaryEmailAddress?.emailAddress,
-                      name: user.fullName ?? undefined,
-                      avatarUrl: user.imageUrl,
-                      passcode: pass,
-                    });
-                    addToast({ variant: "success", title: "Clave guardada en este equipo" });
-                    try { await setPassStatus.mutateAsync({ deviceId: currentId, hasPasscode: true }); } catch {}
-                    await utils.device.myDevices.invalidate();
-                  } else {
-                    await reqReset.mutateAsync({ deviceId: d.deviceId });
+                <Button
+                  size="sm"
+                  variant="flat"
+                  onPress={() =>
+                    setEditing({
+                      deviceId: d.deviceId,
+                      code: "",
+                      passA: "",
+                      passB: "",
+                    })
                   }
-                }}>Recuperar / Reset</Button>
-                {currentId === d.deviceId && (
-                  <Button size="sm" color="danger" variant="light" onPress={async () => {
-                    try {
-                      // Limpiar datos locales: binding, identidad y el identificador persistente
-                      await db.deviceInfo.where({ deviceId: currentId }).delete();
-                      await db.identities.clear();
+                >
+                  Editar clave
+                </Button>
+                <Button
+                  size="sm"
+                  variant="light"
+                  onPress={async () => {
+                    if (currentId === d.deviceId && user) {
+                      // provisionar directamente para este equipo
+                      const pass = prompt("Nueva clave (mín. 6)") || "";
+                      if (pass.length < 6) return;
+                      await provisionFromClerk({
+                        clerkId: user.id,
+                        email: user.primaryEmailAddress?.emailAddress,
+                        name: user.fullName ?? undefined,
+                        avatarUrl: user.imageUrl,
+                        passcode: pass,
+                      });
+                      addToast({
+                        variant: "success",
+                        title: "Clave guardada en este equipo",
+                      });
                       try {
-                        window.localStorage.removeItem("_device_uid");
-                        window.localStorage.removeItem("_device_id"); // legacy
+                        await setPassStatus.mutateAsync({
+                          deviceId: currentId,
+                          hasPasscode: true,
+                        });
                       } catch {}
-                      try { lock(); } catch {}
-                      setCurrentHasLocal(false);
-                      // Recalcular el currentId para que deje de marcar "Este equipo"
-                      try { setCurrentId(robustDeviceId()); } catch {}
                       await utils.device.myDevices.invalidate();
-                      addToast({ variant: "success", title: "Equipo desvinculado localmente" });
-                    } catch (e: any) {
-                      addToast({ variant: "error", title: "No se pudo desvincular", description: e?.message });
+                    } else {
+                      await reqReset.mutateAsync({ deviceId: d.deviceId });
                     }
-                  }}>Desvincular este equipo</Button>
+                  }}
+                >
+                  Recuperar / Reset
+                </Button>
+                {currentId === d.deviceId && (
+                  <Button
+                    size="sm"
+                    color="danger"
+                    variant="light"
+                    onPress={async () => {
+                      try {
+                        // Limpiar datos locales: binding, identidad y el identificador persistente
+                        await db.deviceInfo
+                          .where({ deviceId: currentId })
+                          .delete();
+                        await db.identities.clear();
+                        try {
+                          window.localStorage.removeItem("_device_uid");
+                          window.localStorage.removeItem("_device_id"); // legacy
+                        } catch {}
+                        try {
+                          lock();
+                        } catch {}
+                        setCurrentHasLocal(false);
+                        // Recalcular el currentId para que deje de marcar "Este equipo"
+                        try {
+                          setCurrentId(robustDeviceId());
+                        } catch {}
+                        await utils.device.myDevices.invalidate();
+                        addToast({
+                          variant: "success",
+                          title: "Equipo desvinculado localmente",
+                        });
+                      } catch (e: any) {
+                        addToast({
+                          variant: "error",
+                          title: "No se pudo desvincular",
+                          description: e?.message,
+                        });
+                      }
+                    }}
+                  >
+                    Desvincular este equipo
+                  </Button>
                 )}
                 {/* Eliminar de la cuenta (no depende de ser el equipo actual) */}
-                <Button size="sm" color="danger" variant="flat" onPress={async () => {
-                  if (!confirm("¿Eliminar este dispositivo de la cuenta?")) return;
-                  await deleteDevice.mutateAsync({ deviceId: d.deviceId });
-                }}>Eliminar de la cuenta</Button>
+                <Button
+                  size="sm"
+                  color="danger"
+                  variant="flat"
+                  onPress={async () => {
+                    if (!confirm("¿Eliminar este dispositivo de la cuenta?"))
+                      return;
+                    await deleteDevice.mutateAsync({ deviceId: d.deviceId });
+                  }}
+                >
+                  Eliminar de la cuenta
+                </Button>
               </div>
             </div>
           ))}
@@ -643,21 +887,67 @@ function DevicesManager({ onClose }: { onClose: () => void }) {
       {editing && (
         <div className="border rounded-lg p-3 space-y-2">
           <div className="text-sm font-medium">Actualizar clave</div>
-          <Input label="Código de 6 dígitos (correo)" value={editing.code} onChange={(e) => setEditing({ ...editing, code: (e.target as HTMLInputElement).value })} />
+          <Input
+            label="Código de 6 dígitos (correo)"
+            value={editing.code}
+            onChange={(e) =>
+              setEditing({
+                ...editing,
+                code: (e.target as HTMLInputElement).value,
+              })
+            }
+          />
           <div className="grid sm:grid-cols-2 gap-2">
-            <Input type="password" label="Nueva clave" value={editing.passA} onChange={(e) => setEditing({ ...editing, passA: (e.target as HTMLInputElement).value })} />
-            <Input type="password" label="Confirmar clave" value={editing.passB} onChange={(e) => setEditing({ ...editing, passB: (e.target as HTMLInputElement).value })} />
+            <Input
+              type="password"
+              label="Nueva clave"
+              value={editing.passA}
+              onChange={(e) =>
+                setEditing({
+                  ...editing,
+                  passA: (e.target as HTMLInputElement).value,
+                })
+              }
+            />
+            <Input
+              type="password"
+              label="Confirmar clave"
+              value={editing.passB}
+              onChange={(e) =>
+                setEditing({
+                  ...editing,
+                  passB: (e.target as HTMLInputElement).value,
+                })
+              }
+            />
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="bordered" onPress={() => setEditing(null)}>Cancelar</Button>
-            <Button color="primary" isLoading={applyReset.isPending} onPress={async () => {
-              if (editing.passA.length < 6 || editing.passA !== editing.passB) {
-                addToast({ variant: "warning", title: "Valida la nueva clave" });
-                return;
-              }
-              await applyReset.mutateAsync({ deviceId: editing.deviceId, code: editing.code });
-              setEditing(null);
-            }}>Guardar</Button>
+            <Button variant="bordered" onPress={() => setEditing(null)}>
+              Cancelar
+            </Button>
+            <Button
+              color="primary"
+              isLoading={applyReset.isPending}
+              onPress={async () => {
+                if (
+                  editing.passA.length < 6 ||
+                  editing.passA !== editing.passB
+                ) {
+                  addToast({
+                    variant: "warning",
+                    title: "Valida la nueva clave",
+                  });
+                  return;
+                }
+                await applyReset.mutateAsync({
+                  deviceId: editing.deviceId,
+                  code: editing.code,
+                });
+                setEditing(null);
+              }}
+            >
+              Guardar
+            </Button>
           </div>
         </div>
       )}
