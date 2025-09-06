@@ -342,24 +342,18 @@ export function DashboardLayout({
                   </Button>
                 </div>
               )}
-              <div
-                className="text-xs px-2 py-1 rounded-full border"
-                title={
-                  syncStatus.online
-                    ? syncStatus.syncing
-                      ? "Sincronizando…"
-                      : "Sincronizado"
-                    : "Sin conexión"
-                }
-              >
-                {syncStatus.online
-                  ? syncStatus.syncing
+              {syncStatus.online && (
+                <div
+                  className="text-xs px-2 py-1 rounded-full border"
+                  title={syncStatus.syncing ? "Sincronizando…" : "Sincronizado"}
+                >
+                  {syncStatus.syncing
                     ? "Sincronizando…"
                     : syncStatus.pending > 0
                     ? `Pendiente: ${syncStatus.pending}`
-                    : "Sincronizado"
-                  : "Offline"}
-              </div>
+                    : "Sincronizado"}
+                </div>
+              )}
               <Button
                 size="sm"
                 variant="flat"
