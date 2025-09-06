@@ -67,8 +67,12 @@ export function AIInputBar({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     const context = ctx as CanvasRenderingContext2D;
-    analyser.fftSize = 1024;
-    analyser.smoothingTimeConstant = 0.75;
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.86;
+    try {
+      analyser.minDecibels = -100;
+      analyser.maxDecibels = -20;
+    } catch {}
     const bufferLength = analyser.frequencyBinCount;
     const freqArray = new Uint8Array(bufferLength);
 
@@ -88,18 +92,26 @@ export function AIInputBar({
       analyser.getByteFrequencyData(freqArray);
 
       // Compute energy emphasizing voice band (aprox). Use mid bins.
-      const start = Math.floor(bufferLength * 0.05);
-      const end = Math.floor(bufferLength * 0.75);
-      let sum = 0;
-      for (let i = start; i < end; i++) sum += freqArray[i];
-      const avg = sum / Math.max(1, end - start); // 0..255
+      // Voice band emphasis (aprox 100Hz-4kHz) using tapered weights
+      const start = Math.floor(bufferLength * 0.03);
+      const end = Math.floor(bufferLength * 0.60);
+      const mid = (start + end) / 2;
+      let weighted = 0;
+      let weightSum = 0.0001;
+      for (let i = start; i < end; i++) {
+        const t = Math.abs(i - mid) / (end - start);
+        const w = Math.max(0, 1 - t * 2); // triangular window peaking at mid
+        weighted += freqArray[i] * w;
+        weightSum += w;
+      }
+      const avg = weighted / weightSum; // 0..255
       const energy = avg / 255; // 0..1
 
       // push into history (timeline of bars)
       const WIDTH = canvas.clientWidth;
       const HEIGHT = canvas.clientHeight;
-      const barWidth = 2; // px
-      const gap = 2; // px
+      const barWidth = 3; // px
+      const gap = 1; // px
       const step = barWidth + gap;
       const maxBars = Math.max(4, Math.floor(WIDTH / step));
       const hist = freqHistoryRef.current;
@@ -118,9 +130,9 @@ export function AIInputBar({
       context.setLineDash([]);
 
       // auto-gain smoothing
-      const targetFill = 0.8; // portion of half-height
-      const proposedScale = Math.min(4, Math.max(0.6, targetFill / Math.max(0.15, energy)));
-      scaleRef.current = scaleRef.current + (proposedScale - scaleRef.current) * 0.05;
+      const targetFill = 0.9; // portion of half-height
+      const proposedScale = Math.min(6, Math.max(0.5, targetFill / Math.max(0.08, energy)));
+      scaleRef.current = scaleRef.current + (proposedScale - scaleRef.current) * 0.1;
 
       // draw bars centered around baseline
       const centerY = HEIGHT / 2;
