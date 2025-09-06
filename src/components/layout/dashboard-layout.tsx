@@ -374,29 +374,34 @@ export function DashboardLayout({
               {hasClerk && (
                 <div className="flex items-center gap-2">
                   <UserButton />
-                  <Button
-                    size="sm"
-                    variant="light"
-                    onPress={async () => {
-                      try {
-                        await signOut({ redirectUrl: "/sign-in" });
-                      } catch (e) {
-                        console.warn(
-                          "Sign out failed, forcing redirect",
-                          e as any
-                        );
-                      } finally {
+                  {!syncStatus.online && (
+                    <Button
+                      size="sm"
+                      variant="light"
+                      onPress={async () => {
+                        if (!confirm("¿Cerrar sesión en modo offline?")) return;
                         try {
-                          // Limpieza defensiva del estado local
-                          window.localStorage.removeItem("ACTIVE_FARM_ID");
-                        } catch {}
-                        window.location.href = "/sign-in";
-                      }
-                    }}
-                    title="Cerrar sesión"
-                  >
-                    Cerrar sesión
-                  </Button>
+                          try {
+                            lock();
+                          } catch {}
+                          try {
+                            window.localStorage.removeItem("ACTIVE_FARM_ID");
+                          } catch {}
+                          addToast({
+                            variant: "success",
+                            title: "Sesión cerrada (offline)",
+                          });
+                        } finally {
+                          try {
+                            window.location.href = "/device-unlock";
+                          } catch {}
+                        }
+                      }}
+                      title="Cerrar sesión (offline)"
+                    >
+                      Cerrar sesión
+                    </Button>
+                  )}
                 </div>
               )}
             </nav>
