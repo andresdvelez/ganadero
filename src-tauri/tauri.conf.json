@@ -22,11 +22,6 @@
         ".env",
         "models"
       ],
-      "macOS": {
-        "infoPlist": {
-          "NSMicrophoneUsageDescription": "Necesitamos el micrófono para dictado de voz en el asistente."
-        }
-      },
       "externalBin": [
         "sidecar/node"
       ],
