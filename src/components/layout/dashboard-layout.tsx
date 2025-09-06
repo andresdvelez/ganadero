@@ -384,7 +384,8 @@ export function DashboardLayout({
                   (Boolean((window as any).__TAURI__) ||
                     (typeof navigator !== "undefined" &&
                       /Tauri/i.test(navigator.userAgent)));
-                if (!isDesktop) return null;
+                // Mostrar el botón del modal SOLO cuando está online (y app de escritorio)
+                if (!isDesktop || !syncStatus.online) return null;
                 return (
                   <button
                     className="text-sm text-neutral-600 hover:text-neutral-900"
