@@ -11,6 +11,7 @@ import { addToast } from "@/components/ui/toast";
 import { trpc } from "@/lib/trpc/client";
 import { Select, SelectItem } from "@/components/ui/select";
 import { HeroModal } from "@/components/ui/hero-modal";
+import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
 import { useUser } from "@clerk/nextjs";
 import {
@@ -53,6 +54,8 @@ export function DashboardLayout({
   }>({ online: true, syncing: false, pending: 0 });
   const [conflictsOpen, setConflictsOpen] = useState(false);
   const [offlineModalOpen, setOfflineModalOpen] = useState(false);
+  const [offlineInfoOpen, setOfflineInfoOpen] = useState(false);
+  const [showOfflineOverlay, setShowOfflineOverlay] = useState(false);
   const devicesQ = trpc.device.myDevices.useQuery();
   const [conflicts, setConflicts] = useState<any[]>([]);
   const [hasConflicts, setHasConflicts] = useState(false);
@@ -74,6 +77,20 @@ export function DashboardLayout({
     const t = setInterval(refresh, 5000);
     window.addEventListener("online", refresh);
     window.addEventListener("offline", refresh);
+    const onOfflineOverlay = () => {
+      try {
+        const last = Number(
+          window.localStorage.getItem("OFFLINE_OVERLAY_ACK_AT") || "0"
+        );
+        const twelveHours = 12 * 60 * 60 * 1000;
+        if (Date.now() - last > twelveHours) setShowOfflineOverlay(true);
+      } catch {
+        setShowOfflineOverlay(true);
+      }
+    };
+    window.addEventListener("offline", onOfflineOverlay);
+    if (typeof navigator !== "undefined" && !navigator.onLine)
+      onOfflineOverlay();
     const onSyncCompleted = async (e: any) => {
       const { synced, failed, conflicts } = e.detail || {};
       addToast({
@@ -89,6 +106,7 @@ export function DashboardLayout({
       clearInterval(t);
       window.removeEventListener("online", refresh);
       window.removeEventListener("offline", refresh);
+      window.removeEventListener("offline", onOfflineOverlay);
       window.removeEventListener("sync:completed", onSyncCompleted as any);
     };
   }, []);
@@ -380,32 +398,44 @@ export function DashboardLayout({
                 <div className="flex items-center gap-2">
                   <UserButton />
                   {!syncStatus.online && (
-                    <Button
-                      size="sm"
-                      variant="light"
-                      onPress={async () => {
-                        if (!confirm("¿Cerrar sesión en modo offline?")) return;
-                        try {
+                    <>
+                      <motion.button
+                        className="relative px-2 py-1 rounded-full bg-[#2E77D0] text-white text-xs shadow"
+                        title="Sin conexión: puedes seguir usando Ganado AI. Al reconectarte, sincronizaremos automáticamente tus datos y resultados de la IA."
+                        onClick={() => setOfflineInfoOpen(true)}
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.97 }}
+                      >
+                        Offline
+                      </motion.button>
+                      <Button
+                        size="sm"
+                        variant="light"
+                        onPress={async () => {
+                          if (!confirm("¿Cerrar sesión en modo offline?"))
+                            return;
                           try {
-                            lock();
-                          } catch {}
-                          try {
-                            window.localStorage.removeItem("ACTIVE_FARM_ID");
-                          } catch {}
-                          addToast({
-                            variant: "success",
-                            title: "Sesión cerrada (offline)",
-                          });
-                        } finally {
-                          try {
-                            window.location.href = "/device-unlock";
-                          } catch {}
-                        }
-                      }}
-                      title="Cerrar sesión (offline)"
-                    >
-                      Cerrar sesión
-                    </Button>
+                            try {
+                              lock();
+                            } catch {}
+                            try {
+                              window.localStorage.removeItem("ACTIVE_FARM_ID");
+                            } catch {}
+                            addToast({
+                              variant: "success",
+                              title: "Sesión cerrada (offline)",
+                            });
+                          } finally {
+                            try {
+                              window.location.href = "/device-unlock";
+                            } catch {}
+                          }
+                        }}
+                        title="Cerrar sesión (offline)"
+                      >
+                        Cerrar sesión
+                      </Button>
+                    </>
                   )}
                 </div>
               )}
@@ -489,6 +519,99 @@ export function DashboardLayout({
         </div>
       )}
 
+      {/* Modal informativo rápido sobre modo offline */}
+      {offlineInfoOpen && (
+        <HeroModal
+          open={offlineInfoOpen}
+          onClose={() => setOfflineInfoOpen(false)}
+          title="Modo sin conexión"
+        >
+          <motion.div
+            className="text-sm text-neutral-700 space-y-2"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <p>
+              Estás usando Ganado AI sin conexión. Puedes continuar operando con
+              normalidad.
+            </p>
+            <p>
+              Cuando recuperes Internet, sincronizaremos automáticamente tus
+              datos y los resultados generados por la IA.
+            </p>
+            <p>
+              Si instalaste la app de escritorio, podrás seguir usando nuestro
+              modelo de IA local sin Internet.
+            </p>
+            <div className="mt-3 flex justify-end">
+              <Button onPress={() => setOfflineInfoOpen(false)}>
+                Entendido
+              </Button>
+            </div>
+          </motion.div>
+        </HeroModal>
+      )}
+
+      {/* Overlay de entrada en modo offline (se muestra máx. cada 12h) */}
+      <AnimatePresence>
+        {showOfflineOverlay && (
+          <motion.div
+            className="fixed inset-0 z-[60] grid place-items-center bg-black/75"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="text-center max-w-2xl mx-auto px-6"
+              initial={{ y: 16, opacity: 0, scale: 0.98 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: -8, opacity: 0, scale: 0.98 }}
+              transition={{
+                type: "spring",
+                stiffness: 420,
+                damping: 32,
+                mass: 0.8,
+              }}
+            >
+              <div className="mx-auto mb-6 w-28 h-28 rounded-full border-8 border-neutral-500 grid place-items-center">
+                <motion.div
+                  className="w-10 h-10 border-b-4 border-neutral-400 rounded-full"
+                  animate={{ rotate: 360 }}
+                  transition={{
+                    repeat: Infinity,
+                    ease: "linear",
+                    duration: 1.2,
+                  }}
+                />
+              </div>
+              <h2 className="text-3xl md:text-5xl font-extrabold text-white mb-3">
+                No tienes conexión a Internet
+              </h2>
+              <p className="text-neutral-200 text-base md:text-lg mb-6">
+                Puedes seguir usando Ganado AI con normalidad. Cuando vuelvas a
+                tener conexión, sincronizaremos automáticamente tus datos y los
+                resultados generados por la inteligencia artificial. Si tienes
+                la app de escritorio instalada, el modelo local seguirá
+                funcionando sin conexión.
+              </p>
+              <Button
+                color="primary"
+                onPress={() => {
+                  try {
+                    window.localStorage.setItem(
+                      "OFFLINE_OVERLAY_ACK_AT",
+                      String(Date.now())
+                    );
+                  } catch {}
+                  setShowOfflineOverlay(false);
+                }}
+              >
+                Continuar al dashboard
+              </Button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {offlineModalOpen && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/30">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl p-4">
