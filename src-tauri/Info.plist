@@ -6,8 +6,7 @@
   <string>Necesitamos acceso al micrófono para dictado de voz en el asistente.</string>
   <key>NSCameraUsageDescription</key>
   <string>Necesitamos acceso a la cámara para escanear códigos QR y subir imágenes.</string>
+  <key>NSSpeechRecognitionUsageDescription</key>
+  <string>Necesitamos reconocimiento de voz para transcribir lo que dices al asistente.</string>
 </dict>
 </plist>
-
-
-

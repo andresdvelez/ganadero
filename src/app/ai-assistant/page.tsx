@@ -140,6 +140,7 @@ export default function AIAssistantPage() {
   const [modulesOpen, setModulesOpen] = useState(false);
   const audioAnalyserRef = useRef<AnalyserNode | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
+  const [analyserState, setAnalyserState] = useState<AnalyserNode | null>(null);
   const rafRef = useRef<number | null>(null);
   const [isPaused, setIsPaused] = useState(false);
   const [editFromMessageId, setEditFromMessageId] = useState<string | null>(
@@ -2881,6 +2882,7 @@ export default function AIAssistantPage() {
         analyser.maxDecibels = -10;
         src.connect(analyser);
         audioAnalyserRef.current = analyser;
+        setAnalyserState(analyser);
         audioStreamRef.current = stream;
       } catch {}
     }

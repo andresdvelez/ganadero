@@ -115,6 +115,10 @@ export default function OnboardingPage() {
   const [voiceOn, setVoiceOn] = useState(true);
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const audioAnalyserRef = useRef<AnalyserNode | null>(null);
+  const audioStreamRef = useRef<MediaStream | null>(null);
+  const [listenStartedAt, setListenStartedAt] = useState<number | null>(null);
+  const [listenElapsedMs, setListenElapsedMs] = useState<number>(0);
   const speak = (text: string) => {
     if (!voiceOn) return;
     try {
@@ -143,13 +147,45 @@ export default function OnboardingPage() {
       const t = e.results?.[0]?.[0]?.transcript || "";
       if (t) setInputText((prev) => (prev ? prev + " " + t : t));
     };
-    rec.onend = () => setIsListening(false);
+    rec.onend = () => {
+      setIsListening(false);
+      setListenStartedAt(null);
+      if (audioStreamRef.current) {
+        try { audioStreamRef.current.getTracks().forEach((t) => t.stop()); } catch {}
+        audioStreamRef.current = null;
+      }
+    };
+    // Setup analyser for waveform under user gesture
+    const setupAnalyser = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const src = ctx.createMediaStreamSource(stream);
+        const analyser = ctx.createAnalyser();
+        analyser.smoothingTimeConstant = 0.8;
+        analyser.minDecibels = -90;
+        analyser.maxDecibels = -10;
+        src.connect(analyser);
+        audioAnalyserRef.current = analyser;
+        audioStreamRef.current = stream;
+      } catch {}
+    };
+    rec.onstart = () => {
+      setIsListening(true);
+      setListenStartedAt(Date.now());
+      setListenElapsedMs(0);
+      setupAnalyser();
+    };
     rec.start();
-    setIsListening(true);
   };
   const stopListening = () => {
     try { recognitionRef.current?.stop?.(); } catch {}
     setIsListening(false);
+    setListenStartedAt(null);
+    if (audioStreamRef.current) {
+      try { audioStreamRef.current.getTracks().forEach((t) => t.stop()); } catch {}
+      audioStreamRef.current = null;
+    }
   };
 
   // Logo de la organización (temporal en cliente)
@@ -1194,9 +1230,11 @@ export default function OnboardingPage() {
                     onSend={handleSend}
                     onMic={() => (isListening ? stopListening() : startListening())}
                     isListening={isListening}
+                    elapsedMs={listenElapsedMs}
                     disabled={false}
                     placeholder={ph}
                     hideWebSearchToggle
+                    analyser={audioAnalyserRef.current}
                   />
                 );
               })()

@@ -54,7 +54,8 @@ export function AIInputBar({
   // Oscilloscope canvas refs
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const rafRef = useRef<number | null>(null);
-  const scaleRef = useRef<number>(1.6);
+  const scaleRef = useRef<number>(1.0);
+  const freqHistoryRef = useRef<number[]>([]);
 
   useEffect(() => {
     if (!isListening || !analyser || !canvasRef.current) {
@@ -67,9 +68,9 @@ export function AIInputBar({
     if (!ctx) return;
     const context = ctx as CanvasRenderingContext2D;
     analyser.fftSize = 1024;
-    analyser.smoothingTimeConstant = 0.5;
+    analyser.smoothingTimeConstant = 0.75;
     const bufferLength = analyser.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
+    const freqArray = new Uint8Array(bufferLength);
 
     function resize() {
       const dpr = Math.max(1, window.devicePixelRatio || 1);
@@ -84,13 +85,31 @@ export function AIInputBar({
     window.addEventListener("resize", onResize);
 
     const draw = () => {
-      analyser.getByteTimeDomainData(dataArray);
+      analyser.getByteFrequencyData(freqArray);
+
+      // Compute energy emphasizing voice band (aprox). Use mid bins.
+      const start = Math.floor(bufferLength * 0.05);
+      const end = Math.floor(bufferLength * 0.75);
+      let sum = 0;
+      for (let i = start; i < end; i++) sum += freqArray[i];
+      const avg = sum / Math.max(1, end - start); // 0..255
+      const energy = avg / 255; // 0..1
+
+      // push into history (timeline of bars)
       const WIDTH = canvas.clientWidth;
       const HEIGHT = canvas.clientHeight;
+      const barWidth = 2; // px
+      const gap = 2; // px
+      const step = barWidth + gap;
+      const maxBars = Math.max(4, Math.floor(WIDTH / step));
+      const hist = freqHistoryRef.current;
+      hist.push(energy);
+      while (hist.length > maxBars) hist.shift();
+
       // clear
       context.clearRect(0, 0, WIDTH, HEIGHT);
-      // baseline
-      context.strokeStyle = "#e5e7eb"; // neutral-200
+      // baseline (dotted)
+      context.strokeStyle = "#e5e7eb";
       context.setLineDash([3, 4]);
       context.beginPath();
       context.moveTo(0, HEIGHT / 2);
@@ -98,36 +117,21 @@ export function AIInputBar({
       context.stroke();
       context.setLineDash([]);
 
-      // auto-gain based on average absolute deviation
-      let sumAbs = 0;
-      for (let i = 0; i < bufferLength; i++)
-        sumAbs += Math.abs(dataArray[i] - 128);
-      const avgAbs = sumAbs / bufferLength; // 0..128
-      const currentAmp = Math.max(1, avgAbs);
-      const targetFill = 0.42; // target 42% of half-height
-      const proposedScale = Math.min(
-        4,
-        Math.max(0.8, (targetFill * 128) / currentAmp)
-      );
-      // smooth scale to avoid jitter
-      scaleRef.current =
-        scaleRef.current + (proposedScale - scaleRef.current) * 0.15;
+      // auto-gain smoothing
+      const targetFill = 0.8; // portion of half-height
+      const proposedScale = Math.min(4, Math.max(0.6, targetFill / Math.max(0.15, energy)));
+      scaleRef.current = scaleRef.current + (proposedScale - scaleRef.current) * 0.05;
 
-      // waveform
-      context.lineWidth = 3;
-      context.strokeStyle = "#6b7280"; // neutral-500 line for more contraste
-      context.beginPath();
-      const sliceWidth = WIDTH / bufferLength;
-      let x = 0;
-      for (let i = 0; i < bufferLength; i++) {
-        const centered = (dataArray[i] - 128) / 128; // -1..1
-        const y = HEIGHT / 2 + centered * (HEIGHT / 2) * scaleRef.current;
-        if (i === 0) context.moveTo(x, y);
-        else context.lineTo(x, y);
-        x += sliceWidth;
+      // draw bars centered around baseline
+      const centerY = HEIGHT / 2;
+      context.fillStyle = "#111827"; // neutral-900 for crisp bars
+      for (let i = 0; i < hist.length; i++) {
+        const v = Math.max(0, Math.min(1, hist[i] * scaleRef.current));
+        const h = Math.max(2, v * (HEIGHT * 0.9));
+        const x = i * step;
+        const y = centerY - h / 2;
+        context.fillRect(x, y, barWidth, h);
       }
-      context.lineTo(WIDTH, HEIGHT / 2);
-      context.stroke();
 
       rafRef.current = requestAnimationFrame(draw);
     };
@@ -136,6 +140,7 @@ export function AIInputBar({
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       window.removeEventListener("resize", onResize);
       rafRef.current = null;
+      freqHistoryRef.current = [];
     };
   }, [isListening, analyser]);
 
@@ -176,8 +181,8 @@ export function AIInputBar({
         />
       )}
 
-      {/* Web search toggle */}
-      {!hideWebSearchToggle && (
+      {/* Web search toggle - oculto en modo listening para no solaparse */}
+      {!hideWebSearchToggle && !isListening && (
         <div className="absolute right-[6.5rem] top-1/2 -translate-y-1/2 flex items-center gap-2 text-neutral-600 select-none">
           <span className="hidden sm:inline text-sm">Búsqueda web</span>
           <Switch
