@@ -63,6 +63,7 @@ export default function OnboardingPage() {
   const [deviceLinked, setDeviceLinked] = useState(false);
   const [passA, setPassA] = useState("");
   const [passB, setPassB] = useState("");
+  const [deviceName, setDeviceName] = useState("Este equipo");
   const [created, setCreated] = useState<null | {
     orgId: string;
     orgName: string;
@@ -128,6 +129,15 @@ export default function OnboardingPage() {
       else setOs("other");
     } catch {}
   }, []);
+
+  useEffect(() => {
+    try {
+      if (deviceName === "Este equipo") {
+        if (os === "mac") setDeviceName("Mi Mac");
+        else if (os === "windows") setDeviceName("Mi PC");
+      }
+    } catch {}
+  }, [os]);
 
   // Voz: síntesis y reconocimiento
   const [voiceOn, setVoiceOn] = useState(true);
@@ -1475,7 +1485,7 @@ export default function OnboardingPage() {
       await bindDeviceLocally({
         deviceId,
         clerkId: user.id,
-        name: "Este equipo",
+        name: deviceName || "Este equipo",
         platform: typeof navigator !== "undefined" ? navigator.platform : "web",
         orgId,
       });
@@ -1506,7 +1516,7 @@ export default function OnboardingPage() {
       // 2) Registrar dispositivo en backend
       await registerDevice.mutateAsync({
         deviceId,
-        name: "Este equipo",
+        name: deviceName || "Este equipo",
         platform: typeof navigator !== "undefined" ? navigator.platform : "web",
         orgId,
       });
@@ -1518,7 +1528,7 @@ export default function OnboardingPage() {
       await bindDeviceLocally({
         deviceId,
         clerkId: user.id,
-        name: "Este equipo",
+        name: deviceName || "Este equipo",
         platform: typeof navigator !== "undefined" ? navigator.platform : "web",
       });
       setDeviceLinked(true);
@@ -1977,7 +1987,22 @@ export default function OnboardingPage() {
               </div>
             ) : (
               <div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-2">
+                <div className="rounded-xl border border-neutral-200 bg-white/70 p-3 shadow-sm mb-3">
+                  <div className="text-sm text-neutral-700">
+                    Esta clave protege tu sesión local para trabajar sin
+                    internet (modo offline). Es opcional y puedes vincular este
+                    equipo más tarde desde la plataforma.
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
+                  <Input
+                    label="Nombre del dispositivo"
+                    placeholder="Ej.: Mi Mac / PC oficina"
+                    value={deviceName}
+                    onChange={(e) =>
+                      setDeviceName((e.target as HTMLInputElement).value)
+                    }
+                  />
                   <Input
                     type="password"
                     label="Clave local (mín. 6)"
