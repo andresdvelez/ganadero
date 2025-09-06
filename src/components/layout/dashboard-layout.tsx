@@ -622,6 +622,10 @@ function DevicesManager({ onClose }: { onClose: () => void }) {
   const [linkPassB, setLinkPassB] = useState("");
   const [linkName, setLinkName] = useState("");
   const [linking, setLinking] = useState(false);
+  const ownershipQ = trpc.device.checkOwnership.useQuery(
+    { deviceId: currentId },
+    { enabled: !!currentId }
+  );
 
   if (devicesQ.isLoading) return <div className="text-sm">Cargando…</div>;
   const list = devicesQ.data || [];
@@ -659,6 +663,16 @@ function DevicesManager({ onClose }: { onClose: () => void }) {
               }
             />
           </div>
+          {ownershipQ.data?.exists && ownershipQ.data?.sameUser === false && (
+            <div className="mb-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+              Este dispositivo ya está vinculado a otra cuenta
+              {ownershipQ.data.ownerEmail
+                ? ` (${ownershipQ.data.ownerEmail})`
+                : ""}
+              . Para traerlo a tu cuenta, ingresa la clave local (si tenía) y
+              pulsa “Vincular este equipo”.
+            </div>
+          )}
           <div className="flex justify-end">
             <Button
               color="primary"
@@ -671,7 +685,17 @@ function DevicesManager({ onClose }: { onClose: () => void }) {
                   });
                 setLinking(true);
                 try {
-                  // Guardar identidad local si se ingresó clave
+                  // 1) Asociar localmente el dispositivo a este usuario primero
+                  await bindDeviceLocally({
+                    deviceId: currentId,
+                    clerkId: user.id,
+                    name: linkName || "Este equipo",
+                    platform:
+                      typeof navigator !== "undefined"
+                        ? navigator.platform
+                        : "web",
+                  });
+                  // 2) Guardar identidad local si se ingresó clave (después del bind)
                   if (linkPassA || linkPassB) {
                     if (linkPassA.length < 6) {
                       addToast({
@@ -697,15 +721,6 @@ function DevicesManager({ onClose }: { onClose: () => void }) {
                       passcode: linkPassA,
                     });
                   }
-                  await bindDeviceLocally({
-                    deviceId: currentId,
-                    clerkId: user.id,
-                    name: linkName || "Este equipo",
-                    platform:
-                      typeof navigator !== "undefined"
-                        ? navigator.platform
-                        : "web",
-                  });
                   await registerDevice.mutateAsync({
                     deviceId: currentId,
                     name: linkName || "Este equipo",
