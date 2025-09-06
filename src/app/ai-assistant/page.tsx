@@ -2866,12 +2866,12 @@ export default function AIAssistantPage() {
       });
       return;
     }
+    // En Tauri (macOS), asegura permiso de micrófono para niveles/analizador
+    const isTauri = typeof window !== "undefined" && (window as any).__TAURI__;
     // Prepare WebAudio stream for visual levels
     async function setupAnalyser() {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-        });
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         const ctx = new (window.AudioContext ||
           (window as any).webkitAudioContext)();
         const src = ctx.createMediaStreamSource(stream);
@@ -2884,6 +2884,8 @@ export default function AIAssistantPage() {
         audioStreamRef.current = stream;
       } catch {}
     }
+    // En macOS la primera llamada debe ser sobre gesto de usuario y puede tardar; mostrar feedback
+    addToast({ variant: "info", title: "Escuchando…", description: "Permite acceso al micrófono si aparece el diálogo." });
     const SpeechRecognition =
       (window as any).webkitSpeechRecognition ||
       (window as any).SpeechRecognition;

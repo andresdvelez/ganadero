@@ -195,7 +195,7 @@ export function AIInputBar({
         isIconOnly
         aria-label="Hablar"
         onPress={onMic}
-        disabled={disabled}
+        disabled={disabled || (typeof window !== "undefined" && !((window as any).webkitSpeechRecognition || (window as any).SpeechRecognition))}
         className={cn(
           "absolute top-1/2 -translate-y-1/2 rounded-full bg-white text-neutral-700 shadow-sm border border-neutral-200 h-10 w-10 transition-all",
           isListening ? "right-2" : hasText ? "right-[3.75rem]" : "right-2"
