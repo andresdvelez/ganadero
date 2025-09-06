@@ -117,3 +117,21 @@ export function lock(): void {
   currentClerkId = null;
   setExternalEncryptionKey(null);
 }
+
+// Verifica passcode y elimina el vínculo local del dispositivo actual
+export async function unlinkLocalDeviceWithPasscode(params: {
+  deviceId: string;
+  passcode: string;
+}): Promise<void> {
+  // Validar passcode contra identidad local existente
+  await unlock(params.passcode);
+  // Borrar registro de deviceInfo para permitir nueva vinculación
+  const existing = await db.deviceInfo
+    .where({ deviceId: params.deviceId })
+    .first();
+  if (existing?.id) {
+    await db.deviceInfo.delete(existing.id);
+  }
+  // Bloquear de nuevo por seguridad
+  lock();
+}
