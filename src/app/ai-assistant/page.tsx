@@ -238,15 +238,31 @@ export default function AIAssistantPage() {
             "Nuevo chat"
           ).slice(0, 60);
           const now = new Date();
-          await db.chats.put({ uuid: id, title, createdAt: now, updatedAt: now } as any);
+          await db.chats.put({
+            uuid: id,
+            title,
+            createdAt: now,
+            updatedAt: now,
+          } as any);
           await Promise.all(
             messages.map((m) =>
-              db.chatMessages.add({ chatUuid: id, role: m.role, content: m.content, createdAt: m.timestamp || new Date() } as any)
+              db.chatMessages.add({
+                chatUuid: id,
+                role: m.role,
+                content: m.content,
+                createdAt: m.timestamp || new Date(),
+              } as any)
             )
           );
-          try { window.dispatchEvent(new Event("ai-history-updated")); } catch {}
           try {
-            const items = await db.chats.orderBy("updatedAt").reverse().limit(20).toArray();
+            window.dispatchEvent(new Event("ai-history-updated"));
+          } catch {}
+          try {
+            const items = await db.chats
+              .orderBy("updatedAt")
+              .reverse()
+              .limit(20)
+              .toArray();
             setChatList(items);
           } catch {}
         }
@@ -292,7 +308,10 @@ export default function AIAssistantPage() {
     };
     window.addEventListener("ai-new-chat", onNewChat as any);
     window.addEventListener("ai-open-chat", onOpenChat as any);
-    window.addEventListener("ai-request-save-current-chat", onSaveAndNew as any);
+    window.addEventListener(
+      "ai-request-save-current-chat",
+      onSaveAndNew as any
+    );
 
     try {
       const isTauriEnv =
@@ -320,7 +339,10 @@ export default function AIAssistantPage() {
     return () => {
       window.removeEventListener("ai-new-chat", onNewChat as any);
       window.removeEventListener("ai-open-chat", onOpenChat as any);
-      window.removeEventListener("ai-request-save-current-chat", onSaveAndNew as any);
+      window.removeEventListener(
+        "ai-request-save-current-chat",
+        onSaveAndNew as any
+      );
       // auto summarize on unmount if there is a session
       if (chatUuid && messages.length >= 10) {
         summarizeSession.mutate({
@@ -351,6 +373,18 @@ export default function AIAssistantPage() {
     return () => window.removeEventListener("open-modules", handler as any);
   }, []);
 
+  // Abrir módulos si venimos con ?modules=1 (fix Tauri mobile/webview)
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get("modules") === "1") {
+        setModulesOpen(true);
+        url.searchParams.delete("modules");
+        window.history.replaceState({}, "", url.toString());
+      }
+    } catch {}
+  }, []);
+
   // FAB para nuevo chat (UX: esquina inferior derecha)
   const FabNewChat = () => (
     <button
@@ -361,7 +395,11 @@ export default function AIAssistantPage() {
           // Guardar el chat actual en historial (si hay contenido)
           if (messages.length > 0) {
             const id = chatUuid || generateUUID();
-            const title = (messages.find((m) => m.role === "user")?.content || messages[0]?.content || "Nuevo chat").slice(0, 60);
+            const title = (
+              messages.find((m) => m.role === "user")?.content ||
+              messages[0]?.content ||
+              "Nuevo chat"
+            ).slice(0, 60);
             const now = new Date();
             await db.chats.put({
               uuid: id,
@@ -384,7 +422,11 @@ export default function AIAssistantPage() {
         // Disparar evento para resetear hilo y refrescar historial
         window.dispatchEvent(new Event("ai-new-chat"));
         try {
-          const items = await db.chats.orderBy("updatedAt").reverse().limit(20).toArray();
+          const items = await db.chats
+            .orderBy("updatedAt")
+            .reverse()
+            .limit(20)
+            .toArray();
           setChatList(items);
         } catch {}
       }}
@@ -2932,7 +2974,9 @@ export default function AIAssistantPage() {
     // Prepare WebAudio stream for visual levels
     async function setupAnalyser() {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
         const ctx = new (window.AudioContext ||
           (window as any).webkitAudioContext)();
         const src = ctx.createMediaStreamSource(stream);
@@ -2947,7 +2991,11 @@ export default function AIAssistantPage() {
       } catch {}
     }
     // En macOS la primera llamada debe ser sobre gesto de usuario y puede tardar; mostrar feedback
-    addToast({ variant: "info", title: "Escuchando…", description: "Permite acceso al micrófono si aparece el diálogo." });
+    addToast({
+      variant: "info",
+      title: "Escuchando…",
+      description: "Permite acceso al micrófono si aparece el diálogo.",
+    });
     const SpeechRecognition =
       (window as any).webkitSpeechRecognition ||
       (window as any).SpeechRecognition;
@@ -4920,7 +4968,9 @@ export default function AIAssistantPage() {
       <button
         className="fixed bottom-6 right-6 z-40 h-14 px-5 rounded-full bg-neutral-900 text-white shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center gap-3"
         title="Nuevo chat"
-        onClick={() => window.dispatchEvent(new Event("ai-request-save-current-chat"))}
+        onClick={() =>
+          window.dispatchEvent(new Event("ai-request-save-current-chat"))
+        }
       >
         <span className="text-2xl leading-none">+</span>
         <span className="text-sm font-medium">Nuevo chat</span>

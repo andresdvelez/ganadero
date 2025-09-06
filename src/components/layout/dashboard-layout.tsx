@@ -2,7 +2,7 @@
 
 import { ReactNode, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import { UserButton, useClerk } from "@clerk/nextjs";
 import { getSyncManager } from "@/services/sync/sync-manager";
@@ -43,6 +43,7 @@ export function DashboardLayout({
   leftSlot,
   rightSlot,
 }: DashboardLayoutProps) {
+  const router = useRouter();
   const { signOut } = useClerk();
   const hasClerk = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
   const [syncStatus, setSyncStatus] = useState<{
@@ -177,9 +178,13 @@ export function DashboardLayout({
                 (collapsed ? "justify-center " : "") +
                 "flex items-center gap-2 px-3 py-2 rounded-full hover:bg-neutral-100 text-neutral-800 w-full text-left"
               }
-              onClick={() =>
-                window.dispatchEvent(new CustomEvent("open-modules"))
-              }
+              onClick={() => {
+                try {
+                  router.push("/modules");
+                } catch {
+                  window.location.href = "/modules";
+                }
+              }}
               title="Navegador de módulos"
             >
               <Compass className="w-4 h-4" />
