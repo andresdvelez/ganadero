@@ -22,7 +22,27 @@ export async function hasOfflineIdentity(): Promise<boolean> {
 export async function getOfflineIdentity(): Promise<
   OfflineIdentity | undefined
 > {
-  return await db.identities.toCollection().first();
+  // Preferir identidad asociada al binding local del dispositivo actual
+  try {
+    const did = robustDeviceId();
+    const dev = await db.deviceInfo.where({ deviceId: did }).first();
+    if (dev?.boundClerkId) {
+      const match = await db.identities
+        .where({ clerkId: dev.boundClerkId })
+        .first();
+      if (match) return match;
+    }
+  } catch {}
+  // Fallback: la identidad más reciente
+  const all = await db.identities.toArray();
+  if (!all.length) return undefined;
+  let latest = all[0]!;
+  for (const it of all) {
+    if (it.updatedAt && latest.updatedAt) {
+      if (new Date(it.updatedAt) > new Date(latest.updatedAt)) latest = it;
+    }
+  }
+  return latest;
 }
 
 export type ProvisionInput = {
