@@ -6,6 +6,7 @@ const projectRoot = path.resolve(process.cwd());
 const appDir = path.join(projectRoot, 'src', 'app');
 const publicDir = path.join(projectRoot, 'public');
 const tauriDistDir = path.join(projectRoot, 'src-tauri', 'dist');
+const tauriModelsDir = path.join(projectRoot, 'src-tauri', 'models');
 
 // Ya no movemos rutas fuera antes del build. Mantener todo dentro para que Next standalone
 // incluya API, auth y páginas offline en el paquete de Tauri.
@@ -30,14 +31,15 @@ if (process.env.TAURI !== '1' && process.env.TAURI !== 'true') {
 
 // Mantener las rutas; no hacer renombres para Tauri
 
-// Copiar logo y recursos necesarios a dist para la splash offline
+// Copiar recursos necesarios a dist para la splash offline
 try {
   fs.mkdirSync(tauriDistDir, { recursive: true });
-  const logoSrc = path.join(publicDir, 'logo.png');
-  const logoDst = path.join(tauriDistDir, 'logo.png');
-  if (fs.existsSync(logoSrc)) {
-    fs.copyFileSync(logoSrc, logoDst);
-    console.log('[prebuild] Copied public/logo.png -> src-tauri/dist/logo.png');
+  fs.mkdirSync(tauriModelsDir, { recursive: true });
+  const splashSrc = path.join(publicDir, 'brand', 'splash-screen.jpeg');
+  const splashDst = path.join(tauriDistDir, 'splash-screen.jpeg');
+  if (fs.existsSync(splashSrc)) {
+    fs.copyFileSync(splashSrc, splashDst);
+    console.log('[prebuild] Copied public/brand/splash-screen.jpeg -> src-tauri/dist/splash-screen.jpeg');
   }
 } catch (e) {
   console.warn('[prebuild] Could not copy splash assets:', e?.message || e);

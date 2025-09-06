@@ -34,7 +34,7 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
 
   const explicit = process.env.NEXT_PUBLIC_TRPC_URL;
   const baseDefault = "/api/trpc";
-  const remoteFallback = "https://ganadero-nine.vercel.app/api/trpc";
+  const remoteFallback = "https://app.ganado.co/api/trpc";
 
   const [resolvedUrl, setResolvedUrl] = useState<string>(
     explicit && explicit.length > 0 ? explicit : baseDefault
@@ -50,18 +50,19 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
         typeof window !== "undefined" && (window as any).__TAURI__;
       if (isTauri) {
         const localUrl = "http://127.0.0.1:4317/api/trpc";
-        // Decidir por reachability real (no confiar en navigator.onLine)
-        const remoteReady = await probe("https://ganadero-nine.vercel.app/manifest.webmanifest");
-        if (remoteReady) {
-          if (!cancelled) setResolvedUrl(remoteFallback);
-          return;
-        }
-        const localReady = await probe("http://127.0.0.1:4317/manifest.webmanifest");
+        // Preferir servidor local embebido si está listo; evitar CORS con remoto
+        const localReady = await probe("http://127.0.0.1:4317/manifest.webmanifest", 1800);
         if (localReady) {
           if (!cancelled) setResolvedUrl(localUrl);
           return;
         }
-        if (!cancelled) setResolvedUrl(remoteFallback);
+        const remoteReady = await probe("https://app.ganado.co/manifest.webmanifest", 1200);
+        if (remoteReady) {
+          if (!cancelled) setResolvedUrl(remoteFallback);
+          return;
+        }
+        // Si ninguno responde aún, intenta local por defecto (el server suele tardar en iniciar)
+        if (!cancelled) setResolvedUrl(localUrl);
         return;
       }
       // Web: keep relative so it works on Vercel and dev

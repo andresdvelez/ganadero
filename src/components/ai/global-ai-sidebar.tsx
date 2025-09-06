@@ -9,7 +9,7 @@ export function GlobalAISidebar() {
   const [activeUuid, setActiveUuid] = useState<string | null>(null);
 
   useEffect(() => {
-    (async () => {
+    const load = async () => {
       try {
         const items = await db.chats
           .orderBy("updatedAt")
@@ -18,7 +18,11 @@ export function GlobalAISidebar() {
           .toArray();
         setChatList(items);
       } catch {}
-    })();
+    };
+    load();
+    const onUpdated = () => load();
+    window.addEventListener("ai-history-updated", onUpdated);
+    return () => window.removeEventListener("ai-history-updated", onUpdated);
   }, []);
 
   return (
@@ -29,7 +33,7 @@ export function GlobalAISidebar() {
         updatedAt: c.updatedAt,
       }))}
       activeChatUuid={activeUuid}
-      onNewChat={() => window.dispatchEvent(new Event("ai-new-chat"))}
+      onNewChat={() => window.dispatchEvent(new Event("ai-request-save-current-chat"))}
       onSelectChat={(uuid) => {
         setActiveUuid(uuid);
         window.dispatchEvent(

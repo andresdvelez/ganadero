@@ -27,7 +27,9 @@ export function HeroDrawer({
     document.body.appendChild(container);
     containerRef.current = container;
     return () => {
-      document.body.removeChild(container);
+      try {
+        if (container.parentNode) document.body.removeChild(container);
+      } catch {}
       containerRef.current = null;
     };
   }, [open]);

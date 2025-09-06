@@ -29,6 +29,22 @@ export function generateTagNumber(): string {
   return `${timestamp}-${randomStr}`.toUpperCase();
 }
 
+/**
+ * Devuelve true si la app corre instalada: Tauri o PWA standalone.
+ * Seguro para SSR: en servidor devuelve false.
+ */
+export function isAppInstalledRuntime(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const isTauri = Boolean((window as any).__TAURI__ || (window as any).__TAURI_IPC__);
+    const byMedia = typeof window.matchMedia === "function" && window.matchMedia("(display-mode: standalone)").matches;
+    const byIOS = (navigator as any).standalone === true;
+    return Boolean(isTauri || byMedia || byIOS);
+  } catch {
+    return false;
+  }
+}
+
 export function calculateAge(birthDate: Date | string): string {
   const birth = typeof birthDate === "string" ? new Date(birthDate) : birthDate;
   const today = new Date();

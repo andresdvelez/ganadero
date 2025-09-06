@@ -1,14 +1,14 @@
 {
   "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/v1/tools/cli/schema.json",
   "build": {
-    "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "TAURI=1 node ./scripts/tauri-prebuild.mjs && node ./scripts/prepare-node-sidecar.mjs && TAURI=1 npm run build && node ./scripts/assert-standalone.mjs && TAURI=1 node ./scripts/tauri-postbuild.mjs",
+    "beforeDevCommand": "bun run dev",
+    "beforeBuildCommand": "bash ./scripts/tauri-build.sh",
     "devPath": "http://localhost:3001",
     "distDir": "dist"
   },
   "package": {
     "productName": "Ganado AI",
-    "version": "0.1.0"
+    "version": "0.1.1"
   },
   "tauri": {
     "bundle": {
@@ -19,7 +19,8 @@
         ".next/standalone/**",
         ".next/static/**",
         ".next/standalone/server.js",
-        ".env"
+        ".env",
+        "models"
       ],
       "externalBin": [
         "sidecar/node"
@@ -41,7 +42,7 @@
     "updater": {
       "active": false,
       "endpoints": [
-        "https://ganadero-nine.vercel.app/api/updates/{target}/{current_version}"
+        "https://app.ganado.co/api/updates/{target}/{current_version}"
       ],
       "pubkey": ""
     },

@@ -4,7 +4,7 @@ export const runtime = "edge";
 
 async function proxy(req: Request, params: { path: string[] }) {
   const base =
-    process.env.OLLAMA_SERVER_URL || "https://ganadero-nine.vercel.app";
+    process.env.OLLAMA_SERVER_URL || "https://app.ganado.co";
   const targetUrl = `${base.replace(/\/$/, "")}/${params.path.join("/")}`;
 
   const init: RequestInit = {

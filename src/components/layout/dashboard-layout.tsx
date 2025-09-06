@@ -2,8 +2,9 @@
 
 import { ReactNode, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import Image from "next/image";
-import { UserButton } from "@clerk/nextjs";
+import { UserButton, useClerk } from "@clerk/nextjs";
 import { getSyncManager } from "@/services/sync/sync-manager";
 import { Button } from "@/components/ui/button";
 import { addToast } from "@/components/ui/toast";
@@ -13,8 +14,9 @@ import { HeroModal } from "@/components/ui/hero-modal";
 import { Input } from "@/components/ui/input";
 import { useUser } from "@clerk/nextjs";
 import { provisionFromClerk, bindDeviceLocally, hasOfflineIdentity, lock } from "@/lib/auth/offline-auth";
-import { robustDeviceId } from "@/lib/utils";
+import { robustDeviceId, isAppInstalledRuntime } from "@/lib/utils";
 import { db } from "@/lib/dexie";
+import { Home, Bot, Compass, CreditCard, Apple, Laptop, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -27,6 +29,7 @@ export function DashboardLayout({
   leftSlot,
   rightSlot,
 }: DashboardLayoutProps) {
+  const { signOut } = useClerk();
   const hasClerk = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
   const [syncStatus, setSyncStatus] = useState<{
     online: boolean;
@@ -75,37 +78,128 @@ export function DashboardLayout({
     };
   }, []);
 
+  const pathname = usePathname();
+  const [collapsed, setCollapsed] = useState<boolean>(false);
+  // Persistir estado de plegado
+  useEffect(() => {
+    try {
+      const s = window.localStorage.getItem("SIDEBAR_COLLAPSED");
+      if (s) setCollapsed(s === "1");
+    } catch {}
+  }, []);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("SIDEBAR_COLLAPSED", collapsed ? "1" : "0");
+    } catch {}
+  }, [collapsed]);
+
+  const sidebarWidth = collapsed ? 72 : 260; // px
+  const sidebarLeft = 8; // px gap para efecto flotante
+
+  const navLinkClass = (href: string) => {
+    const isActive = pathname === href || (href !== "/" && pathname.startsWith(href));
+    return (
+      (collapsed ? "flex justify-center " : "flex items-center ") +
+      "gap-2 px-3 py-2 rounded-full transition-colors " +
+      (isActive ? "bg-neutral-900 text-white" : "hover:bg-neutral-100 text-neutral-800")
+    );
+  };
+
   return (
-    <div className="min-h-screen grid grid-rows-[auto,1fr]">
-      <header className="flex items-center justify-between px-4 h-14 border-b bg-white">
-        <div className="flex items-center gap-2">
-          <Image src="/logo.png" alt="Ganado AI" width={28} height={28} />
-          <div className="font-semibold">Ganado AI</div>
-          {/* Selector de finca (solo ADMIN) */}
-          <FarmSelector />
-        </div>
-        <nav className="flex items-center gap-3">
-          {/* Descargas de app de escritorio */}
-          {(() => {
-            const macUrl =
-              process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_URL || "/download";
-            const winUrl =
-              process.env.NEXT_PUBLIC_DESKTOP_WIN_DOWNLOAD_URL || "/download";
-            return (
-              <>
-                <Button asChild size="sm" variant="light">
-                  <a href={macUrl} target="_blank" rel="noreferrer">
-                    Descargar macOS
-                  </a>
-                </Button>
-                <Button asChild size="sm" variant="light">
-                  <a href={winUrl} target="_blank" rel="noreferrer">
-                    Descargar Windows
-                  </a>
-                </Button>
-              </>
-            );
-          })()}
+    <div className="min-h-dvh">
+      {/* Header se renderiza dentro del área principal, no ocupa encima del sidebar */}
+      <div className="pt-0">
+        {/* Sidebar flotante de altura completa */}
+        <aside
+          className="fixed top-0 z-40 my-3 border border-neutral-200/60 bg-white/70 backdrop-blur-md shadow-lg p-3 flex flex-col gap-3 overflow-auto rounded-2xl"
+          style={{ width: sidebarWidth, left: sidebarLeft, height: "98dvh", transition: "width 260ms cubic-bezier(0.22,1,0.36,1), left 260ms cubic-bezier(0.22,1,0.36,1)" }}
+        >
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2 px-1">
+              {collapsed ? (
+                <Image src="/brand/logotype-black-nobg.png" alt="Ganado" width={40} height={40} priority />
+              ) : (
+                <Image src="/brand/full-logo-black-nobg.png" alt="Ganado" width={160} height={36} priority />
+              )}
+            </div>
+            {/* Botón interno opcional (no necesario, mantenemos foco en el flotante) */}
+          </div>
+          <nav className="space-y-1">
+            <Link href="/" className={navLinkClass("/")} title="Inicio">
+              <Home className="w-4 h-4" />
+              {!collapsed && <span>Inicio</span>}
+            </Link>
+            <Link href="/ai-assistant" className={navLinkClass("/ai-assistant")} title="Asistente de AI">
+              <Bot className="w-4 h-4" />
+              {!collapsed && <span>Asistente de AI</span>}
+            </Link>
+            <button
+              className={(collapsed ? "justify-center " : "") + "flex items-center gap-2 px-3 py-2 rounded-full hover:bg-neutral-100 text-neutral-800 w-full text-left"}
+              onClick={() => window.dispatchEvent(new CustomEvent("open-modules"))}
+              title="Navegador de módulos"
+            >
+              <Compass className="w-4 h-4" />
+              {!collapsed && <span>Navegador de módulos</span>}
+            </button>
+            <Link href="/settings/billing" className={navLinkClass("/settings/billing")} title="Plan y facturación">
+              <CreditCard className="w-4 h-4" />
+              {!collapsed && <span>Plan y facturación</span>}
+            </Link>
+          </nav>
+          {!collapsed && (
+            <>
+              <div className="mt-2">
+                <div className="text-xs uppercase tracking-wide text-neutral-500 px-1">Chats recientes</div>
+                <RecentChats />
+                <div className="px-1 mt-2">
+                  <a className="text-sm text-primary-600 hover:underline" href="/ai-assistant?history=1">Ver todo</a>
+                </div>
+              </div>
+              {(() => {
+                const installed = isAppInstalledRuntime();
+                if (installed) return null;
+                return (
+                  <div className="mt-auto pt-2 border-t">
+                    <div className="text-xs uppercase tracking-wide text-neutral-500 px-1 mb-2">Descargas</div>
+                    {(() => {
+                      const macUrl = process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_URL || "/download";
+                      const winUrl = process.env.NEXT_PUBLIC_DESKTOP_WIN_DOWNLOAD_URL || "/download";
+                      return (
+                        <div className="flex flex-col gap-2">
+                          <a className="px-3 py-2 rounded-full bg-black text-white text-sm shadow hover:opacity-90 flex items-center gap-2" href={macUrl} target="_blank" rel="noreferrer">
+                            <img src="/brand/apple-logo.svg" alt="Apple" className="w-4 h-4" />
+                            <span>Descargar para macOS</span>
+                          </a>
+                          <a className="px-3 py-2 rounded-full bg-neutral-900 text-white text-sm shadow hover:opacity-90 flex items-center gap-2" href={winUrl} target="_blank" rel="noreferrer">
+                            <img src="/brand/windows-logo.svg" alt="Windows" className="w-4 h-4" />
+                            <span>Descargar para Windows</span>
+                          </a>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                );
+              })()}
+            </>
+          )}
+        </aside>
+        {/* Botón flotante fijo para plegar/expandir (siempre visible) */}
+        <button
+          className="fixed z-50 w-8 h-8 grid place-items-center rounded-full shadow bg-white/90 hover:bg-white text-neutral-700 border border-neutral-200/70"
+          style={{ top: 16, left: sidebarLeft + sidebarWidth - 12, transition: "left 260ms cubic-bezier(0.22,1,0.36,1)" }}
+          onClick={() => setCollapsed((v) => !v)}
+          title={collapsed ? "Expandir" : "Plegar"}
+        >
+          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        </button>
+
+        {/* Área principal a la derecha del sidebar */}
+        <div className="transition-all" style={{ marginLeft: sidebarLeft + sidebarWidth, transition: "margin-left 260ms cubic-bezier(0.22,1,0.36,1)" }}>
+          <header className="flex items-center justify-between px-4 h-14 bg-transparent">
+            <div className="flex items-center gap-3">
+              <FarmSelector />
+            </div>
+            <nav className="flex items-center gap-3">
           {hasConflicts && (
             <div className="flex items-center gap-2">
               <div
@@ -183,21 +277,45 @@ export function DashboardLayout({
               </button>
             );
           })()}
-          {hasClerk && <UserButton />}
+          {hasClerk && (
+            <div className="flex items-center gap-2">
+              <UserButton />
+              <Button
+                size="sm"
+                variant="light"
+                onPress={async () => {
+                  try {
+                    await signOut({ redirectUrl: "/sign-in" });
+                  } catch (e) {
+                    console.warn("Sign out failed, forcing redirect", e as any);
+                  } finally {
+                    try {
+                      // Limpieza defensiva del estado local
+                      window.localStorage.removeItem("ACTIVE_FARM_ID");
+                    } catch {}
+                    window.location.href = "/sign-in";
+                  }
+                }}
+                title="Cerrar sesión"
+              >
+                Cerrar sesión
+              </Button>
+            </div>
+          )}
         </nav>
-      </header>
-      <div className="grid grid-cols-[auto,1fr,auto] min-h-0">
-        {leftSlot ? (
-          <div className="border-r bg-white/80 min-h-0">{leftSlot}</div>
-        ) : (
-          <div />
-        )}
-        <main className="p-4 overflow-auto min-h-0">{children}</main>
-        {rightSlot ? (
-          <div className="border-l bg-white/80 min-h-0">{rightSlot}</div>
-        ) : (
-          <div />
-        )}
+          </header>
+          <main className="relative p-4 overflow-auto min-h-[100dvh] transition-all">
+            {/* Puntos difuminados de fondo para reforzar efecto glass */}
+            <div className="pointer-events-none fixed inset-0 -z-10">
+              <div className="absolute top-28 left-40 h-72 w-72 rounded-full bg-emerald-200/25 blur-3xl" />
+              <div className="absolute bottom-24 right-32 h-96 w-96 rounded-full bg-sky-200/20 blur-3xl" />
+              <div className="absolute top-1/2 left-1/3 h-64 w-64 -translate-y-1/2 rounded-full bg-amber-200/20 blur-3xl" />
+            </div>
+            <div className="max-w-[1400px] mx-auto space-y-4">
+              {children}
+            </div>
+          </main>
+        </div>
       </div>
       {conflictsOpen && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/30">
@@ -280,6 +398,35 @@ export function DashboardLayout({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function RecentChats() {
+  const [items, setItems] = useState<Array<{ uuid: string; title: string; updatedAt: Date }>>([]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const rows = await db.chats.orderBy("updatedAt").reverse().limit(5).toArray();
+        setItems(rows as any);
+      } catch {}
+    })();
+  }, []);
+  if (!items.length) return (
+    <div className="text-sm text-neutral-500 px-2 py-3">Sin chats</div>
+  );
+  return (
+    <div className="space-y-1 mt-1">
+      {items.map((c) => (
+        <button
+          key={c.uuid}
+          className="w-full text-left px-3 py-2 rounded-lg hover:bg-neutral-100"
+          onClick={() => window.dispatchEvent(new CustomEvent("ai-open-chat", { detail: { uuid: c.uuid } }))}
+        >
+          <div className="text-sm font-medium text-neutral-800 line-clamp-2">{c.title}</div>
+          <div className="text-[11px] text-neutral-500">{new Date(c.updatedAt).toLocaleString()}</div>
+        </button>
+      ))}
     </div>
   );
 }

@@ -20,23 +20,7 @@ function decodeJwtNoVerify(
 }
 
 export const createTRPCContext = async (opts: { req: NextRequest }) => {
-  if (process.env.ALLOW_DEV_UNAUTH === "1") {
-    // Farm context (dev)
-    const farmIdHeader =
-      opts.req.headers.get("x-farm-id") || opts.req.headers.get("X-FARM-ID");
-    const farmId = farmIdHeader?.trim() || null;
-    if (farmId) {
-      try {
-        await prisma.$executeRaw`SELECT set_config('app.current_farm', ${farmId}, true)`;
-      } catch {}
-    }
-    return {
-      prisma,
-      userId: "dev-user",
-      req: opts.req,
-      farmId,
-    } as const;
-  }
+  // Deshabilitado: no permitir modo no autenticado en producción ni por bandera.
 
   let userId: string | null = null;
   try {
@@ -143,7 +127,13 @@ export const createTRPCContext = async (opts: { req: NextRequest }) => {
         });
       }
     } catch (e) {
-      // Swallow provisioning errors to avoid blocking auth; downstream routes may still handle not found
+      // Fallback si Clerk falla: crear usuario placeholder por clerkId
+      const placeholderEmail = `user_${userId}@ganado.ai`;
+      await prisma.user.upsert({
+        where: { clerkId: userId },
+        update: {},
+        create: { clerkId: userId, email: placeholderEmail, name: null },
+      });
     }
   }
 

@@ -12,9 +12,9 @@ import {
   hasOfflineIdentity,
   provisionFromClerk,
 } from "@/lib/auth/offline-auth";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { addToast } from "@/components/ui/toast";
-import { robustDeviceId } from "@/lib/utils";
+import { robustDeviceId, isAppInstalledRuntime } from "@/lib/utils";
 
 export default function DownloadPage() {
   const { user } = useUser();
@@ -34,10 +34,15 @@ export default function DownloadPage() {
   const [passcode, setPasscode] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [isAppInstalled, setIsAppInstalled] = useState(false);
 
   const deviceId = useMemo(() => {
     if (typeof window === "undefined") return "";
     return robustDeviceId();
+  }, []);
+
+  useEffect(() => {
+    setIsAppInstalled(isAppInstalledRuntime());
   }, []);
 
   const modelUrl =
@@ -114,31 +119,36 @@ export default function DownloadPage() {
             <CardContent>
               <h1 className="text-2xl font-semibold mb-2">Descargas</h1>
               <p className="text-neutral-600 mb-4">
-                Instala la app de escritorio y el modelo de IA local para usar
-                la plataforma sin Internet.
+                {isAppInstalled
+                  ? "Ya tienes la app instalada en este dispositivo."
+                  : "Instala la app de escritorio y el modelo de IA local para usar la plataforma sin Internet."}
               </p>
-              <div className="grid sm:grid-cols-3 gap-3">
-                <Button asChild>
-                  <a href={desktopUrl} download>
-                    macOS (.dmg)
-                  </a>
-                </Button>
-                <Button asChild>
-                  <a href={desktopWinUrl} download>
-                    Windows (.exe)
-                  </a>
-                </Button>
-                <Button asChild>
-                  <a href={desktopLinuxUrl} download>
-                    Linux (.AppImage)
-                  </a>
-                </Button>
-              </div>
-              <div className="mt-6">
-                <Button asChild color="secondary">
-                  <a href={modelUrl}>Descargar modelo IA local</a>
-                </Button>
-              </div>
+              {!isAppInstalled && (
+                <div className="grid sm:grid-cols-3 gap-3">
+                  <Button asChild>
+                    <a href={desktopUrl} download>
+                      macOS (.dmg)
+                    </a>
+                  </Button>
+                  <Button asChild>
+                    <a href={desktopWinUrl} download>
+                      Windows (.exe)
+                    </a>
+                  </Button>
+                  <Button asChild>
+                    <a href={desktopLinuxUrl} download>
+                      Linux (.AppImage)
+                    </a>
+                  </Button>
+                </div>
+              )}
+              {!isAppInstalled && (
+                <div className="mt-6">
+                  <Button asChild color="secondary">
+                    <a href={modelUrl}>Descargar modelo IA local</a>
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
 

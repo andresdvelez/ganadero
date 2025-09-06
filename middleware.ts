@@ -17,6 +17,16 @@ const isPublicRoute = createRouteMatcher([
 export default clerkMiddleware(async (auth, req) => {
   const { pathname } = req.nextUrl;
 
+  // En Tauri (app de escritorio), no aplicar autenticación ni redirecciones desde middleware
+  if (process.env.TAURI === "1" || process.env.TAURI === "true") {
+    return NextResponse.next();
+  }
+
+  // Salir inmediatamente para recursos de Next estáticos
+  if (pathname.startsWith("/_next/")) {
+    return NextResponse.next();
+  }
+
   // Redirect legacy /_/ paths to clean paths
   if (pathname.startsWith("/_/download")) {
     const url = req.nextUrl.clone();
@@ -52,8 +62,8 @@ export default clerkMiddleware(async (auth, req) => {
 });
 
 export const config = {
-  matcher: [
-    // Skip Next.js internals and all static files, unless found in search params
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
-  ],
+  matcher:
+    process.env.TAURI === "1" || process.env.TAURI === "true"
+      ? []
+      : ["/((?!_next|.*\\..*|api|trpc).*)"],
 };

@@ -6,6 +6,7 @@ use std::process::{Child, Command, Stdio};
 use std::net::TcpStream;
 use tauri::Manager;
 use tokio::time::sleep;
+use std::time::Duration;
 
 static SERVER_CHILD: tauri::async_runtime::Mutex<Option<Child>> = tauri::async_runtime::Mutex::const_new(None);
 
@@ -166,7 +167,7 @@ fn main() {
         return Ok(());
       }
 
-      // Producción: lanzar servidor Next standalone
+      // Producción: preferir remoto si hay Internet; si no, lanzar servidor Next standalone
       let app_dir = app.path_resolver().resource_dir().ok_or("resource_dir not found")?;
       let data_dir = app.path_resolver().app_data_dir().ok_or("app_data_dir not found")?;
       let logs_dir = data_dir.join("logs");
@@ -188,8 +189,31 @@ fn main() {
       let env_file = app_dir.join(".env");
       let env_map = load_env_from_file(&env_file);
 
+      let public_remote = std::env::var("PUBLIC_APP_URL").ok().unwrap_or("https://app.ganado.co".to_string());
+      let prefer_remote = std::env::var("PREFER_REMOTE").ok().map(|v| v=="1"||v.to_lowercase()=="true").unwrap_or(false);
+
       let mut started = false;
       let mut attempted_start = false;
+
+      // Decidir destino según conectividad SOLO si se prefiere remoto vía env
+      if prefer_remote {
+        if let Some(win) = app.get_window("main") {
+          let w = win.clone();
+          let remote = public_remote.clone();
+          tauri::async_runtime::block_on(async {
+            let client = reqwest::Client::builder().timeout(Duration::from_millis(1500)).build().unwrap();
+            let mut online = false;
+            if let Ok(resp) = client.get(&remote).header("Cache-Control", "no-store").send().await {
+              online = resp.status().is_success();
+            }
+            if online {
+              let _ = w.eval(&format!("window.location.replace('{}');", remote));
+              return;
+            }
+          });
+        }
+      }
+
       if let Some(srv) = server_js {
         // Si el puerto ya está ocupado (posible instancia previa), considerarlo disponible
         let prebound = TcpStream::connect(("127.0.0.1", port)).is_ok();
@@ -223,13 +247,16 @@ fn main() {
           .or(node_in_macos_arm);
 
         // Primer intento: usar el binario preferido si existe
+        // Permitir modo no autenticado SOLO en desarrollo o si ALLOW_DEV_UNAUTH=1 ya viene seteado
+        let allow_dev_unauth = std::env::var("ALLOW_DEV_UNAUTH").ok().as_deref() == Some("1") || cfg!(debug_assertions);
+
         if let Some(node_bin) = prefer_node {
           let mut cmd = Command::new(node_bin);
           let sidecar_attempt = cmd
             .arg(&srv)
             .env("PORT", port.to_string())
             .env("HOST", "127.0.0.1")
-            .env("ALLOW_DEV_UNAUTH", "1")
+            .envs(if allow_dev_unauth { vec![("ALLOW_DEV_UNAUTH", "1")] } else { vec![] as Vec<(&str,&str)> })
             .envs(env_map.iter().map(|(k,v)| (k.as_str(), v.as_str())))
             .current_dir(srv.parent().unwrap_or(&app_dir))
             .stdout(Stdio::from(OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap())))
@@ -253,7 +280,7 @@ fn main() {
                 .arg(&srv)
                 .env("PORT", port.to_string())
                 .env("HOST", "127.0.0.1")
-                .env("ALLOW_DEV_UNAUTH", "1")
+                .envs(if allow_dev_unauth { vec![("ALLOW_DEV_UNAUTH", "1")] } else { vec![] as Vec<(&str,&str)> })
                 .envs(env_map.iter().map(|(k,v)| (k.as_str(), v.as_str())))
                 .current_dir(srv.parent().unwrap_or(&app_dir))
                 .stdout(Stdio::from(OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap())))
@@ -276,7 +303,7 @@ fn main() {
             .arg(&srv)
             .env("PORT", port.to_string())
             .env("HOST", "127.0.0.1")
-            .env("ALLOW_DEV_UNAUTH", "1")
+            .envs(if allow_dev_unauth { vec![("ALLOW_DEV_UNAUTH", "1")] } else { vec![] as Vec<(&str,&str)> })
             .envs(env_map.iter().map(|(k,v)| (k.as_str(), v.as_str())))
             .current_dir(srv.parent().unwrap_or(&app_dir))
             .stdout(Stdio::from(OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap())))
@@ -300,45 +327,61 @@ fn main() {
       if let Some(win) = app.get_window("main") {
         let w = win.clone();
         tauri::async_runtime::spawn(async move {
-          // Esperar hasta 30s por disponibilidad HTTP real del standalone (manifest.webmanifest)
+          // Esperar readiness REAL del standalone: requerir 200 en '/'
           let client = reqwest::Client::new();
           let mut attempts: u32 = 0;
-          let max_attempts: u32 = 60; // 60 * 500ms = 30s
+          let max_attempts: u32 = 80; // ~24s (80*300ms)
           let mut ready = false;
           while attempts < max_attempts {
-            let url = format!("http://127.0.0.1:{}/manifest.webmanifest", port);
+            let url = format!("http://127.0.0.1:{}/", port);
             match client.get(&url)
               .header("Cache-Control", "no-store")
               .send().await {
               Ok(resp) => {
-                let code = resp.status().as_u16();
-                if resp.status().is_success() || code == 404 || code == 405 {
-                  ready = true;
-                  break;
+                if resp.status().is_success() {
+                  // Chequear cuerpo básico HTML para evitar redirección prematura con bundles no listos
+                  if let Ok(text) = resp.text().await {
+                    if text.contains("<!DOCTYPE html") || text.contains("<html") {
+                      ready = true;
+                      break;
+                    }
+                  }
                 }
               }
               Err(_) => {}
             }
             attempts += 1;
-            sleep(std::time::Duration::from_millis(500)).await;
+            sleep(std::time::Duration::from_millis(300)).await;
           }
 
           if ready {
             let _ = w.eval(&format!(
-              "(function(){{console.log('[GanadoAI] Local server ready on {0}'); window.location.replace('http://127.0.0.1:{0}/');}})();",
+              "(function(){{
+                try{{
+                  // Limpieza defensiva antes de la primera navegación para evitar chunks stale
+                  if('caches' in window){{caches.keys().then(keys=>Promise.all(keys.map(k=>caches.delete(k)))).catch(()=>{{}});}}
+                  try{{navigator.serviceWorker?.getRegistrations().then(rs=>Promise.all(rs.map(r=>r.unregister())));}}catch{{}}
+                  try{{localStorage.removeItem('NEXT_CACHE');}}catch{{}}
+                }}catch{{}}
+                var ts=Date.now();
+                console.log('[GanadoAI] Local server ready on {0}, navigating with bust=',ts);
+                window.location.replace('http://127.0.0.1:{0}/?v='+ts);
+              }})();",
               port
             ));
           } else {
             // Sin readiness: si offline, llevar directamente al unlock local; si online, ir a remoto
             let _ = w.eval(&format!(
-              "(function(){{try{{var online=navigator.onLine; if(!online){{window.location.replace('http://127.0.0.1:{0}/device-unlock'); return;}} window.location.replace('https://ganadero-nine.vercel.app');}}catch(e){{}}}})();",
+              "(function(){{try{{var online=navigator.onLine; if(!online){{window.location.replace('http://127.0.0.1:{0}/device-unlock'); return;}} window.location.replace('https://app.ganado.co');}}catch(e){{}}}})();",
               port
             ));
           }
         });
 
-        // Auto-descarga e inicio del servidor local de IA en segundo plano (primer arranque)
+        // Preparar modelo local: copiar desde Resources/models si existe, o descargar
         let app_handle = app.app_handle();
+        let auto_model = std::env::var("AUTO_MODEL_SETUP").ok().map(|v| v=="1"||v.to_lowercase()=="true").unwrap_or(false);
+        if auto_model {
         tauri::async_runtime::spawn(async move {
           // Configuración por variables de entorno (opcional)
           let model_url = std::env::var("NEXT_PUBLIC_MODEL_DOWNLOAD_URL").ok()
@@ -358,14 +401,49 @@ fn main() {
               })
           });
 
-          let model_path_res = if let Some(p) = existing_model { Ok(p.to_string_lossy().into_owned()) } else if let Some(url) = model_url.clone() {
-            download_model(url, model_sha.clone(), app_handle.clone(), app_handle.get_window("main").unwrap()).await
-          } else { Err("no model url configured".to_string()) };
+          // Intentar copiar desde Resources/models si no hay modelo
+          let model_path_res = if let Some(p) = existing_model {
+            Ok(p.to_string_lossy().into_owned())
+          } else {
+            let resources_dir = app_handle.path_resolver().resource_dir();
+            let bundled_model = resources_dir.as_ref().and_then(|rd| {
+              let md = rd.join("models");
+              std::fs::read_dir(&md).ok().and_then(|mut it| {
+                it.find_map(|e| e.ok()).and_then(|e| {
+                  let p = e.path();
+                  if p.extension().and_then(|s| s.to_str()).unwrap_or("") == "gguf" { Some(p) } else { None }
+                })
+              })
+            });
+
+            if let Some(src) = bundled_model {
+              if let Some(app_models) = models_dir.clone() {
+                let _ = std::fs::create_dir_all(&app_models);
+                let target = app_models.join(src.file_name().unwrap_or_else(|| std::ffi::OsStr::new("model.gguf")));
+                if std::fs::copy(&src, &target).is_ok() {
+                  Ok(target.to_string_lossy().into_owned())
+                } else if let Some(url) = model_url.clone() {
+                  download_model(url, model_sha.clone(), app_handle.clone(), app_handle.get_window("main").unwrap()).await
+                } else {
+                  Err("no model available".to_string())
+                }
+              } else if let Some(url) = model_url.clone() {
+                download_model(url, model_sha.clone(), app_handle.clone(), app_handle.get_window("main").unwrap()).await
+              } else {
+                Err("no model available".to_string())
+              }
+            } else if let Some(url) = model_url.clone() {
+              download_model(url, model_sha.clone(), app_handle.clone(), app_handle.get_window("main").unwrap()).await
+            } else {
+              Err("no model url configured".to_string())
+            }
+          };
 
           if let Ok(model_path) = model_path_res {
             let _ = start_llama_server(app_handle.clone(), model_path, llama_port).await;
           }
         });
+        }
 
         win.on_window_event(|event| {
           if let tauri::WindowEvent::CloseRequested { .. } = event {

@@ -39,7 +39,6 @@ import { trpc } from "@/lib/trpc/client";
 import { AnimalNewEmbedded } from "@/components/embedded/animal-new-embedded";
 import { AIAssistantDashboard } from "@/components/ai/ai-dashboard";
 import { AIInputBar } from "@/components/ai/ai-input-bar";
-import { AISidebar } from "@/components/ai/ai-sidebar";
 import { ModuleLauncher } from "@/components/modules/module-launcher";
 import { HealthNewEmbedded } from "@/components/embedded/health-new-embedded";
 import { MilkNewEmbedded } from "@/components/embedded/milk-new-embedded";
@@ -111,7 +110,9 @@ export default function AIAssistantPage() {
   const routeIntent = trpc.ai.routeIntent.useMutation();
   const checkLocal = trpc.ai.checkLocalModel.useMutation();
   const ensureLocal = trpc.ai.ensureLocalModel.useMutation();
+  const utils = trpc.useUtils();
   const cloud = trpc.ai.checkCloudAvailable.useQuery();
+  const listSessions = trpc.ai.listSessions.useQuery({ limit: 20 });
   const cloudAvailable = !!cloud.data?.available;
   const [localModelAvailable, setLocalModelAvailable] = useState<
     boolean | null
@@ -139,6 +140,7 @@ export default function AIAssistantPage() {
   const [modulesOpen, setModulesOpen] = useState(false);
   const audioAnalyserRef = useRef<AnalyserNode | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
+  const [analyserState, setAnalyserState] = useState<AnalyserNode | null>(null);
   const rafRef = useRef<number | null>(null);
   const [isPaused, setIsPaused] = useState(false);
   const [editFromMessageId, setEditFromMessageId] = useState<string | null>(
@@ -186,7 +188,6 @@ export default function AIAssistantPage() {
 
   // New TRPC hooks for AI context/memories
   const recordMessage = trpc.ai.recordMessage.useMutation();
-  const utils = trpc.useUtils();
   const confirmMemories = trpc.ai.confirmMemories.useMutation();
   const summarizeSession = trpc.ai.summarizeSession.useMutation();
   const recordChoice = trpc.ai.recordChoice.useMutation();
@@ -197,10 +198,7 @@ export default function AIAssistantPage() {
     { refetchInterval: 30000 }
   );
   const alertsEvaluate = trpc.alerts.evaluateAll.useMutation();
-  const listSessions = trpc.ai.listSessions.useQuery(
-    { limit: 20 },
-    { refetchInterval: 60000 }
-  );
+  // ya declarado arriba
   // We'll fetch messages with utils.ai.listMessages when needed
 
   const MODEL_URL =
@@ -228,6 +226,32 @@ export default function AIAssistantPage() {
       setChatUuid(null);
       setMessages([]);
       setInput("");
+    };
+    const onSaveAndNew = async () => {
+      // Guardar chat actual y luego crear hilo nuevo
+      try {
+        if (messages.length > 0) {
+          const id = chatUuid || generateUUID();
+          const title = (
+            messages.find((m) => m.role === "user")?.content ||
+            messages[0]?.content ||
+            "Nuevo chat"
+          ).slice(0, 60);
+          const now = new Date();
+          await db.chats.put({ uuid: id, title, createdAt: now, updatedAt: now } as any);
+          await Promise.all(
+            messages.map((m) =>
+              db.chatMessages.add({ chatUuid: id, role: m.role, content: m.content, createdAt: m.timestamp || new Date() } as any)
+            )
+          );
+          try { window.dispatchEvent(new Event("ai-history-updated")); } catch {}
+          try {
+            const items = await db.chats.orderBy("updatedAt").reverse().limit(20).toArray();
+            setChatList(items);
+          } catch {}
+        }
+      } catch {}
+      window.dispatchEvent(new Event("ai-new-chat"));
     };
     const onOpenChat = async (e: any) => {
       const uuid = e?.detail?.uuid as string;
@@ -268,6 +292,7 @@ export default function AIAssistantPage() {
     };
     window.addEventListener("ai-new-chat", onNewChat as any);
     window.addEventListener("ai-open-chat", onOpenChat as any);
+    window.addEventListener("ai-request-save-current-chat", onSaveAndNew as any);
 
     try {
       const isTauriEnv =
@@ -283,10 +308,19 @@ export default function AIAssistantPage() {
         setLocalModelAvailable((prev) => (prev === true ? true : false));
       }
     })();
+    // opcional: abrir chat por query ?open=sessionId o mostrar historial con ?history=1
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      const open = sp.get("open");
+      if (open) {
+        onOpenChat({ detail: { uuid: open } } as any);
+      }
+    } catch {}
 
     return () => {
       window.removeEventListener("ai-new-chat", onNewChat as any);
       window.removeEventListener("ai-open-chat", onOpenChat as any);
+      window.removeEventListener("ai-request-save-current-chat", onSaveAndNew as any);
       // auto summarize on unmount if there is a session
       if (chatUuid && messages.length >= 10) {
         summarizeSession.mutate({
@@ -316,6 +350,49 @@ export default function AIAssistantPage() {
     window.addEventListener("open-modules", handler as any);
     return () => window.removeEventListener("open-modules", handler as any);
   }, []);
+
+  // FAB para nuevo chat (UX: esquina inferior derecha)
+  const FabNewChat = () => (
+    <button
+      className="fixed bottom-6 right-6 z-40 h-14 px-5 rounded-full bg-neutral-900 text-white shadow-lg hover:scale-105 active:scale-95 transition-all ios-surface flex items-center gap-3"
+      title="Nuevo chat"
+      onClick={async () => {
+        try {
+          // Guardar el chat actual en historial (si hay contenido)
+          if (messages.length > 0) {
+            const id = chatUuid || generateUUID();
+            const title = (messages.find((m) => m.role === "user")?.content || messages[0]?.content || "Nuevo chat").slice(0, 60);
+            const now = new Date();
+            await db.chats.put({
+              uuid: id,
+              title,
+              createdAt: now,
+              updatedAt: now,
+            } as any);
+            await Promise.all(
+              messages.map((m) =>
+                db.chatMessages.add({
+                  chatUuid: id,
+                  role: m.role,
+                  content: m.content,
+                  createdAt: m.timestamp || new Date(),
+                } as any)
+              )
+            );
+          }
+        } catch {}
+        // Disparar evento para resetear hilo y refrescar historial
+        window.dispatchEvent(new Event("ai-new-chat"));
+        try {
+          const items = await db.chats.orderBy("updatedAt").reverse().limit(20).toArray();
+          setChatList(items);
+        } catch {}
+      }}
+    >
+      <span className="text-2xl leading-none">+</span>
+      <span className="text-sm font-medium">Nuevo chat</span>
+    </button>
+  );
 
   const scrollToBottom = () =>
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -2850,12 +2927,12 @@ export default function AIAssistantPage() {
       });
       return;
     }
+    // En Tauri (macOS), asegura permiso de micrófono para niveles/analizador
+    const isTauri = typeof window !== "undefined" && (window as any).__TAURI__;
     // Prepare WebAudio stream for visual levels
     async function setupAnalyser() {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-        });
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         const ctx = new (window.AudioContext ||
           (window as any).webkitAudioContext)();
         const src = ctx.createMediaStreamSource(stream);
@@ -2865,9 +2942,12 @@ export default function AIAssistantPage() {
         analyser.maxDecibels = -10;
         src.connect(analyser);
         audioAnalyserRef.current = analyser;
+        setAnalyserState(analyser);
         audioStreamRef.current = stream;
       } catch {}
     }
+    // En macOS la primera llamada debe ser sobre gesto de usuario y puede tardar; mostrar feedback
+    addToast({ variant: "info", title: "Escuchando…", description: "Permite acceso al micrófono si aparece el diálogo." });
     const SpeechRecognition =
       (window as any).webkitSpeechRecognition ||
       (window as any).SpeechRecognition;
@@ -3648,32 +3728,7 @@ export default function AIAssistantPage() {
   }, []);
 
   return (
-    <DashboardLayout
-      leftSlot={
-        <AISidebar
-          chats={
-            listSessions.data && listSessions.data.length
-              ? listSessions.data.map((s: any) => ({
-                  uuid: s.sessionId,
-                  title: s.sessionId.slice(0, 8),
-                  updatedAt: s.updatedAt,
-                }))
-              : chatList.map((c) => ({
-                  uuid: c.uuid,
-                  title: c.title,
-                  updatedAt: c.updatedAt,
-                }))
-          }
-          activeChatUuid={chatUuid}
-          onNewChat={() => window.dispatchEvent(new Event("ai-new-chat"))}
-          onSelectChat={(uuid) =>
-            window.dispatchEvent(
-              new CustomEvent("ai-open-chat", { detail: { uuid } })
-            )
-          }
-        />
-      }
-    >
+    <DashboardLayout>
       <div className="flex flex-col h-[calc(100vh-4rem)]">
         <div className="p-2 border-b border-neutral-200 flex items-center justify-between gap-3">
           <div className="text-sm text-neutral-600">
@@ -4861,6 +4916,15 @@ export default function AIAssistantPage() {
           </div>
         </HeroDrawer>
       </div>
+      {/* Botón flotante para nuevo chat (visible y con guardado de historial) */}
+      <button
+        className="fixed bottom-6 right-6 z-40 h-14 px-5 rounded-full bg-neutral-900 text-white shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center gap-3"
+        title="Nuevo chat"
+        onClick={() => window.dispatchEvent(new Event("ai-request-save-current-chat"))}
+      >
+        <span className="text-2xl leading-none">+</span>
+        <span className="text-sm font-medium">Nuevo chat</span>
+      </button>
     </DashboardLayout>
   );
 }

@@ -12,6 +12,7 @@
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "icons:gen": "node ./scripts/generate-placeholder-icon.mjs",
+    "icons:tauri": "node ./scripts/regenerate-tauri-icons.mjs",
     "seed": "prisma db push && prisma db seed",
     "postinstall": "prisma generate"
   },
@@ -24,6 +25,7 @@
     "@capacitor/filesystem": "^7.1.4",
     "@capacitor/geolocation": "^7.1.4",
     "@capacitor/local-notifications": "^7.0.2",
+    "@clerk/localizations": "^3.24.1",
     "@clerk/nextjs": "^6.29.0",
     "@headlessui/react": "^2.2.7",
     "@heroui/react": "^2.8.2",
@@ -55,6 +57,7 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-dropzone": "^14.3.8",
+    "recharts": "^2.12.7",
     "react-hook-form": "^7.62.0",
     "react-map-gl": "^8.0.4",
     "react-qr-reader": "^3.0.0-beta-1",

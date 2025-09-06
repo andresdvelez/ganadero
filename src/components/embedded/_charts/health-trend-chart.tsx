@@ -1,0 +1,38 @@
+"use client";
+
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from "recharts";
+
+export default function HealthTrendChart({ data }: { data: Array<{ date: string; cases?: number; recoveries?: number }> }) {
+  const rows = (data || []).map((d) => ({
+    date: d.date,
+    cases: d.cases ?? 0,
+    recoveries: d.recoveries ?? 0,
+  }));
+  if (rows.length === 0) {
+    return (
+      <div className="h-60 grid place-items-center text-sm text-neutral-500">
+        <div className="text-center">
+          <div className="mb-2">Aún no hay datos de salud.</div>
+          <a href="/_/health/new" className="underline text-primary-600">Registrar caso de salud</a>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="h-60">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={rows} margin={{ left: 8, right: 8, top: 8, bottom: 8 }}>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+          <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+          <YAxis tick={{ fontSize: 12 }} />
+          <Tooltip />
+          <Legend />
+          <Line type="monotone" dataKey="cases" stroke="#ef4444" dot={false} />
+          <Line type="monotone" dataKey="recoveries" stroke="#3b82f6" dot={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+

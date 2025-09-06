@@ -82,6 +82,14 @@ export default function GlobalError({
     }
   }
 
+  // Auto-reparar cuando sea un error de carga de chunks
+  useEffect(() => {
+    if (typeof summary === "string" && /Loading chunk|ChunkLoadError/i.test(summary)) {
+      // Ejecutar reparación sin esperar interacción del usuario
+      repairAndReload();
+    }
+  }, [summary]);
+
   return (
     <html lang="es">
       <body className="min-h-screen grid place-items-center bg-neutral-50 p-6">

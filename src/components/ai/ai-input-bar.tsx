@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Mic, ArrowUp } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { addToast } from "@/components/ui/toast";
 import { Switch } from "@heroui/react";
 
 export function AIInputBar({
@@ -21,6 +22,7 @@ export function AIInputBar({
   webSearch,
   onToggleWebSearch,
   analyser,
+  hideWebSearchToggle,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -35,7 +37,9 @@ export function AIInputBar({
   webSearch?: boolean;
   onToggleWebSearch?: (v: boolean) => void;
   analyser?: AnalyserNode | null;
+  hideWebSearchToggle?: boolean;
 }) {
+  const [isRequestingMic, setIsRequestingMic] = useState(false);
   const hasText = (value || "").trim().length > 0;
   const timeLabel = useMemo(() => {
     if (!elapsedMs || elapsedMs < 0) return "";
@@ -50,7 +54,11 @@ export function AIInputBar({
   // Oscilloscope canvas refs
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const rafRef = useRef<number | null>(null);
-  const scaleRef = useRef<number>(1.6);
+  const scaleRef = useRef<number>(1.0);
+  const freqHistoryRef = useRef<number[]>([]);
+  const noiseFloorRef = useRef<number>(0.03); // energía en silencio
+  const speechCeilRef = useRef<number>(0.5);  // energía pico esperada hablando
+  const envRef = useRef<number>(0); // seguidor de envolvente para estabilidad
 
   useEffect(() => {
     if (!isListening || !analyser || !canvasRef.current) {
@@ -62,10 +70,14 @@ export function AIInputBar({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     const context = ctx as CanvasRenderingContext2D;
-    analyser.fftSize = 1024;
-    analyser.smoothingTimeConstant = 0.5;
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.6;
+    try {
+      analyser.minDecibels = -110;
+      analyser.maxDecibels = -10;
+    } catch {}
     const bufferLength = analyser.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
+    const freqArray = new Uint8Array(bufferLength);
 
     function resize() {
       const dpr = Math.max(1, window.devicePixelRatio || 1);
@@ -80,13 +92,60 @@ export function AIInputBar({
     window.addEventListener("resize", onResize);
 
     const draw = () => {
-      analyser.getByteTimeDomainData(dataArray);
+      analyser.getByteFrequencyData(freqArray);
+
+      // Compute energy emphasizing voice band (aprox). Use mid bins.
+      // Voice band emphasis (aprox 100Hz-4kHz) using tapered weights
+      const start = Math.floor(bufferLength * 0.03);
+      const end = Math.floor(bufferLength * 0.60);
+      const mid = (start + end) / 2;
+      let weighted = 0;
+      let weightSum = 0.0001;
+      let peak = 0;
+      for (let i = start; i < end; i++) {
+        const t = Math.abs(i - mid) / (end - start);
+        const w = Math.max(0, 1 - t * 2); // triangular window peaking at mid
+        weighted += freqArray[i] * w;
+        weightSum += w;
+        if (freqArray[i] > peak) peak = freqArray[i];
+      }
+      const avg = weighted / weightSum; // 0..255
+      // Combine average with instantaneous peak to increase responsiveness
+      const energyLin = 0.65 * (avg / 255) + 0.35 * (peak / 255);
+      const energyRaw = Math.max(0, Math.min(1, energyLin));
+
+      // Adaptive baseline and ceiling
+      const nf = noiseFloorRef.current;
+      const sc = speechCeilRef.current;
+      // Actualizar piso de ruido (baja cuando hay silencio, sube muy lento)
+      const newNf = energyRaw < nf
+        ? nf + (energyRaw - nf) * 0.25
+        : nf + (Math.max(0.01, nf * 0.98) - nf) * 0.005;
+      noiseFloorRef.current = Math.max(0.005, Math.min(0.2, newNf));
+      // Actualizar techo (sube rápido en picos, decae suave)
+      const newSc = energyRaw > sc ? sc + (energyRaw - sc) * 0.35 : sc * 0.995;
+      speechCeilRef.current = Math.max(noiseFloorRef.current + 0.08, Math.min(1, newSc));
+
+      // Normalizar entre piso y techo
+      const normalized = (energyRaw - noiseFloorRef.current) / Math.max(0.001, (speechCeilRef.current - noiseFloorRef.current));
+      // Mapeo no lineal para expandir diferencias pequeñas
+      const energy = Math.pow(Math.max(0, Math.min(1, normalized)), 0.6);
+
+      // push into history (timeline of bars)
       const WIDTH = canvas.clientWidth;
       const HEIGHT = canvas.clientHeight;
+      const barWidth = 1; // px (delgadas)
+      const gap = 1; // px (muchas barras)
+      const step = barWidth + gap;
+      const maxBars = Math.max(4, Math.floor(WIDTH / step));
+      const hist = freqHistoryRef.current;
+      hist.push(energy);
+      while (hist.length > maxBars) hist.shift();
+
       // clear
       context.clearRect(0, 0, WIDTH, HEIGHT);
-      // baseline
-      context.strokeStyle = "#e5e7eb"; // neutral-200
+      // baseline (dotted)
+      context.strokeStyle = "#e5e7eb";
       context.setLineDash([3, 4]);
       context.beginPath();
       context.moveTo(0, HEIGHT / 2);
@@ -94,36 +153,21 @@ export function AIInputBar({
       context.stroke();
       context.setLineDash([]);
 
-      // auto-gain based on average absolute deviation
-      let sumAbs = 0;
-      for (let i = 0; i < bufferLength; i++)
-        sumAbs += Math.abs(dataArray[i] - 128);
-      const avgAbs = sumAbs / bufferLength; // 0..128
-      const currentAmp = Math.max(1, avgAbs);
-      const targetFill = 0.42; // target 42% of half-height
-      const proposedScale = Math.min(
-        4,
-        Math.max(0.8, (targetFill * 128) / currentAmp)
-      );
-      // smooth scale to avoid jitter
-      scaleRef.current =
-        scaleRef.current + (proposedScale - scaleRef.current) * 0.15;
+      // auto-gain smoothing
+      // Seguidor de envolvente para barras más estables pero reactivas
+      envRef.current = envRef.current + (energy - envRef.current) * (energy > envRef.current ? 0.35 : 0.15);
 
-      // waveform
-      context.lineWidth = 3;
-      context.strokeStyle = "#6b7280"; // neutral-500 line for more contraste
-      context.beginPath();
-      const sliceWidth = WIDTH / bufferLength;
-      let x = 0;
-      for (let i = 0; i < bufferLength; i++) {
-        const centered = (dataArray[i] - 128) / 128; // -1..1
-        const y = HEIGHT / 2 + centered * (HEIGHT / 2) * scaleRef.current;
-        if (i === 0) context.moveTo(x, y);
-        else context.lineTo(x, y);
-        x += sliceWidth;
+      // draw bars centered around baseline
+      const centerY = HEIGHT / 2;
+      context.fillStyle = "#111827"; // neutral-900 for crisp bars
+      for (let i = 0; i < hist.length; i++) {
+        const vEnv = envRef.current * 0.5 + hist[i] * 0.5;
+        const v = Math.max(0, Math.min(1, vEnv * scaleRef.current));
+        const h = Math.max(2, v * (HEIGHT * 0.9));
+        const x = i * step;
+        const y = centerY - h / 2;
+        context.fillRect(x, y, barWidth, h);
       }
-      context.lineTo(WIDTH, HEIGHT / 2);
-      context.stroke();
 
       rafRef.current = requestAnimationFrame(draw);
     };
@@ -132,6 +176,7 @@ export function AIInputBar({
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       window.removeEventListener("resize", onResize);
       rafRef.current = null;
+      freqHistoryRef.current = [];
     };
   }, [isListening, analyser]);
 
@@ -143,9 +188,6 @@ export function AIInputBar({
             <div className="flex-1 h-6">
               <canvas ref={canvasRef} className="w-full h-full" />
             </div>
-            <span className="text-sm tabular-nums text-neutral-600">
-              {timeLabel}
-            </span>
           </div>
         </div>
       ) : (
@@ -167,37 +209,72 @@ export function AIInputBar({
           classNames={
             {
               inputWrapper:
-                "h-16 rounded-[28px] bg-white border border-neutral-200 shadow-sm pr-44 pl-2 transition-all",
+                "h-16 rounded-[28px] bg-white border border-neutral-200 shadow-sm pr-44 pl-2 transition-all focus:outline-none focus:ring-0 focus-visible:ring-0 outline-none ring-0 data-[focus=true]:ring-0 data-[focus=true]:outline-none",
               input:
-                "h-12 rounded-[20px] bg-neutral-100 text-[16px] px-4 placeholder:text-neutral-500",
+                "h-12 rounded-[20px] bg-neutral-100 text-[16px] px-4 placeholder:text-neutral-500 focus:outline-none",
             } as any
           }
         />
       )}
 
-      {/* Web search toggle */}
-      <div className="absolute right-[6.5rem] top-1/2 -translate-y-1/2 flex items-center gap-2 text-neutral-600 select-none">
-        <span className="hidden sm:inline text-sm">Búsqueda web</span>
-        <Switch
-          size="sm"
-          isSelected={!!webSearch}
-          onValueChange={(v) => onToggleWebSearch?.(v)}
-          aria-label="Buscar en la web"
-        />
-      </div>
+      {/* Web search toggle - oculto en modo listening para no solaparse */}
+      {!hideWebSearchToggle && !isListening && (
+        <div className="absolute right-[6.5rem] top-1/2 -translate-y-1/2 flex items-center gap-2 text-neutral-600 select-none">
+          <span className="hidden sm:inline text-sm">Búsqueda web</span>
+          <Switch
+            size="sm"
+            isSelected={!!webSearch}
+            onValueChange={(v) => onToggleWebSearch?.(v)}
+            aria-label="Buscar en la web"
+          />
+        </div>
+      )}
 
       {/* Mic button moves when send appears (send hidden during listening) */}
       <Button
         isIconOnly
         aria-label="Hablar"
-        onPress={onMic}
-        disabled={disabled}
+        onPress={() => {
+          // 1) Iniciar inmediatamente la lógica de micrófono (SpeechRecognition) bajo gesto de usuario
+          try { onMic(); } catch {}
+          // 2) En paralelo, solicitar permiso del micrófono SIN bloquear el gesto
+          try {
+            if (
+              typeof navigator !== "undefined" &&
+              navigator.mediaDevices?.getUserMedia
+            ) {
+              setIsRequestingMic(true);
+              navigator.mediaDevices
+                .getUserMedia({ audio: true })
+                .then((stream) => {
+                  try { stream.getTracks().forEach((t) => t.stop()); } catch {}
+                })
+                .catch(() => {
+                  addToast({
+                    variant: "warning",
+                    title: "Permiso de micrófono requerido",
+                    description:
+                      "Autoriza el micrófono cuando aparezca el diálogo. Si fue denegado, habilítalo en Preferencias del Sistema > Privacidad > Micrófono.",
+                  });
+                })
+                .finally(() => setIsRequestingMic(false));
+            }
+          } catch {}
+        }}
+        isLoading={isRequestingMic}
+        disabled={disabled || isRequestingMic}
         className={cn(
           "absolute top-1/2 -translate-y-1/2 rounded-full bg-white text-neutral-700 shadow-sm border border-neutral-200 h-10 w-10 transition-all",
           isListening ? "right-2" : hasText ? "right-[3.75rem]" : "right-2"
         )}
       >
-        <Mic className="h-5 w-5" />
+        {isListening && elapsedMs !== undefined && elapsedMs >= 0 ? (
+          <span className="text-[11px] font-medium tabular-nums">
+            {timeLabel}
+          </span>
+        ) : (
+          <Mic className="h-5 w-5" />
+        )}
       </Button>
 
       {/* Send button appears with slide/opacity */}

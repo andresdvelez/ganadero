@@ -16,7 +16,36 @@ export default function AuthSignUpPage() {
     };
   }, []);
 
-  if (online) return <SignUp />;
+  if (online)
+    return (
+      <div className="flex items-center justify-center relative">
+        <div className=" grid place-items-center px-4">
+          <div className="w-full max-w-md">
+            <SignUp
+              signInUrl="/sign-in"
+              appearance={{
+                variables: {
+                  colorPrimary: "#1c2c24",
+                  colorBackground: "#ffffff",
+                  colorText: "#1c2c24",
+                  colorInputBackground: "#ffffff",
+                  borderRadius: "16px",
+                },
+                elements: {
+                  card: "shadow-xl border border-neutral-200 rounded-2xl",
+                  headerTitle: "text-[#1c2c24] font-semibold",
+                  headerSubtitle: "text-neutral-600",
+                  formButtonPrimary:
+                    "bg-[#1c2c24] hover:bg-[#1c2c24] focus:ring-[#1c2c24] text-white",
+                  formFieldInput: "bg-white",
+                  footerAction__signIn: "",
+                },
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    );
 
   return (
     <div className="min-h-screen grid place-items-center bg-neutral-50">

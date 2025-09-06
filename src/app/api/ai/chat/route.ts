@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
         Authorization: `Bearer ${apiKey}`,
         "HTTP-Referer":
           process.env.NEXT_PUBLIC_SITE_URL ||
-          "https://ganadero-nine.vercel.app",
+          "https://app.ganado.co",
         "X-Title": process.env.NEXT_PUBLIC_SITE_NAME || "Ganado AI",
       },
       body: JSON.stringify({

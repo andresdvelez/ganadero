@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Image as ImageIcon,
-  MessageSquare,
+  Globe,
   Settings,
   Heart,
   Server,
@@ -110,7 +110,16 @@ export function AIAssistantDashboard({
             >
               <Paperclip className="h-4 w-4" />
             </Button>
-            {/* Removed Modules launcher button */}
+            <Button
+              isIconOnly
+              variant="solid"
+              className="h-12 w-12 rounded-full bg-white text-neutral-700 shadow-[0_10px_20px_rgba(0,0,0,0.08)] border border-neutral-200 pointer-events-auto"
+              aria-label="Búsqueda web"
+              disabled={overlayActive}
+              onPress={() => onToggleWebSearch?.(!webSearch)}
+            >
+              <Globe className="h-4 w-4" />
+            </Button>
             <Button
               isIconOnly
               variant="solid"
@@ -119,15 +128,6 @@ export function AIAssistantDashboard({
               disabled={overlayActive}
             >
               <ImageIcon className="h-4 w-4" />
-            </Button>
-            <Button
-              isIconOnly
-              variant="solid"
-              className="h-12 w-12 rounded-full bg-white text-neutral-700 shadow-[0_10px_20px_rgba(0,0,0,0.08)] border border-neutral-200 pointer-events-auto"
-              aria-label="Plantillas"
-              disabled={overlayActive}
-            >
-              <MessageSquare className="h-4 w-4" />
             </Button>
           </div>
         </div>
