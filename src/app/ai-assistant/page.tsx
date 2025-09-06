@@ -227,6 +227,32 @@ export default function AIAssistantPage() {
       setMessages([]);
       setInput("");
     };
+    const onSaveAndNew = async () => {
+      // Guardar chat actual y luego crear hilo nuevo
+      try {
+        if (messages.length > 0) {
+          const id = chatUuid || generateUUID();
+          const title = (
+            messages.find((m) => m.role === "user")?.content ||
+            messages[0]?.content ||
+            "Nuevo chat"
+          ).slice(0, 60);
+          const now = new Date();
+          await db.chats.put({ uuid: id, title, createdAt: now, updatedAt: now } as any);
+          await Promise.all(
+            messages.map((m) =>
+              db.chatMessages.add({ chatUuid: id, role: m.role, content: m.content, createdAt: m.timestamp || new Date() } as any)
+            )
+          );
+          try { window.dispatchEvent(new Event("ai-history-updated")); } catch {}
+          try {
+            const items = await db.chats.orderBy("updatedAt").reverse().limit(20).toArray();
+            setChatList(items);
+          } catch {}
+        }
+      } catch {}
+      window.dispatchEvent(new Event("ai-new-chat"));
+    };
     const onOpenChat = async (e: any) => {
       const uuid = e?.detail?.uuid as string;
       if (!uuid) return;
@@ -266,6 +292,7 @@ export default function AIAssistantPage() {
     };
     window.addEventListener("ai-new-chat", onNewChat as any);
     window.addEventListener("ai-open-chat", onOpenChat as any);
+    window.addEventListener("ai-request-save-current-chat", onSaveAndNew as any);
 
     try {
       const isTauriEnv =
@@ -293,6 +320,7 @@ export default function AIAssistantPage() {
     return () => {
       window.removeEventListener("ai-new-chat", onNewChat as any);
       window.removeEventListener("ai-open-chat", onOpenChat as any);
+      window.removeEventListener("ai-request-save-current-chat", onSaveAndNew as any);
       // auto summarize on unmount if there is a session
       if (chatUuid && messages.length >= 10) {
         summarizeSession.mutate({
@@ -4888,13 +4916,14 @@ export default function AIAssistantPage() {
           </div>
         </HeroDrawer>
       </div>
-      {/* Botón flotante para nuevo chat */}
+      {/* Botón flotante para nuevo chat (visible y con guardado de historial) */}
       <button
-        className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-neutral-900 text-white shadow-lg hover:scale-105 active:scale-95 transition-all ios-surface"
+        className="fixed bottom-6 right-6 z-40 h-14 px-5 rounded-full bg-neutral-900 text-white shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center gap-3"
         title="Nuevo chat"
-        onClick={() => window.dispatchEvent(new Event("ai-new-chat"))}
+        onClick={() => window.dispatchEvent(new Event("ai-request-save-current-chat"))}
       >
         <span className="text-2xl leading-none">+</span>
+        <span className="text-sm font-medium">Nuevo chat</span>
       </button>
     </DashboardLayout>
   );
