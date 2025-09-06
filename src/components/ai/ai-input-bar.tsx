@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Mic, ArrowUp } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { addToast } from "@/components/ui/toast";
 import { Switch } from "@heroui/react";
 
@@ -39,6 +39,7 @@ export function AIInputBar({
   analyser?: AnalyserNode | null;
   hideWebSearchToggle?: boolean;
 }) {
+  const [isRequestingMic, setIsRequestingMic] = useState(false);
   const hasText = (value || "").trim().length > 0;
   const timeLabel = useMemo(() => {
     if (!elapsedMs || elapsedMs < 0) return "";
@@ -146,9 +147,6 @@ export function AIInputBar({
             <div className="flex-1 h-6">
               <canvas ref={canvasRef} className="w-full h-full" />
             </div>
-            <span className="text-sm tabular-nums text-neutral-600">
-              {timeLabel}
-            </span>
           </div>
         </div>
       ) : (
@@ -195,33 +193,47 @@ export function AIInputBar({
       <Button
         isIconOnly
         aria-label="Hablar"
-        onPress={async () => {
+        onPress={() => {
+          // 1) Iniciar inmediatamente la lógica de micrófono (SpeechRecognition) bajo gesto de usuario
+          try { onMic(); } catch {}
+          // 2) En paralelo, solicitar permiso del micrófono SIN bloquear el gesto
           try {
             if (
               typeof navigator !== "undefined" &&
               navigator.mediaDevices?.getUserMedia
             ) {
-              const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-              try { stream.getTracks().forEach((t) => t.stop()); } catch {}
+              setIsRequestingMic(true);
+              navigator.mediaDevices
+                .getUserMedia({ audio: true })
+                .then((stream) => {
+                  try { stream.getTracks().forEach((t) => t.stop()); } catch {}
+                })
+                .catch(() => {
+                  addToast({
+                    variant: "warning",
+                    title: "Permiso de micrófono requerido",
+                    description:
+                      "Autoriza el micrófono cuando aparezca el diálogo. Si fue denegado, habilítalo en Preferencias del Sistema > Privacidad > Micrófono.",
+                  });
+                })
+                .finally(() => setIsRequestingMic(false));
             }
-          } catch (err) {
-            addToast({
-              variant: "warning",
-              title: "Permiso de micrófono requerido",
-              description:
-                "Autoriza el micrófono cuando aparezca el diálogo. Si fue denegado, habilítalo en Preferencias del Sistema > Privacidad > Micrófono.",
-            });
-          } finally {
-            try { onMic(); } catch {}
-          }
+          } catch {}
         }}
-        disabled={disabled}
+        isLoading={isRequestingMic}
+        disabled={disabled || isRequestingMic}
         className={cn(
           "absolute top-1/2 -translate-y-1/2 rounded-full bg-white text-neutral-700 shadow-sm border border-neutral-200 h-10 w-10 transition-all",
           isListening ? "right-2" : hasText ? "right-[3.75rem]" : "right-2"
         )}
       >
-        <Mic className="h-5 w-5" />
+        {isListening && elapsedMs !== undefined && elapsedMs >= 0 ? (
+          <span className="text-[11px] font-medium tabular-nums">
+            {timeLabel}
+          </span>
+        ) : (
+          <Mic className="h-5 w-5" />
+        )}
       </Button>
 
       {/* Send button appears with slide/opacity */}
