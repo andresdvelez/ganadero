@@ -241,14 +241,21 @@ async fn start_ollama_server(app: tauri::AppHandle, port: u16) -> Result<(), Str
     *guard = None;
   }
 
-  // Resolver binario de Ollama: OLLAMA_BIN, PATH, rutas comunes
+  // Resolver binario de Ollama: OLLAMA_BIN, PATH, rutas comunes y binario empaquetado en Resources
   let candidate_env = std::env::var("OLLAMA_BIN").ok();
   let mut candidates = vec![
-    candidate_env.unwrap_or_else(|| "ollama".to_string()),
+    candidate_env.clone().unwrap_or_else(|| "ollama".to_string()),
     "/opt/homebrew/bin/ollama".to_string(),
     "/usr/local/bin/ollama".to_string(),
     "/usr/bin/ollama".to_string(),
   ];
+  // Añadir binario empaquetado en Resources/bin/ollama si existe
+  if let Some(res_bin) = app.path_resolver().resolve_resource("bin/ollama") {
+    if res_bin.exists() { candidates.push(res_bin.to_string_lossy().into_owned()); }
+  }
+  if let Some(res_bin) = app.path_resolver().resolve_resource("bin/ollama.exe") {
+    if res_bin.exists() { candidates.push(res_bin.to_string_lossy().into_owned()); }
+  }
   // Agregar candidatos dentro de la app Ollama (macOS)
   #[cfg(target_os = "macos")]
   {
@@ -267,7 +274,10 @@ async fn start_ollama_server(app: tauri::AppHandle, port: u16) -> Result<(), Str
 
   let mut last_err: Option<String> = None;
   let _ = writeln!(logf, "[tauri] start_ollama_server: candidatos {:?}", candidates);
-  for bin in candidates {
+  // Directorio de modelos privado de la app para evitar corrupciones en ~/.ollama
+  let app_models_root = data_dir.join("ollama-store");
+  let _ = std::fs::create_dir_all(&app_models_root);
+  for bin in candidates.clone() {
     let _ = writeln!(logf, "[tauri] intentando lanzar '{} serve'", bin);
     let mut cmd = Command::new(&bin);
     // Redirigir stdout/err al log para diagnósticos
@@ -278,6 +288,7 @@ async fn start_ollama_server(app: tauri::AppHandle, port: u16) -> Result<(), Str
     // "only one * is allowed".
     let allowed_origins = "app://*,file://*,tauri://*,http://localhost,https://localhost,http://127.0.0.1,https://127.0.0.1";
     cmd.env("OLLAMA_HOST", format!("127.0.0.1:{}", port))
+      .env("OLLAMA_MODELS", &app_models_root)
       .env("OLLAMA_ORIGINS", allowed_origins)
       .arg("serve")
       .stdout(Stdio::from(out))
@@ -343,13 +354,36 @@ async fn stop_ollama_server() -> Result<(), String> {
 
 #[tauri::command]
 async fn ensure_ollama_model_available(app: tauri::AppHandle, tag: String, model_path: Option<String>) -> Result<(), String> {
+  // Usar el almacén de modelos propio de la app para evitar blobs corruptos en ~/.ollama
+  let data_dir = app.path_resolver().app_data_dir().ok_or("app_data_dir not found")?;
+  let app_models_root = data_dir.join("ollama-store");
+  let _ = std::fs::create_dir_all(&app_models_root);
   // Verifica si el tag ya existe consultando el endpoint local
   let port = std::env::var("NEXT_PUBLIC_LLAMA_PORT").ok().and_then(|s| s.parse::<u16>().ok()).unwrap_or(11434);
   let client = reqwest::Client::builder().timeout(Duration::from_millis(1500)).build().map_err(|e| e.to_string())?;
   let url = format!("http://127.0.0.1:{}/api/tags", port);
   if let Ok(resp) = client.get(&url).send().await {
     if let Ok(text) = resp.text().await {
-      if text.contains(&format!("\"{}\"", tag)) { return Ok(()); }
+      if text.contains(&format!("\"{}\"", tag)) {
+        // Validación rápida: intento mínimo de chat para detectar modelo corrupto
+        let chat_url = format!("http://127.0.0.1:{}/api/chat", port);
+        let body = serde_json::json!({
+          "model": tag,
+          "messages": [{"role": "user", "content": "hola"}],
+          "stream": false
+        });
+        if let Ok(r) = client.post(&chat_url).json(&body).send().await {
+          if !r.status().is_success() {
+            // Respuesta 5xx indica posible modelo corrupto
+            let _ = Command::new("ollama")
+              .arg("rm").arg(&tag)
+              .env("OLLAMA_HOST", format!("127.0.0.1:{}", port))
+              .stdout(Stdio::null()).stderr(Stdio::null()).status();
+          } else {
+            return Ok(());
+          }
+        }
+      }
     }
   }
 
@@ -368,11 +402,18 @@ async fn ensure_ollama_model_available(app: tauri::AppHandle, tag: String, model
   // Ejecutar `ollama create <tag> -f <Modelfile>` buscando binarios en rutas comunes
   let candidate_env = std::env::var("OLLAMA_BIN").ok();
   let mut candidates = vec![
-    candidate_env.unwrap_or_else(|| "ollama".to_string()),
+    candidate_env.clone().unwrap_or_else(|| "ollama".to_string()),
     "/opt/homebrew/bin/ollama".to_string(),
     "/usr/local/bin/ollama".to_string(),
     "/usr/bin/ollama".to_string(),
   ];
+  // Añadir binario empaquetado en Resources/bin/ollama si existe
+  if let Some(res_bin) = app.path_resolver().resolve_resource("bin/ollama") {
+    if res_bin.exists() { candidates.push(res_bin.to_string_lossy().into_owned()); }
+  }
+  if let Some(res_bin) = app.path_resolver().resolve_resource("bin/ollama.exe") {
+    if res_bin.exists() { candidates.push(res_bin.to_string_lossy().into_owned()); }
+  }
   #[cfg(target_os = "macos")]
   {
     let home = std::env::var("HOME").unwrap_or_default();
@@ -383,12 +424,24 @@ async fn ensure_ollama_model_available(app: tauri::AppHandle, tag: String, model
   }
 
   let mut created = false;
+  let models_env = app_models_root.to_string_lossy().into_owned();
   for bin in candidates {
+    // Intento defensivo: borrar tag previo si existe para evitar referenciar blobs corruptos
+    let _ = Command::new(&bin)
+      .arg("rm")
+      .arg(&tag)
+      .env("OLLAMA_HOST", format!("127.0.0.1:{}", port))
+      .env("OLLAMA_MODELS", &models_env)
+      .stdout(Stdio::null())
+      .stderr(Stdio::null())
+      .status();
+
     let status = Command::new(&bin)
       .arg("create")
       .arg(&tag)
       .arg("-f").arg(&tmp)
       .env("OLLAMA_HOST", format!("127.0.0.1:{}", port))
+      .env("OLLAMA_MODELS", &models_env)
       .stdout(Stdio::null())
       .stderr(Stdio::null())
       .status();
@@ -410,16 +463,41 @@ async fn ensure_ollama_model_available(app: tauri::AppHandle, tag: String, model
       attempts += 1;
     }
     // Reintento con "ollama" en PATH
+    // Borrar tag y recrear apuntando al GGUF desde nuestro almacén
+    let _ = Command::new("ollama")
+      .arg("rm").arg(&tag)
+      .env("OLLAMA_HOST", format!("127.0.0.1:{}", port))
+      .env("OLLAMA_MODELS", &models_env)
+      .stdout(Stdio::null()).stderr(Stdio::null()).status();
     if let Ok(s) = Command::new("ollama")
       .arg("create").arg(&tag).arg("-f").arg(&tmp)
       .env("OLLAMA_HOST", format!("127.0.0.1:{}", port))
+      .env("OLLAMA_MODELS", &models_env)
       .stdout(Stdio::null()).stderr(Stdio::null()).status() {
       if s.success() { created = true; }
     }
   }
 
   if !created { return Err("ollama create failed".into()); }
-  Ok(())
+  // Validar carga real del modelo con un chat mínimo
+  let chat_url = format!("http://127.0.0.1:{}/api/chat", port);
+  let body = serde_json::json!({
+    "model": tag,
+    "messages": [{"role": "user", "content": "hola"}],
+    "stream": false
+  });
+  match client.post(&chat_url).json(&body).send().await {
+    Ok(r) if r.status().is_success() => Ok(()),
+    _ => {
+      // Borrar tag inválido y reportar error claro
+      let _ = Command::new("ollama")
+        .arg("rm").arg(&tag)
+        .env("OLLAMA_HOST", format!("127.0.0.1:{}", port))
+        .env("OLLAMA_MODELS", &models_env)
+        .stdout(Stdio::null()).stderr(Stdio::null()).status();
+      Err("Modelo local dañado o incompleto. Conéctate para re-descargar el modelo.".into())
+    }
+  }
 }
 
 fn main() {
@@ -431,6 +509,25 @@ fn main() {
         let handle = app.app_handle();
         tauri::async_runtime::spawn(async move {
           let port = std::env::var("NEXT_PUBLIC_LLAMA_PORT").ok().and_then(|s| s.parse::<u16>().ok()).unwrap_or(11434);
+          // Copiar modelo desde Resources/models a app_data/models si no existe aún
+          if let Some(res_dir) = handle.path_resolver().resource_dir() {
+            let bundled = res_dir.join("models");
+            if let Ok(mut rd) = std::fs::read_dir(&bundled) {
+              while let Some(Ok(entry)) = rd.next() {
+                let p = entry.path();
+                if p.extension().and_then(|s| s.to_str()).unwrap_or("") == "gguf" {
+                  if let Some(app_data) = handle.path_resolver().app_data_dir() {
+                    let dst_dir = app_data.join("models");
+                    let _ = std::fs::create_dir_all(&dst_dir);
+                    let dst = dst_dir.join(p.file_name().unwrap_or_default());
+                    if !dst.exists() {
+                      let _ = std::fs::copy(&p, &dst);
+                    }
+                  }
+                }
+              }
+            }
+          }
           // Arrancar servidor
           let _ = start_ollama_server(handle.clone(), port).await;
           // Intentar asegurar modelo DeepSeek (tag por defecto)

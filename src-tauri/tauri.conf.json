@@ -20,11 +20,12 @@
         ".next/static/**",
         ".next/standalone/server.js",
         ".env",
-        "models"
+        "models",
+        "bin/**",
+        "resources/models/**",
+        "resources/bin/**"
       ],
-      "externalBin": [
-        "sidecar/node"
-      ],
+      "externalBin": ["sidecar/node"],
       "icon": [
         "icons/32x32.png",
         "icons/128x128.png",
