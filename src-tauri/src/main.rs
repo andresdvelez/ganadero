@@ -224,12 +224,21 @@ async fn start_ollama_server(port: u16) -> Result<(), String> {
 
   // Resolver binario de Ollama: OLLAMA_BIN, PATH, rutas comunes
   let candidate_env = std::env::var("OLLAMA_BIN").ok();
-  let candidates = vec![
+  let mut candidates = vec![
     candidate_env.unwrap_or_else(|| "ollama".to_string()),
     "/opt/homebrew/bin/ollama".to_string(),
     "/usr/local/bin/ollama".to_string(),
     "/usr/bin/ollama".to_string(),
   ];
+  // Agregar candidatos dentro de la app Ollama (macOS)
+  #[cfg(target_os = "macos")]
+  {
+    let home = std::env::var("HOME").unwrap_or_default();
+    candidates.push("/Applications/Ollama.app/Contents/MacOS/ollama".to_string());
+    if !home.is_empty() {
+      candidates.push(format!("{}/Applications/Ollama.app/Contents/MacOS/ollama", home));
+    }
+  }
 
   let client = reqwest::Client::builder()
     .timeout(Duration::from_millis(800))
@@ -269,6 +278,27 @@ async fn start_ollama_server(port: u16) -> Result<(), String> {
       Err(e) => { last_err = Some(format!("{}", e)); }
     }
   }
+  
+  // Fallback: en macOS, intentar abrir la app Ollama y esperar readiness
+  #[cfg(target_os = "macos")]
+  {
+    if last_err.is_none() { last_err = Some("no candidate bin worked".into()); }
+    let _ = Command::new("open")
+      .arg("-a").arg("Ollama")
+      .stdout(Stdio::null())
+      .stderr(Stdio::null())
+      .status();
+    // Esperar hasta 12s
+    let mut attempts = 0u32;
+    while attempts < 60 {
+      if let Ok(resp) = client.get(&url).send().await {
+        if resp.status().is_success() { return Ok(()); }
+      }
+      sleep(Duration::from_millis(200)).await;
+      attempts += 1;
+    }
+    last_err = Some("opened Ollama.app but server not ready".into());
+  }
   Err(format!("cannot start ollama serve: {}", last_err.unwrap_or_else(|| "unknown error".into())))
 }
 
@@ -304,18 +334,60 @@ async fn ensure_ollama_model_available(app: tauri::AppHandle, tag: String, model
     f.write_all(line.as_bytes()).map_err(|e| e.to_string())?;
   }
 
-  // Ejecutar `ollama create <tag> -f <Modelfile>`
-  let status = Command::new("ollama")
-    .arg("create")
-    .arg(&tag)
-    .arg("-f").arg(&tmp)
-    .env("OLLAMA_HOST", format!("127.0.0.1:{}", port))
-    .stdout(Stdio::null())
-    .stderr(Stdio::null())
-    .status()
-    .map_err(|e| e.to_string())?;
+  // Ejecutar `ollama create <tag> -f <Modelfile>` buscando binarios en rutas comunes
+  let candidate_env = std::env::var("OLLAMA_BIN").ok();
+  let mut candidates = vec![
+    candidate_env.unwrap_or_else(|| "ollama".to_string()),
+    "/opt/homebrew/bin/ollama".to_string(),
+    "/usr/local/bin/ollama".to_string(),
+    "/usr/bin/ollama".to_string(),
+  ];
+  #[cfg(target_os = "macos")]
+  {
+    let home = std::env::var("HOME").unwrap_or_default();
+    candidates.push("/Applications/Ollama.app/Contents/MacOS/ollama".to_string());
+    if !home.is_empty() {
+      candidates.push(format!("{}/Applications/Ollama.app/Contents/MacOS/ollama", home));
+    }
+  }
 
-  if !status.success() { return Err("ollama create failed".into()); }
+  let mut created = false;
+  for bin in candidates {
+    let status = Command::new(&bin)
+      .arg("create")
+      .arg(&tag)
+      .arg("-f").arg(&tmp)
+      .env("OLLAMA_HOST", format!("127.0.0.1:{}", port))
+      .stdout(Stdio::null())
+      .stderr(Stdio::null())
+      .status();
+    match status {
+      Ok(s) if s.success() => { created = true; break; }
+      _ => {}
+    }
+  }
+
+  // Fallback macOS: abrir la app Ollama y reintentar una vez que el server esté listo
+  #[cfg(target_os = "macos")]
+  if !created {
+    let _ = Command::new("open").arg("-a").arg("Ollama").stdout(Stdio::null()).stderr(Stdio::null()).status();
+    // Esperar hasta 10s a que el server esté arriba
+    let mut attempts = 0u32;
+    while attempts < 50 {
+      if let Ok(resp) = client.get(&url).send().await { if resp.status().is_success() { break; } }
+      sleep(Duration::from_millis(200)).await;
+      attempts += 1;
+    }
+    // Reintento con "ollama" en PATH
+    if let Ok(s) = Command::new("ollama")
+      .arg("create").arg(&tag).arg("-f").arg(&tmp)
+      .env("OLLAMA_HOST", format!("127.0.0.1:{}", port))
+      .stdout(Stdio::null()).stderr(Stdio::null()).status() {
+      if s.success() { created = true; }
+    }
+  }
+
+  if !created { return Err("ollama create failed".into()); }
   Ok(())
 }
 
