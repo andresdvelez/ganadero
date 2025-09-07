@@ -409,6 +409,17 @@ fn main() {
   tauri::Builder::default()
     .invoke_handler(tauri::generate_handler![download_model, models_dir, download_llama_binary, start_llama_server, stop_llama_server, find_available_model, start_ollama_server, stop_ollama_server, ensure_ollama_model_available])
     .setup(|app| {
+      // Autoinicio del servidor de Ollama y preparación del modelo en segundo plano (dev y prod)
+      {
+        let handle = app.app_handle();
+        tauri::async_runtime::spawn(async move {
+          let port = std::env::var("NEXT_PUBLIC_LLAMA_PORT").ok().and_then(|s| s.parse::<u16>().ok()).unwrap_or(11434);
+          // Arrancar servidor
+          let _ = start_ollama_server(handle.clone(), port).await;
+          // Intentar asegurar modelo DeepSeek (tag por defecto)
+          let _ = ensure_ollama_model_available(handle.clone(), "deepseek-r1-qwen-1_5b:latest".to_string(), None).await;
+        });
+      }
       // En desarrollo: no arrancar Next standalone; Tauri ya carga devPath
       if cfg!(debug_assertions) {
         return Ok(());

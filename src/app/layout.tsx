@@ -46,7 +46,51 @@ export default function RootLayout({
             backgroundPosition: "center",
             backgroundRepeat: "no-repeat",
           }}
-        />
+        >
+          <div
+            id="__splash_layer"
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              alignItems: "flex-end",
+              justifyContent: "center",
+              padding: "18px",
+              background:
+                "linear-gradient(to top, rgba(0,0,0,0.55), rgba(0,0,0,0.0))",
+              color: "#fff",
+              fontFamily:
+                "system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,Arial",
+            }}
+          >
+            <div
+              style={{
+                width: "100%",
+                maxWidth: 720,
+                display: "flex",
+                gap: 12,
+                alignItems: "center",
+                justifyContent: "flex-start",
+                backdropFilter: "blur(2px)",
+              }}
+            >
+              <div
+                className="spinner"
+                style={{
+                  width: 18,
+                  height: 18,
+                  border: "2px solid rgba(255,255,255,0.4)",
+                  borderTopColor: "#fff",
+                  borderRadius: "50%",
+                  animation: "spin 1s linear infinite",
+                }}
+              />
+              <div id="__splash_msg" style={{ fontSize: 14 }}>
+                Preparando Ganado AI…
+              </div>
+            </div>
+          </div>
+        </div>
         {/* Auto-recover de chunks desincronizados tras despliegue */}
         <script
           dangerouslySetInnerHTML={{
@@ -64,7 +108,7 @@ export default function RootLayout({
     }catch{}
   }
   if(document.readyState==='complete') { hideSplash(); }
-  else { window.addEventListener('load', hideSplash); setTimeout(hideSplash, 1800); }
+  else { window.addEventListener('load', hideSplash); }
 
   function clearAndReload(){
     try{ if (sessionStorage.getItem('NEXT_RECOVERED_ONCE') === '1') { return; } }catch{}
@@ -103,6 +147,26 @@ export default function RootLayout({
   });
   // En Tauri, desregistrar SW al inicio para evitar Workbox 404
   try{ if(window.__TAURI__){ navigator.serviceWorker?.getRegistrations().then(rs=>Promise.all(rs.map(r=>r.unregister()))); } }catch{}
+
+  // Boot secuencial de IA local durante splash (solo Tauri)
+  async function bootLocalAI(){
+    if(!window.__TAURI__) return;
+    var msgEl = document.getElementById('__splash_msg');
+    function setMsg(t){ try{ if(msgEl) msgEl.textContent=t; }catch{} }
+    try{
+      setMsg('Iniciando servidor de IA local…');
+      await window.__TAURI__.invoke('start_ollama_server', { port: Number(window.process?.env?.NEXT_PUBLIC_LLAMA_PORT||11434) });
+    }catch(e){ setMsg('Intentando abrir Ollama…'); }
+    try{
+      setMsg('Verificando/creando modelo DeepSeek…');
+      await window.__TAURI__.invoke('ensure_ollama_model_available', { tag: 'deepseek-r1-qwen-1_5b:latest', modelPath: null });
+      setMsg('Modelo local listo.');
+    }catch(e){ setMsg('No fue posible preparar el modelo local aún.'); }
+    // Pequeña espera para dar feedback y luego ocultar splash
+    setTimeout(hideSplash, 400);
+  }
+
+  try{ bootLocalAI(); }catch{}
 })();
 `,
           }}
