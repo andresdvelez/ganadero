@@ -1,9 +1,10 @@
 import { RanchDashboard } from "@/components/ranches/RanchDashboard";
 
 interface RanchDetailPageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
-export default function RanchDetailPage({ params }: RanchDetailPageProps) {
-  return <RanchDashboard ranchId={params.id} />;
+export default async function RanchDetailPage({ params }: RanchDetailPageProps) {
+  const { id } = await params;
+  return <RanchDashboard ranchId={id} />;
 }

@@ -27,7 +27,7 @@ const ranchSchema = z.object({
   uggLots: z.number().optional(),
   uggDate: z.string().optional(),
   totalUGG: z.number().optional(),
-  historicalCostAccumulation: z.boolean().default(false),
+  historicalCostAccumulation: z.boolean(),
 });
 
 export type RanchFormData = z.infer<typeof ranchSchema>;

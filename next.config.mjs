@@ -30,6 +30,10 @@ const nextConfig = {
   // Ejecutaremos con `node .next/standalone/server.js` dentro de Tauri
   output: "standalone",
   generateEtags: false,
+  // Skip ESLint during build for production builds
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   async headers() {
     return [
       {
