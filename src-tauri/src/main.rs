@@ -215,6 +215,7 @@ fn find_available_model(app: tauri::AppHandle) -> Result<String, String> {
 
 #[tauri::command]
 async fn start_ollama_server(port: u16) -> Result<(), String> {
+  eprintln!("[tauri] start_ollama_server: inicio puerto {}", port);
   // detener si ya hay uno
   {
     let mut guard = OLLAMA_CHILD.lock().await;
@@ -247,7 +248,9 @@ async fn start_ollama_server(port: u16) -> Result<(), String> {
   let url = format!("http://127.0.0.1:{}/api/tags", port);
 
   let mut last_err: Option<String> = None;
+  eprintln!("[tauri] start_ollama_server: candidatos {:?}", candidates);
   for bin in candidates {
+    eprintln!("[tauri] intentando lanzar '{} serve'", bin);
     let mut cmd = Command::new(&bin);
     cmd.env("OLLAMA_HOST", format!("127.0.0.1:{}", port))
       .arg("serve")
@@ -268,14 +271,14 @@ async fn start_ollama_server(port: u16) -> Result<(), String> {
           }
           sleep(Duration::from_millis(200)).await;
         }
-        if ready { return Ok(()); }
+        if ready { eprintln!("[tauri] ollama listo en {}", url); return Ok(()); }
         last_err = Some("ollama serve did not become ready".into());
         // Si no estuvo listo, matar e intentar siguiente candidato
         let mut guard = OLLAMA_CHILD.lock().await;
         if let Some(child) = guard.as_mut() { let _ = child.kill(); }
         *guard = None;
       },
-      Err(e) => { last_err = Some(format!("{}", e)); }
+      Err(e) => { eprintln!("[tauri] fallo al ejecutar '{}': {}", bin, e); last_err = Some(format!("{}", e)); }
     }
   }
   
@@ -283,6 +286,7 @@ async fn start_ollama_server(port: u16) -> Result<(), String> {
   #[cfg(target_os = "macos")]
   {
     if last_err.is_none() { last_err = Some("no candidate bin worked".into()); }
+    eprintln!("[tauri] intentando abrir Ollama.app");
     let _ = Command::new("open")
       .arg("-a").arg("Ollama")
       .stdout(Stdio::null())
@@ -292,7 +296,7 @@ async fn start_ollama_server(port: u16) -> Result<(), String> {
     let mut attempts = 0u32;
     while attempts < 60 {
       if let Ok(resp) = client.get(&url).send().await {
-        if resp.status().is_success() { return Ok(()); }
+        if resp.status().is_success() { eprintln!("[tauri] Ollama.app lista"); return Ok(()); }
       }
       sleep(Duration::from_millis(200)).await;
       attempts += 1;

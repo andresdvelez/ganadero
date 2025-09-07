@@ -3088,36 +3088,12 @@ export default function AIAssistantPage() {
     const { tauri } = (window as any).__TAURI__;
     try {
       setIsDownloading(true);
-      // 1) Intentar arrancar Ollama y asegurar el modelo (usando GGUF local si existe)
-      try {
-        await tauri.invoke("start_ollama_server", { port: LLAMA_PORT });
-        await tauri.invoke("ensure_ollama_model_available", {
-          tag: "deepseek-r1-qwen-1_5b:latest",
-          modelPath: null,
-        });
-        setAIClientHost(`http://127.0.0.1:${LLAMA_PORT}`);
-        setLocalModelAvailable(true);
-        setLlamaRunning(true);
-        return;
-      } catch (_e) {
-        // sigue a fallback llama.cpp
-      }
-
-      // 2) Fallback a llama.cpp: asegurar binario y modelo
-      await tauri.invoke("download_llama_binary");
-      let modelPath: string | null = null;
-      try {
-        modelPath = await tauri.invoke("find_available_model");
-      } catch {
-        modelPath = null;
-      }
-      if (!modelPath) {
-        modelPath = await tauri.invoke("download_model", {
-          url: MODEL_URL,
-          sha256Hex: MODEL_SHA,
-        });
-      }
-      await tauri.invoke("start_llama_server", { modelPath, port: LLAMA_PORT });
+      // Único flujo: Ollama (server + modelo)
+      await tauri.invoke("start_ollama_server", { port: LLAMA_PORT });
+      await tauri.invoke("ensure_ollama_model_available", {
+        tag: "deepseek-r1-qwen-1_5b:latest",
+        modelPath: null,
+      });
       setAIClientHost(`http://127.0.0.1:${LLAMA_PORT}`);
       setLocalModelAvailable(true);
       setLlamaRunning(true);
@@ -3131,43 +3107,21 @@ export default function AIAssistantPage() {
   const isOnline =
     typeof navigator === "undefined" ? true : navigator.onLine !== false;
   const overlayVisible = !isOnline && localModelAvailable === false;
-  // Auto-arranque en offline si hay Tauri y hay modelo disponible
+  // Auto-arranque en offline solo con Ollama
   useEffect(() => {
     (async () => {
       if (!isTauri) return;
       if (typeof navigator !== "undefined" && navigator.onLine) return;
       try {
         const { tauri } = (window as any).__TAURI__;
-        // 1) Intentar levantar Ollama + modelo
-        try {
-          await tauri.invoke("start_ollama_server", { port: LLAMA_PORT });
-          await tauri.invoke("ensure_ollama_model_available", {
-            tag: "deepseek-r1-qwen-1_5b:latest",
-            modelPath: null,
-          });
-          setAIClientHost(`http://127.0.0.1:${LLAMA_PORT}`);
-          setLocalModelAvailable(true);
-          setLlamaRunning(true);
-          return;
-        } catch {}
-
-        // 2) Fallback llama.cpp
-        await tauri.invoke("download_llama_binary");
-        let modelPath: string | null = null;
-        try {
-          modelPath = await tauri.invoke("find_available_model");
-        } catch {
-          modelPath = null;
-        }
-        if (modelPath) {
-          await tauri.invoke("start_llama_server", {
-            modelPath,
-            port: LLAMA_PORT,
-          });
-          setAIClientHost(`http://127.0.0.1:${LLAMA_PORT}`);
-          setLocalModelAvailable(true);
-          setLlamaRunning(true);
-        }
+        await tauri.invoke("start_ollama_server", { port: LLAMA_PORT });
+        await tauri.invoke("ensure_ollama_model_available", {
+          tag: "deepseek-r1-qwen-1_5b:latest",
+          modelPath: null,
+        });
+        setAIClientHost(`http://127.0.0.1:${LLAMA_PORT}`);
+        setLocalModelAvailable(true);
+        setLlamaRunning(true);
       } catch {}
     })();
   }, [isTauri]);
