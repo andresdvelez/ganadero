@@ -2647,15 +2647,34 @@ export default function AIAssistantPage() {
         });
       } catch {}
 
-      const response = await aiClient.processQuery(textToSend, {
-        currentModule: "chat",
-        recentMessages: messages.slice(-5),
-        profile: context?.profile || null,
-        memories: context?.memories || [],
-        webSearch:
-          webSearch &&
-          (typeof navigator === "undefined" || navigator.onLine !== false),
-      });
+      let response: any;
+      try {
+        response = await aiClient.processQuery(textToSend, {
+          currentModule: "chat",
+          recentMessages: messages.slice(-5),
+          profile: context?.profile || null,
+          memories: context?.memories || [],
+          webSearch:
+            webSearch &&
+            (typeof navigator === "undefined" || navigator.onLine !== false),
+        });
+      } catch (e) {
+        try {
+          console.error("Fallo consulta IA (offline/local):", e);
+        } catch {}
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content:
+            "El asistente de IA no está disponible sin conexión en este momento. Verifica que el modelo local esté instalado y el servidor esté activo. Cuando recuperes internet, también podrás usar la IA en la nube.",
+          timestamp: new Date(),
+          module: "error",
+          action: "none",
+        } as any;
+        setMessages((prev) => [...prev, assistantMessage]);
+        setIsLoading(false);
+        return;
+      }
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -3070,12 +3089,21 @@ export default function AIAssistantPage() {
     try {
       setIsDownloading(true);
       const binPath = await tauri.invoke("download_llama_binary");
-      const modelPath = await tauri.invoke("download_model", {
-        url: MODEL_URL,
-        sha256Hex: MODEL_SHA,
-      });
+      // Intentar encontrar un modelo local ya existente
+      let modelPath: string | null = null;
+      try {
+        modelPath = await tauri.invoke("find_available_model");
+      } catch {
+        modelPath = null;
+      }
+      if (!modelPath) {
+        modelPath = await tauri.invoke("download_model", {
+          url: MODEL_URL,
+          sha256Hex: MODEL_SHA,
+        });
+      }
       await tauri.invoke("start_llama_server", {
-        modelPath,
+        modelPath: modelPath,
         port: LLAMA_PORT,
       });
       setAIClientHost(`http://127.0.0.1:${LLAMA_PORT}`);
@@ -3091,6 +3119,32 @@ export default function AIAssistantPage() {
   const isOnline =
     typeof navigator === "undefined" ? true : navigator.onLine !== false;
   const overlayVisible = !isOnline && localModelAvailable === false;
+  // Auto-arranque en offline si hay Tauri y hay modelo disponible
+  useEffect(() => {
+    (async () => {
+      if (!isTauri) return;
+      if (typeof navigator !== "undefined" && navigator.onLine) return;
+      try {
+        const { tauri } = (window as any).__TAURI__;
+        const binPath = await tauri.invoke("download_llama_binary");
+        let modelPath: string | null = null;
+        try {
+          modelPath = await tauri.invoke("find_available_model");
+        } catch {
+          modelPath = null;
+        }
+        if (modelPath) {
+          await tauri.invoke("start_llama_server", {
+            modelPath,
+            port: LLAMA_PORT,
+          });
+          setAIClientHost(`http://127.0.0.1:${LLAMA_PORT}`);
+          setLocalModelAvailable(true);
+          setLlamaRunning(true);
+        }
+      } catch {}
+    })();
+  }, [isTauri]);
 
   const confirmAndExecute = async () => {
     if (!pendingAction) return;

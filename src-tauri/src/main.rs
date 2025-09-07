@@ -158,9 +158,43 @@ async fn stop_llama_server() -> Result<(), String> {
   Ok(())
 }
 
+#[tauri::command]
+fn find_available_model(app: tauri::AppHandle) -> Result<String, String> {
+  // 1) Buscar en app_data_dir/models
+  if let Some(dir) = app.path_resolver().app_data_dir() {
+    let md = dir.join("models");
+    if let Ok(mut rd) = std::fs::read_dir(&md) {
+      if let Some(Ok(e)) = rd.find(|e| e.as_ref().ok().map(|x| x.path().extension().and_then(|s| s.to_str()).unwrap_or("") == "gguf").unwrap_or(false)) {
+        return Ok(e.path().to_string_lossy().into_owned());
+      }
+    }
+  }
+  // 2) Buscar en resource_dir/models (bundled)
+  if let Some(rd) = app.path_resolver().resource_dir() {
+    let md = rd.join("models");
+    if let Ok(mut it) = std::fs::read_dir(&md) {
+      if let Some(Ok(e)) = it.find(|e| e.as_ref().ok().map(|x| x.path().extension().and_then(|s| s.to_str()).unwrap_or("") == "gguf").unwrap_or(false)) {
+        return Ok(e.path().to_string_lossy().into_owned());
+      }
+    }
+  }
+  // 3) En desarrollo: intentar src-tauri/models relativo al cwd
+  if cfg!(debug_assertions) {
+    if let Ok(cwd) = std::env::current_dir() {
+      let md = cwd.join("src-tauri").join("models");
+      if let Ok(mut it) = std::fs::read_dir(&md) {
+        if let Some(Ok(e)) = it.find(|e| e.as_ref().ok().map(|x| x.path().extension().and_then(|s| s.to_str()).unwrap_or("") == "gguf").unwrap_or(false)) {
+          return Ok(e.path().to_string_lossy().into_owned());
+        }
+      }
+    }
+  }
+  Err("no local model found".into())
+}
+
 fn main() {
   tauri::Builder::default()
-    .invoke_handler(tauri::generate_handler![download_model, models_dir, download_llama_binary, start_llama_server, stop_llama_server])
+    .invoke_handler(tauri::generate_handler![download_model, models_dir, download_llama_binary, start_llama_server, stop_llama_server, find_available_model])
     .setup(|app| {
       // En desarrollo: no arrancar Next standalone; Tauri ya carga devPath
       if cfg!(debug_assertions) {
