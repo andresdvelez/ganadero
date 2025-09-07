@@ -222,21 +222,54 @@ async fn start_ollama_server(port: u16) -> Result<(), String> {
     *guard = None;
   }
 
-  // Intentar usar binario del sistema
-  let mut cmd = Command::new("ollama");
-  cmd.env("OLLAMA_HOST", format!("127.0.0.1:{}", port))
-    .arg("serve")
-    .stdout(Stdio::null())
-    .stderr(Stdio::null());
+  // Resolver binario de Ollama: OLLAMA_BIN, PATH, rutas comunes
+  let candidate_env = std::env::var("OLLAMA_BIN").ok();
+  let candidates = vec![
+    candidate_env.unwrap_or_else(|| "ollama".to_string()),
+    "/opt/homebrew/bin/ollama".to_string(),
+    "/usr/local/bin/ollama".to_string(),
+    "/usr/bin/ollama".to_string(),
+  ];
 
-  match cmd.spawn() {
-    Ok(child) => {
-      let mut guard = OLLAMA_CHILD.lock().await;
-      *guard = Some(child);
-      Ok(())
-    },
-    Err(e) => Err(format!("cannot start ollama serve: {}", e))
+  let client = reqwest::Client::builder()
+    .timeout(Duration::from_millis(800))
+    .build()
+    .map_err(|e| e.to_string())?;
+  let url = format!("http://127.0.0.1:{}/api/tags", port);
+
+  let mut last_err: Option<String> = None;
+  for bin in candidates {
+    let mut cmd = Command::new(&bin);
+    cmd.env("OLLAMA_HOST", format!("127.0.0.1:{}", port))
+      .arg("serve")
+      .stdout(Stdio::null())
+      .stderr(Stdio::null());
+
+    match cmd.spawn() {
+      Ok(child) => {
+        {
+          let mut guard = OLLAMA_CHILD.lock().await;
+          *guard = Some(child);
+        }
+        // Esperar readiness del endpoint /api/tags
+        let mut ready = false;
+        for _ in 0..40 { // ~8s
+          if let Ok(resp) = client.get(&url).send().await {
+            if resp.status().is_success() { ready = true; break; }
+          }
+          sleep(Duration::from_millis(200)).await;
+        }
+        if ready { return Ok(()); }
+        last_err = Some("ollama serve did not become ready".into());
+        // Si no estuvo listo, matar e intentar siguiente candidato
+        let mut guard = OLLAMA_CHILD.lock().await;
+        if let Some(child) = guard.as_mut() { let _ = child.kill(); }
+        *guard = None;
+      },
+      Err(e) => { last_err = Some(format!("{}", e)); }
+    }
   }
+  Err(format!("cannot start ollama serve: {}", last_err.unwrap_or_else(|| "unknown error".into())))
 }
 
 #[tauri::command]
