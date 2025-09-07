@@ -1,5 +1,6 @@
 "use client";
 
+import { DashboardLayout } from "../layout/dashboard-layout";
 import { RanchFormAPI } from "./RanchFormAPI";
 
 interface RanchFormContainerProps {
@@ -14,10 +15,12 @@ export function RanchFormContainer({
   onCancel,
 }: RanchFormContainerProps) {
   return (
-    <RanchFormAPI
-      ranchId={ranchId}
-      onSuccess={onSuccess}
-      onCancel={onCancel}
-    />
+    <DashboardLayout>
+      <RanchFormAPI
+        ranchId={ranchId}
+        onSuccess={onSuccess}
+        onCancel={onCancel}
+      />
+    </DashboardLayout>
   );
 }

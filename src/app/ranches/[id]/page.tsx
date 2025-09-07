@@ -1,9 +1,9 @@
-import { RanchFormContainer } from "@/components/ranches/RanchFormContainer";
+import { RanchDashboard } from "@/components/ranches/RanchDashboard";
 
 interface RanchDetailPageProps {
   params: { id: string };
 }
 
 export default function RanchDetailPage({ params }: RanchDetailPageProps) {
-  return <RanchFormContainer ranchId={params.id} />;
+  return <RanchDashboard ranchId={params.id} />;
 }

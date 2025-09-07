@@ -31,7 +31,7 @@ function extractMemories(text: string): Array<{
 
   // Nombre de la finca / organización
   const finca = t.match(
-    /mi\s+(finca|granja|hacienda|organizacion)\s+(se\s+)?llama\s+([a-zA-Z0-9\s\-_.]+)/i
+    /mi\s+(finca|granja|finca|organizacion)\s+(se\s+)?llama\s+([a-zA-Z0-9\s\-_.]+)/i
   );
   if (finca && finca[3])
     memories.push({

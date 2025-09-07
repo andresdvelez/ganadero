@@ -265,19 +265,19 @@ export const moduleRegistry: Record<string, RanchModule> = {
   },
   ranches: {
     id: "ranches",
-    name: "Haciendas",
+    name: "Fincas",
     category: "Administración",
     path: "/ranches",
     tags: ["fincas", "propiedades", "gestión"],
     actions: {
       list: {
-        label: "Ver haciendas",
+        label: "Ver fincas",
         async run() {
           return { navigateTo: "/ranches" };
         },
       },
       create: {
-        label: "Nueva hacienda",
+        label: "Nueva finca",
         async run() {
           return { navigateTo: "/ranches/new" };
         },

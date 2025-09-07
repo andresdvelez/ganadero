@@ -31,6 +31,10 @@ export function RanchFormAPI({
   
   const orgsQuery = trpc.org.myOrganizations.useQuery();
   const currentOrg = orgsQuery.data?.[0];
+  const ownersQuery = trpc.org.listMembers.useQuery(
+    { orgId: currentOrg?.id! },
+    { enabled: !!currentOrg?.id }
+  );
 
   const handleSubmit = async (data: RanchFormData) => {
     setIsLoading(true);
@@ -185,12 +189,19 @@ export function RanchFormAPI({
     historicalCostAccumulation: false,
   } : undefined;
 
+  const owners = ownersQuery.data?.map(member => ({
+    id: member.user.id,
+    name: member.user.name || member.user.email,
+    email: member.user.email
+  })) || [];
+
   return (
     <RanchFormLogic
       initialData={initialData}
       onSubmit={handleSubmit}
       onCancel={onCancel}
-      isLoading={isLoading || getRanchQuery.isLoading}
+      isLoading={isLoading || getRanchQuery.isLoading || ownersQuery.isLoading}
+      owners={owners}
     />
   );
 }

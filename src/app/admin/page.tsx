@@ -59,14 +59,14 @@ function AdminImpl() {
     try {
       const s = window.localStorage.getItem("ACTIVE_FARM_ID");
       if (s) setActiveFarmId(s);
-    } catch {}
+    } catch { }
   }, []);
 
   useEffect(() => {
     try {
       if (activeFarmId)
         window.localStorage.setItem("ACTIVE_FARM_ID", activeFarmId);
-    } catch {}
+    } catch { }
   }, [activeFarmId]);
 
   const farms = farmsQ.data || [];
@@ -406,7 +406,7 @@ function AdminImpl() {
           />
           <Input
             label="Nombre"
-            placeholder="Ej: Hacienda La Esmeralda"
+            placeholder="Ej: Finca La Esmeralda"
             value={form.name}
             onChange={(e) =>
               setForm({ ...form, name: (e.target as HTMLInputElement).value })

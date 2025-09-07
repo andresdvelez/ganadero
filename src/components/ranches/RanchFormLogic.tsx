@@ -6,11 +6,11 @@ import { z } from "zod";
 import { RanchFormView } from "./RanchFormView";
 
 const ranchSchema = z.object({
-  ranchCode: z.string().min(1, "Código de Hacienda es requerido"),
+  ranchCode: z.string().min(1, "Código de Finca es requerido"),
   farmName: z.string().min(1, "Nombre de la finca es requerido"),
-  location: z.string().optional(),
-  officialNumber: z.string().optional(),
-  owner: z.string().optional(),
+  location: z.string().min(1, "Localización es requerida"),
+  officialNumber: z.string().min(1, "Número oficial es requerido"),
+  owner: z.string().min(1, "Propietario es requerido"),
   phone: z.string().optional(),
   ranchPhone: z.string().optional(),
   address: z.string().optional(),
@@ -27,7 +27,7 @@ const ranchSchema = z.object({
   uggLots: z.number().optional(),
   uggDate: z.string().optional(),
   totalUGG: z.number().optional(),
-  historicalCostAccumulation: z.boolean().optional().default(false),
+  historicalCostAccumulation: z.boolean().default(false),
 });
 
 export type RanchFormData = z.infer<typeof ranchSchema>;
@@ -37,6 +37,7 @@ interface RanchFormLogicProps {
   onSubmit: (data: RanchFormData) => Promise<void>;
   onCancel?: () => void;
   isLoading?: boolean;
+  owners?: { id: string; name: string; email: string }[];
 }
 
 export function RanchFormLogic({
@@ -44,6 +45,7 @@ export function RanchFormLogic({
   onSubmit,
   onCancel,
   isLoading = false,
+  owners,
 }: RanchFormLogicProps) {
   const {
     register,
@@ -78,6 +80,7 @@ export function RanchFormLogic({
       control={control}
       isLoading={isLoading || isSubmitting}
       onCancel={onCancel}
+      owners={owners}
     />
   );
 }
