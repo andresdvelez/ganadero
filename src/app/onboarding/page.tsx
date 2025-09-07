@@ -2030,6 +2030,32 @@ export default function OnboardingPage() {
                   >
                     Vincular este dispositivo
                   </Button>
+                  <Button
+                    variant="flat"
+                    onPress={() => {
+                      const pass =
+                        prompt(
+                          "Para desvincular escribe la clave del dispositivo (mín. 6)"
+                        ) || "";
+                      if (!pass || pass.length < 6) return;
+                      try {
+                        import("@/lib/auth/offline-auth").then(async (m) => {
+                          try {
+                            await m.unlinkLocalDeviceWithPasscode({
+                              deviceId,
+                              passcode: pass,
+                            });
+                          } catch (e) {}
+                          addToast({
+                            variant: "success",
+                            title: "Dispositivo desvinculado localmente",
+                          });
+                        });
+                      } catch {}
+                    }}
+                  >
+                    Desvincular este dispositivo
+                  </Button>
                 </div>
                 {deviceLinked && (
                   <div className="mt-2 text-xs text-green-700">

@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import { db, OfflineIdentity, DeviceInfo } from "@/lib/dexie";
+import { robustDeviceId } from "@/lib/utils";
 import {
   generateKey,
   generateSalt,
@@ -21,7 +22,27 @@ export async function hasOfflineIdentity(): Promise<boolean> {
 export async function getOfflineIdentity(): Promise<
   OfflineIdentity | undefined
 > {
-  return await db.identities.toCollection().first();
+  // Preferir identidad asociada al binding local del dispositivo actual
+  try {
+    const did = robustDeviceId();
+    const dev = await db.deviceInfo.where({ deviceId: did }).first();
+    if (dev?.boundClerkId) {
+      const match = await db.identities
+        .where({ clerkId: dev.boundClerkId })
+        .first();
+      if (match) return match;
+    }
+  } catch {}
+  // Fallback: la identidad más reciente
+  const all = await db.identities.toArray();
+  if (!all.length) return undefined;
+  let latest = all[0]!;
+  for (const it of all) {
+    if (it.updatedAt && latest.updatedAt) {
+      if (new Date(it.updatedAt) > new Date(latest.updatedAt)) latest = it;
+    }
+  }
+  return latest;
 }
 
 export type ProvisionInput = {
@@ -90,14 +111,29 @@ export async function bindDeviceLocally(params: {
   }
 }
 
-export async function getBoundDevice(): Promise<DeviceInfo | undefined> {
+export async function getBoundDevice(
+  deviceId?: string
+): Promise<DeviceInfo | undefined> {
+  if (deviceId) {
+    return await db.deviceInfo.where({ deviceId }).first();
+  }
+  try {
+    const id = robustDeviceId();
+    const rec = await db.deviceInfo.where({ deviceId: id }).first();
+    if (rec) return rec;
+  } catch {}
+  // Fallback (legacy): primer registro
   return await db.deviceInfo.toCollection().first();
 }
 
 export async function unlock(passcode: string): Promise<void> {
   const identity = await getOfflineIdentity();
   if (!identity) throw new Error("No hay identidad offline configurada");
-  const device = await getBoundDevice();
+  let currentId: string | undefined;
+  try {
+    currentId = robustDeviceId();
+  } catch {}
+  const device = await getBoundDevice(currentId);
   if (device && device.boundClerkId !== identity.clerkId) {
     throw new Error("Este dispositivo está vinculado a otra cuenta");
   }
@@ -116,4 +152,22 @@ export function lock(): void {
   unlocked = false;
   currentClerkId = null;
   setExternalEncryptionKey(null);
+}
+
+// Verifica passcode y elimina el vínculo local del dispositivo actual
+export async function unlinkLocalDeviceWithPasscode(params: {
+  deviceId: string;
+  passcode: string;
+}): Promise<void> {
+  // Validar passcode contra identidad local existente
+  await unlock(params.passcode);
+  // Borrar registro de deviceInfo para permitir nueva vinculación
+  const existing = await db.deviceInfo
+    .where({ deviceId: params.deviceId })
+    .first();
+  if (existing?.id) {
+    await db.deviceInfo.delete(existing.id);
+  }
+  // Bloquear de nuevo por seguridad
+  lock();
 }

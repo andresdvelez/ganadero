@@ -95,6 +95,39 @@ export const deviceRouter = createTRPCRouter({
     }));
   }),
 
+  checkOwnership: protectedProcedure
+    .input(z.object({ deviceId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const dev = await prisma.device.findUnique({
+        where: { deviceId: input.deviceId },
+      });
+      if (!dev) return { exists: false };
+      const owner = await prisma.user.findUnique({ where: { id: dev.userId } });
+      return {
+        exists: true,
+        ownerEmail: owner?.email ?? null,
+        sameUser: owner?.clerkId === ctx.userId,
+        orgId: dev.orgId ?? null,
+      };
+    }),
+
+  unlinkWithPasscode: protectedProcedure
+    .input(z.object({ deviceId: z.string(), passcode: z.string().min(6) }))
+    .mutation(async ({ ctx, input }) => {
+      // Only current owner can server-side delete binding
+      const me = await prisma.user.findUnique({
+        where: { clerkId: ctx.userId! },
+      });
+      if (!me) throw new Error("Usuario no encontrado");
+      const dev = await prisma.device.findUnique({
+        where: { deviceId: input.deviceId },
+      });
+      if (!dev) throw new Error("Dispositivo no encontrado");
+      if (dev.userId !== me.id) throw new Error("No autorizado");
+      await prisma.device.delete({ where: { deviceId: input.deviceId } });
+      return { ok: true };
+    }),
+
   setPasscodeStatus: protectedProcedure
     .input(
       z.object({
