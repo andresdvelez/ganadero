@@ -214,8 +214,14 @@ fn find_available_model(app: tauri::AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn start_ollama_server(port: u16) -> Result<(), String> {
-  eprintln!("[tauri] start_ollama_server: inicio puerto {}", port);
+async fn start_ollama_server(app: tauri::AppHandle, port: u16) -> Result<(), String> {
+  // Preparar archivo de log persistente
+  let data_dir = app.path_resolver().app_data_dir().ok_or("app_data_dir not found")?;
+  let logs_dir = data_dir.join("logs");
+  let _ = std::fs::create_dir_all(&logs_dir);
+  let log_path = logs_dir.join("ollama.log");
+  let mut logf = OpenOptions::new().create(true).append(true).open(&log_path).map_err(|e| e.to_string())?;
+  let _ = writeln!(logf, "[tauri] start_ollama_server: inicio puerto {}", port);
   // detener si ya hay uno
   {
     let mut guard = OLLAMA_CHILD.lock().await;
@@ -248,14 +254,17 @@ async fn start_ollama_server(port: u16) -> Result<(), String> {
   let url = format!("http://127.0.0.1:{}/api/tags", port);
 
   let mut last_err: Option<String> = None;
-  eprintln!("[tauri] start_ollama_server: candidatos {:?}", candidates);
+  let _ = writeln!(logf, "[tauri] start_ollama_server: candidatos {:?}", candidates);
   for bin in candidates {
-    eprintln!("[tauri] intentando lanzar '{} serve'", bin);
+    let _ = writeln!(logf, "[tauri] intentando lanzar '{} serve'", bin);
     let mut cmd = Command::new(&bin);
+    // Redirigir stdout/err al log para diagnósticos
+    let out = OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap());
+    let err = OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap());
     cmd.env("OLLAMA_HOST", format!("127.0.0.1:{}", port))
       .arg("serve")
-      .stdout(Stdio::null())
-      .stderr(Stdio::null());
+      .stdout(Stdio::from(out))
+      .stderr(Stdio::from(err));
 
     match cmd.spawn() {
       Ok(child) => {
@@ -265,20 +274,20 @@ async fn start_ollama_server(port: u16) -> Result<(), String> {
         }
         // Esperar readiness del endpoint /api/tags
         let mut ready = false;
-        for _ in 0..40 { // ~8s
+        for _ in 0..120 { // ~24s
           if let Ok(resp) = client.get(&url).send().await {
             if resp.status().is_success() { ready = true; break; }
           }
           sleep(Duration::from_millis(200)).await;
         }
-        if ready { eprintln!("[tauri] ollama listo en {}", url); return Ok(()); }
+        if ready { let _ = writeln!(logf, "[tauri] ollama listo en {}", url); return Ok(()); }
         last_err = Some("ollama serve did not become ready".into());
         // Si no estuvo listo, matar e intentar siguiente candidato
         let mut guard = OLLAMA_CHILD.lock().await;
         if let Some(child) = guard.as_mut() { let _ = child.kill(); }
         *guard = None;
       },
-      Err(e) => { eprintln!("[tauri] fallo al ejecutar '{}': {}", bin, e); last_err = Some(format!("{}", e)); }
+      Err(e) => { let _ = writeln!(logf, "[tauri] fallo al ejecutar '{}': {}", bin, e); last_err = Some(format!("{}", e)); }
     }
   }
   
@@ -286,23 +295,24 @@ async fn start_ollama_server(port: u16) -> Result<(), String> {
   #[cfg(target_os = "macos")]
   {
     if last_err.is_none() { last_err = Some("no candidate bin worked".into()); }
-    eprintln!("[tauri] intentando abrir Ollama.app");
+    let _ = writeln!(logf, "[tauri] intentando abrir Ollama.app");
     let _ = Command::new("open")
       .arg("-a").arg("Ollama")
       .stdout(Stdio::null())
       .stderr(Stdio::null())
       .status();
-    // Esperar hasta 12s
+    // Esperar hasta 24s
     let mut attempts = 0u32;
-    while attempts < 60 {
+    while attempts < 120 {
       if let Ok(resp) = client.get(&url).send().await {
-        if resp.status().is_success() { eprintln!("[tauri] Ollama.app lista"); return Ok(()); }
+        if resp.status().is_success() { let _ = writeln!(logf, "[tauri] Ollama.app lista"); return Ok(()); }
       }
       sleep(Duration::from_millis(200)).await;
       attempts += 1;
     }
     last_err = Some("opened Ollama.app but server not ready".into());
   }
+  let _ = writeln!(logf, "[tauri] cannot start ollama serve: {}", last_err.clone().unwrap_or_else(|| "unknown error".into()));
   Err(format!("cannot start ollama serve: {}", last_err.unwrap_or_else(|| "unknown error".into())))
 }
 

@@ -9,6 +9,8 @@ const pwaConfig = withPWA({
   skipWaiting: true,
   // Desactivar PWA en Tauri para evitar problemas con service workers en esquemas no-HTTP
   disable: isDev || isTauri,
+  // Evitar precachear manifestos internos que no existen en standalone dev
+  buildExcludes: [/app-build-manifest\.json$/],
   runtimeCaching: [
     {
       urlPattern: /^https?.*/,
@@ -35,16 +37,17 @@ const nextConfig = {
       {
         source: "/_next/static/:path*",
         headers: [
-          { key: "Cache-Control", value: "no-store, no-cache, must-revalidate, proxy-revalidate" },
+          {
+            key: "Cache-Control",
+            value: "no-store, no-cache, must-revalidate, proxy-revalidate",
+          },
           { key: "Pragma", value: "no-cache" },
           { key: "Expires", value: "0" },
         ],
       },
       {
         source: "/sw.js",
-        headers: [
-          { key: "Cache-Control", value: "no-store" },
-        ],
+        headers: [{ key: "Cache-Control", value: "no-store" }],
       },
     ];
   },
