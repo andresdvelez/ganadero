@@ -9,6 +9,7 @@ use tokio::time::sleep;
 use std::time::Duration;
 
 static SERVER_CHILD: tauri::async_runtime::Mutex<Option<Child>> = tauri::async_runtime::Mutex::const_new(None);
+static OLLAMA_CHILD: tauri::async_runtime::Mutex<Option<Child>> = tauri::async_runtime::Mutex::const_new(None);
 
 fn load_env_from_file(path: &std::path::Path) -> std::collections::HashMap<String, String> {
   let mut map = std::collections::HashMap::new();
@@ -33,7 +34,10 @@ async fn download_model(url: String, sha256_hex: Option<String>, app: tauri::App
   let dir = app.path_resolver().app_data_dir().ok_or("app_data_dir not found")?;
   let models_dir = dir.join("models");
   if let Err(e) = create_dir_all(&models_dir) { return Err(format!("cannot create models dir: {}", e)); }
-  let filename = url.split('/').last().unwrap_or("model.gguf");
+  let last_seg = url.split('/').last().unwrap_or("model.gguf");
+  let no_query = last_seg.split('?').next().unwrap_or(last_seg);
+  let no_fragment = no_query.split('#').next().unwrap_or(no_query);
+  let filename = if no_fragment.is_empty() { "model.gguf" } else { no_fragment };
   let target = models_dir.join(filename);
 
   let client = reqwest::Client::new();
@@ -53,6 +57,13 @@ async fn download_model(url: String, sha256_hex: Option<String>, app: tauri::App
     let _ = window.emit("model-download-progress", serde_json::json!({"downloaded": downloaded, "total": total }));
   }
   writer.flush().map_err(|e| e.to_string())?;
+
+  // Validación rápida de tamaño (evitar archivos de pocos bytes o incompletos)
+  if let Ok(meta) = std::fs::metadata(&target) {
+    if meta.len() < 100 * 1024 * 1024 { // < 100MB se considera inválido para modelos GGUF
+      return Err(format!("downloaded file too small ({} bytes)", meta.len()));
+    }
+  }
 
   if let Some(expected) = sha256_hex {
     use sha2::{Digest, Sha256};
@@ -116,6 +127,13 @@ async fn download_llama_binary(app: tauri::AppHandle) -> Result<String, String> 
     std::fs::set_permissions(&target, perms).map_err(|e| e.to_string())?;
   }
 
+  // Validar tamaño mínimo para evitar descargas corruptas
+  if let Ok(meta) = std::fs::metadata(&target) {
+    if meta.len() < 100 * 1024 { // <100KB improbable para un binario válido
+      return Err("downloaded llama-server seems corrupted (too small)".into());
+    }
+  }
+
   Ok(target.to_string_lossy().into_owned())
 }
 
@@ -160,41 +178,117 @@ async fn stop_llama_server() -> Result<(), String> {
 
 #[tauri::command]
 fn find_available_model(app: tauri::AppHandle) -> Result<String, String> {
-  // 1) Buscar en app_data_dir/models
+  // Escanear varias ubicaciones y elegir el .gguf de MAYOR tamaño
+  let mut candidates: Vec<std::path::PathBuf> = Vec::new();
   if let Some(dir) = app.path_resolver().app_data_dir() {
-    let md = dir.join("models");
-    if let Ok(mut rd) = std::fs::read_dir(&md) {
-      if let Some(Ok(e)) = rd.find(|e| e.as_ref().ok().map(|x| x.path().extension().and_then(|s| s.to_str()).unwrap_or("") == "gguf").unwrap_or(false)) {
-        return Ok(e.path().to_string_lossy().into_owned());
-      }
-    }
+    candidates.push(dir.join("models"));
   }
-  // 2) Buscar en resource_dir/models (bundled)
   if let Some(rd) = app.path_resolver().resource_dir() {
-    let md = rd.join("models");
-    if let Ok(mut it) = std::fs::read_dir(&md) {
-      if let Some(Ok(e)) = it.find(|e| e.as_ref().ok().map(|x| x.path().extension().and_then(|s| s.to_str()).unwrap_or("") == "gguf").unwrap_or(false)) {
-        return Ok(e.path().to_string_lossy().into_owned());
-      }
-    }
+    candidates.push(rd.join("models"));
   }
-  // 3) En desarrollo: intentar src-tauri/models relativo al cwd
   if cfg!(debug_assertions) {
     if let Ok(cwd) = std::env::current_dir() {
-      let md = cwd.join("src-tauri").join("models");
-      if let Ok(mut it) = std::fs::read_dir(&md) {
-        if let Some(Ok(e)) = it.find(|e| e.as_ref().ok().map(|x| x.path().extension().and_then(|s| s.to_str()).unwrap_or("") == "gguf").unwrap_or(false)) {
-          return Ok(e.path().to_string_lossy().into_owned());
+      candidates.push(cwd.join("src-tauri").join("models"));
+    }
+  }
+
+  let mut best: Option<(u64, std::path::PathBuf)> = None;
+  for dir in candidates {
+    if let Ok(rd) = std::fs::read_dir(&dir) {
+      for entry in rd.flatten() {
+        let p = entry.path();
+        if p.extension().and_then(|s| s.to_str()).unwrap_or("") == "gguf" {
+          if let Ok(meta) = std::fs::metadata(&p) {
+            let sz = meta.len();
+            if best.as_ref().map(|(b, _)| sz > *b).unwrap_or(true) {
+              best = Some((sz, p));
+            }
+          }
         }
       }
     }
   }
+
+  if let Some((_, path)) = best { return Ok(path.to_string_lossy().into_owned()); }
   Err("no local model found".into())
+}
+
+#[tauri::command]
+async fn start_ollama_server(port: u16) -> Result<(), String> {
+  // detener si ya hay uno
+  {
+    let mut guard = OLLAMA_CHILD.lock().await;
+    if let Some(child) = guard.as_mut() { let _ = child.kill(); }
+    *guard = None;
+  }
+
+  // Intentar usar binario del sistema
+  let mut cmd = Command::new("ollama");
+  cmd.env("OLLAMA_HOST", format!("127.0.0.1:{}", port))
+    .arg("serve")
+    .stdout(Stdio::null())
+    .stderr(Stdio::null());
+
+  match cmd.spawn() {
+    Ok(child) => {
+      let mut guard = OLLAMA_CHILD.lock().await;
+      *guard = Some(child);
+      Ok(())
+    },
+    Err(e) => Err(format!("cannot start ollama serve: {}", e))
+  }
+}
+
+#[tauri::command]
+async fn stop_ollama_server() -> Result<(), String> {
+  let mut guard = OLLAMA_CHILD.lock().await;
+  if let Some(child) = guard.as_mut() { let _ = child.kill(); }
+  *guard = None;
+  Ok(())
+}
+
+#[tauri::command]
+async fn ensure_ollama_model_available(app: tauri::AppHandle, tag: String, model_path: Option<String>) -> Result<(), String> {
+  // Verifica si el tag ya existe consultando el endpoint local
+  let port = std::env::var("NEXT_PUBLIC_LLAMA_PORT").ok().and_then(|s| s.parse::<u16>().ok()).unwrap_or(11434);
+  let client = reqwest::Client::builder().timeout(Duration::from_millis(1500)).build().map_err(|e| e.to_string())?;
+  let url = format!("http://127.0.0.1:{}/api/tags", port);
+  if let Ok(resp) = client.get(&url).send().await {
+    if let Ok(text) = resp.text().await {
+      if text.contains(&format!("\"{}\"", tag)) { return Ok(()); }
+    }
+  }
+
+  // Determinar ruta del GGUF
+  let gguf = if let Some(p) = model_path { p } else { find_available_model(app.clone())? };
+
+  // Crear Modelfile temporal
+  let dir = app.path_resolver().app_data_dir().ok_or("app_data_dir not found")?;
+  let tmp = dir.join("Modelfile");
+  {
+    let mut f = File::create(&tmp).map_err(|e| e.to_string())?;
+    let line = format!("FROM \"{}\"\n", gguf.replace('"', "\\\""));
+    f.write_all(line.as_bytes()).map_err(|e| e.to_string())?;
+  }
+
+  // Ejecutar `ollama create <tag> -f <Modelfile>`
+  let status = Command::new("ollama")
+    .arg("create")
+    .arg(&tag)
+    .arg("-f").arg(&tmp)
+    .env("OLLAMA_HOST", format!("127.0.0.1:{}", port))
+    .stdout(Stdio::null())
+    .stderr(Stdio::null())
+    .status()
+    .map_err(|e| e.to_string())?;
+
+  if !status.success() { return Err("ollama create failed".into()); }
+  Ok(())
 }
 
 fn main() {
   tauri::Builder::default()
-    .invoke_handler(tauri::generate_handler![download_model, models_dir, download_llama_binary, start_llama_server, stop_llama_server, find_available_model])
+    .invoke_handler(tauri::generate_handler![download_model, models_dir, download_llama_binary, start_llama_server, stop_llama_server, find_available_model, start_ollama_server, stop_ollama_server, ensure_ollama_model_available])
     .setup(|app| {
       // En desarrollo: no arrancar Next standalone; Tauri ya carga devPath
       if cfg!(debug_assertions) {
