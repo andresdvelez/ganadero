@@ -173,6 +173,73 @@ export const farmRouter = createTRPCRouter({
       });
     }),
 
+  updateField: protectedProcedure
+    .input(z.object({ 
+      id: z.string(), 
+      field: z.string(),
+      value: z.any()
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const me = await prisma.user.findUnique({
+        where: { clerkId: ctx.userId! },
+      });
+      if (!me) throw new Error("Usuario no encontrado");
+      
+      const farm = await prisma.farm.findUnique({ where: { id: input.id } });
+      if (!farm) throw new Error("Finca no encontrada");
+      
+      const membership = await prisma.organizationMembership.findFirst({
+        where: { orgId: farm.orgId, userId: me.id },
+      });
+      if (!membership) throw new Error("No perteneces a esa organización");
+
+      // Convert date strings to Date objects if needed
+      let value = input.value;
+      if (input.field.includes('Date') || input.field.includes('At')) {
+        value = value ? new Date(value as string) : null;
+      }
+      
+      return prisma.farm.update({
+        where: { id: input.id },
+        data: { [input.field]: value },
+      });
+    }),
+
+  updateBulk: protectedProcedure
+    .input(z.object({ 
+      id: z.string(), 
+      updates: z.record(z.string(), z.any())
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const me = await prisma.user.findUnique({
+        where: { clerkId: ctx.userId! },
+      });
+      if (!me) throw new Error("Usuario no encontrado");
+      
+      const farm = await prisma.farm.findUnique({ where: { id: input.id } });
+      if (!farm) throw new Error("Finca no encontrada");
+      
+      const membership = await prisma.organizationMembership.findFirst({
+        where: { orgId: farm.orgId, userId: me.id },
+      });
+      if (!membership) throw new Error("No perteneces a esa organización");
+
+      // Process updates and convert date strings
+      const processedUpdates: Record<string, any> = {};
+      for (const [field, value] of Object.entries(input.updates)) {
+        if (field.includes('Date') || field.includes('At')) {
+          processedUpdates[field] = value ? new Date(value as string) : null;
+        } else {
+          processedUpdates[field] = value;
+        }
+      }
+      
+      return prisma.farm.update({
+        where: { id: input.id },
+        data: processedUpdates,
+      });
+    }),
+
   calcUGG: protectedProcedure
     .input(
       z.object({
