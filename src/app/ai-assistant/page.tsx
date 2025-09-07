@@ -3107,24 +3107,18 @@ export default function AIAssistantPage() {
   const isOnline =
     typeof navigator === "undefined" ? true : navigator.onLine !== false;
   const overlayVisible = !isOnline && localModelAvailable === false;
-  // Auto-arranque en offline solo con Ollama
+  // Auto-arranque se realiza en el splash/layout; aquí solo comprobamos disponibilidad
   useEffect(() => {
     (async () => {
-      if (!isTauri) return;
-      if (typeof navigator !== "undefined" && navigator.onLine) return;
       try {
-        const { tauri } = (window as any).__TAURI__;
-        await tauri.invoke("start_ollama_server", { port: LLAMA_PORT });
-        await tauri.invoke("ensure_ollama_model_available", {
-          tag: "deepseek-r1-qwen-1_5b:latest",
-          modelPath: null,
-        });
-        setAIClientHost(`http://127.0.0.1:${LLAMA_PORT}`);
-        setLocalModelAvailable(true);
-        setLlamaRunning(true);
+        const ok = await aiClient.checkLocalAvailability();
+        if (ok) {
+          setLocalModelAvailable(true);
+          if (isTauri) setAIClientHost(`http://127.0.0.1:${LLAMA_PORT}`);
+        }
       } catch {}
     })();
-  }, [isTauri]);
+  }, [aiClient, isTauri, LLAMA_PORT]);
 
   const confirmAndExecute = async () => {
     if (!pendingAction) return;

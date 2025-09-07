@@ -222,6 +222,18 @@ async fn start_ollama_server(app: tauri::AppHandle, port: u16) -> Result<(), Str
   let log_path = logs_dir.join("ollama.log");
   let mut logf = OpenOptions::new().create(true).append(true).open(&log_path).map_err(|e| e.to_string())?;
   let _ = writeln!(logf, "[tauri] start_ollama_server: inicio puerto {}", port);
+  // Chequeo previo: si ya responde /api/tags en este puerto, no hacer nada
+  let pre_client = reqwest::Client::builder()
+    .timeout(Duration::from_millis(800))
+    .build()
+    .map_err(|e| e.to_string())?;
+  let pre_url = format!("http://127.0.0.1:{}/api/tags", port);
+  if let Ok(resp) = pre_client.get(&pre_url).send().await {
+    if resp.status().is_success() {
+      let _ = writeln!(logf, "[tauri] start_ollama_server: ya estaba listo en {}", pre_url);
+      return Ok(());
+    }
+  }
   // detener si ya hay uno
   {
     let mut guard = OLLAMA_CHILD.lock().await;
@@ -262,6 +274,7 @@ async fn start_ollama_server(app: tauri::AppHandle, port: u16) -> Result<(), Str
     let out = OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap());
     let err = OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap());
     cmd.env("OLLAMA_HOST", format!("127.0.0.1:{}", port))
+      .env("OLLAMA_ORIGINS", "http://localhost https://localhost http://127.0.0.1 https://127.0.0.1 app://* file://* tauri://*")
       .arg("serve")
       .stdout(Stdio::from(out))
       .stderr(Stdio::from(err));

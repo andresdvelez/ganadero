@@ -167,6 +167,11 @@ export default function RootLayout({
   }
 
   try{ bootLocalAI(); }catch{}
+
+  // Si la app pierde conexión en caliente, iniciar IA local automáticamente
+  try{
+    window.addEventListener('offline', function(){ try{ bootLocalAI(); }catch{} });
+  }catch{}
 })();
 `,
           }}

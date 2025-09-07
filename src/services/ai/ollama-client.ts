@@ -31,10 +31,13 @@ export class AIClient {
       if (isBrowser) lsHost = window.localStorage.getItem("OLLAMA_HOST");
     } catch {}
 
-    const tauriLocal = `http://127.0.0.1:${process.env.NEXT_PUBLIC_LLAMA_PORT || 11434}`;
-    const defaultHost = process.env.NODE_ENV === "development"
-      ? "http://127.0.0.1:11434"
-      : "/api/ollama"; // proxy solo en web prod
+    const tauriLocal = `http://127.0.0.1:${
+      process.env.NEXT_PUBLIC_LLAMA_PORT || 11434
+    }`;
+    const defaultHost =
+      process.env.NODE_ENV === "development"
+        ? "http://127.0.0.1:11434"
+        : "/api/ollama"; // proxy solo en web prod
 
     // En Tauri, forzar siempre localhost:11434 salvo que el usuario haya puesto explícitamente OLLAMA_HOST en localStorage
     if (isTauri) {
@@ -158,6 +161,8 @@ export class AIClient {
     const userPrompt = this.buildUserPrompt(query, context);
 
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 1000 * 25);
       const response = await fetch(`${this._ollamaHost}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -169,8 +174,9 @@ export class AIClient {
           ],
           stream: false,
         }),
+        signal: controller.signal,
       });
-
+      clearTimeout(timeout);
       if (!response.ok) throw new Error("Error de Ollama local");
       const data = await response.json();
       const content = data?.message?.content || data?.content || "";
