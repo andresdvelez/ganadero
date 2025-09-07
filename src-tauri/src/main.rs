@@ -273,8 +273,12 @@ async fn start_ollama_server(app: tauri::AppHandle, port: u16) -> Result<(), Str
     // Redirigir stdout/err al log para diagnósticos
     let out = OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap());
     let err = OpenOptions::new().create(true).append(true).open(&log_path).unwrap_or_else(|_| File::create(&log_path).unwrap());
+    // Importante: OLLAMA_ORIGINS debe ir separado por comas, no por espacios,
+    // para que Gin CORS no lo interprete como un único patrón y falle con
+    // "only one * is allowed".
+    let allowed_origins = "app://*,file://*,tauri://*,http://localhost,https://localhost,http://127.0.0.1,https://127.0.0.1";
     cmd.env("OLLAMA_HOST", format!("127.0.0.1:{}", port))
-      .env("OLLAMA_ORIGINS", "http://localhost https://localhost http://127.0.0.1 https://127.0.0.1 app://* file://* tauri://*")
+      .env("OLLAMA_ORIGINS", allowed_origins)
       .arg("serve")
       .stdout(Stdio::from(out))
       .stderr(Stdio::from(err));
