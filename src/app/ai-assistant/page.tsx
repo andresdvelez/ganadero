@@ -2649,6 +2649,12 @@ export default function AIAssistantPage() {
 
       let response: any;
       try {
+        try {
+          console.log("[AI] solicitando respuesta", {
+            online: typeof navigator === "undefined" ? true : navigator.onLine,
+            host: aiClient.ollamaHost,
+          });
+        } catch {}
         response = await aiClient.processQuery(textToSend, {
           currentModule: "chat",
           recentMessages: messages.slice(-5),
@@ -2662,11 +2668,28 @@ export default function AIAssistantPage() {
         try {
           console.error("Fallo consulta IA (offline/local):", e);
         } catch {}
+        const showDevError =
+          process.env.NODE_ENV !== "production" ||
+          (typeof window !== "undefined" &&
+            window.localStorage.getItem("DEBUG_AI") === "1");
+        const devDetails = (() => {
+          try {
+            const err = e as any;
+            const msg = err?.message || String(err);
+            const host = aiClient.ollamaHost;
+            const online =
+              typeof navigator === "undefined" ? true : navigator.onLine;
+            return `\n\n[DEV] online=${online} host=${host} error=${msg}`;
+          } catch {
+            return "";
+          }
+        })();
         const assistantMessage: Message = {
           id: (Date.now() + 1).toString(),
           role: "assistant",
           content:
-            "El asistente de IA no está disponible sin conexión en este momento. Verifica que el modelo local esté instalado y el servidor esté activo. Cuando recuperes internet, también podrás usar la IA en la nube.",
+            "El asistente de IA no está disponible sin conexión en este momento. Verifica que el modelo local esté instalado y el servidor esté activo. Cuando recuperes internet, también podrás usar la IA en la nube." +
+            (showDevError ? devDetails : ""),
           timestamp: new Date(),
           module: "error",
           action: "none",
@@ -2685,6 +2708,13 @@ export default function AIAssistantPage() {
         action: response.action,
       };
       setMessages((prev) => [...prev, assistantMessage]);
+      try {
+        console.log("[AI] respuesta recibida", {
+          module: response.module,
+          action: response.action,
+        });
+      } catch {}
+      setIsLoading(false);
 
       // Persist assistant message + queue
       await db.chatMessages.add({
