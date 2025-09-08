@@ -188,9 +188,17 @@ export default function RootLayout({
     }catch(e){ setMsg('Intentando abrir Ollama…'); }
     try{
       setMsg('Verificando/creando modelo DeepSeek…');
-      await window.__TAURI__.invoke('ensure_ollama_model_available', { tag: 'deepseek-r1-qwen-1_5b:latest', modelPath: null });
+      // Modelo más ligero por defecto para respuesta inicial más rápida
+      await window.__TAURI__.invoke('ensure_ollama_model_available', { tag: 'deepseek-r1:7b', modelPath: null });
       setMsg('Modelo local listo.');
     }catch(e){ setMsg('No fue posible preparar el modelo local aún.'); }
+    // Precalentar con consulta mínima
+    try{
+      await fetch('http://127.0.0.1:'+Number(window.process?.env?.NEXT_PUBLIC_LLAMA_PORT||11434)+'/api/chat', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ model: 'deepseek-r1:7b', messages:[{role:'user', content:'ok'}], stream:false, options:{ num_predict: 16 } })
+      });
+    }catch{}
     // Pequeña espera para dar feedback y luego ocultar splash
     try{ window.__BOOT_DONE__ = true; }catch{}
     setTimeout(hideSplash, 400);

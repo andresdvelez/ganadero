@@ -53,7 +53,14 @@ export class AIClient {
       ).replace(/\/$/, "");
     }
 
+    // Permitir override por localStorage (ej: OLLAMA_MODEL)
+    let lsModel: string | null = null;
+    try {
+      if (isBrowser) lsModel = window.localStorage.getItem("OLLAMA_MODEL");
+    } catch {}
+
     this.model =
+      lsModel ||
       config.model ||
       process.env.NEXT_PUBLIC_OLLAMA_MODEL ||
       "deepseek-r1-qwen-1_5b:latest";
@@ -197,6 +204,7 @@ export class AIClient {
       const controller = new AbortController();
       // Primer token en modelos locales puede tardar. Aumentamos timeout a 120s.
       const timeout = setTimeout(() => controller.abort(), 1000 * 120);
+      // Usar streaming para obtener el primer token lo antes posible
       const response = await fetch(`${this._ollamaHost}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -206,8 +214,7 @@ export class AIClient {
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
           ],
-          // Mantener modelo caliente y limitar tokens para respuestas ágiles
-          stream: false,
+          stream: true,
           keep_alive: "5m",
           options: {
             num_predict: 256,
@@ -216,11 +223,38 @@ export class AIClient {
         }),
         signal: controller.signal,
       });
+      if (!response.ok || !response.body) {
+        clearTimeout(timeout);
+        throw new Error("Error de Ollama local (sin cuerpo)");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulated = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        // El stream viene en líneas JSON separadas por \n
+        const lines = chunk.split(/\n+/).filter(Boolean);
+        for (const line of lines) {
+          try {
+            const obj = JSON.parse(line);
+            const part = obj?.message?.content ?? obj?.content ?? "";
+            if (part) accumulated += part;
+            // Notificar avance al consumidor (si lo solicita)
+            try {
+              if (typeof (context as any)?.onPartial === "function") {
+                (context as any).onPartial(accumulated);
+              }
+            } catch {}
+          } catch {
+            // líneas incompletas pueden aparecer; ignorar y continuar
+          }
+        }
+      }
       clearTimeout(timeout);
-      if (!response.ok) throw new Error("Error de Ollama local");
-      const data = await response.json();
-      const content = data?.message?.content || data?.content || "";
-      return this.parseAIResponse(content);
+      return this.parseAIResponse(accumulated.trim());
     } catch (error) {
       console.error(
         "[AI][local] host=",

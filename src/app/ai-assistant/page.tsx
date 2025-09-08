@@ -2655,6 +2655,22 @@ export default function AIAssistantPage() {
             host: aiClient.ollamaHost,
           });
         } catch {}
+        let stageText = "";
+        const stage = (t: string) => {
+          stageText = t;
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `stage-${Date.now()}`,
+              role: "assistant",
+              content: t,
+              timestamp: new Date(),
+              module: "status",
+              action: "none",
+            } as any,
+          ]);
+        };
+        stage("Alistando la bestia…");
         response = await aiClient.processQuery(textToSend, {
           currentModule: "chat",
           recentMessages: messages.slice(-5),
@@ -2663,6 +2679,19 @@ export default function AIAssistantPage() {
           webSearch:
             webSearch &&
             (typeof navigator === "undefined" || navigator.onLine !== false),
+          onPartial: (txt: string) => {
+            // Actualización de estado entendible para vaquero
+            if (txt.length < 1) return;
+            if (txt.length < 30 && stageText !== "Arriando datos…")
+              stage("Arriando datos…");
+            else if (
+              txt.length < 120 &&
+              stageText !== "Desensillando la respuesta…"
+            )
+              stage("Desensillando la respuesta…");
+            else if (stageText !== "Ya casi, amarrando la idea…")
+              stage("Ya casi, amarrando la idea…");
+          },
         });
       } catch (e) {
         try {
