@@ -39,9 +39,11 @@ export class AIClient {
         ? "http://127.0.0.1:11434"
         : "/api/ollama"; // proxy solo en web prod
 
-    // En Tauri, forzar siempre localhost:11434 salvo que el usuario haya puesto explícitamente OLLAMA_HOST en localStorage
+    // En Tauri: preferir SIEMPRE el proxy interno del servidor Node sidecar (evita CORS)
+    // Puerto del sidecar (ver TRPCProvider): 4317
     if (isTauri) {
-      this._ollamaHost = (lsHost || tauriLocal).replace(/\/$/, "");
+      const tauriProxy = "http://127.0.0.1:4317/api/ollama";
+      this._ollamaHost = (lsHost || tauriProxy).replace(/\/$/, "");
     } else {
       this._ollamaHost = (
         lsHost ||
@@ -111,7 +113,22 @@ export class AIClient {
       if (ok) return true;
     } catch {}
 
-    // 2) Browser prod fallback: attempt direct localhost (user's machine)
+    // 2) En Tauri: intentar puerto directo de Ollama si el proxy no está disponible
+    try {
+      const isBrowser = typeof window !== "undefined";
+      const isTauri = isBrowser && !!(window as any).__TAURI__;
+      if (isTauri) {
+        const port = Number(process.env.NEXT_PUBLIC_LLAMA_PORT || 11434);
+        const direct = `http://127.0.0.1:${port}`;
+        const ok = await tryCheck(direct);
+        if (ok) {
+          this.setHost(direct);
+          return true;
+        }
+      }
+    } catch {}
+
+    // 3) En navegador (no Tauri), intentar localhost directo como fallback
     try {
       const isBrowser = typeof window !== "undefined";
       const isTauri = isBrowser && !!(window as any).__TAURI__;
