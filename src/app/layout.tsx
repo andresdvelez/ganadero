@@ -96,6 +96,33 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
 (function(){
+  // Defiere cualquier redirección hasta completar boot local en Tauri.
+  // En web, solo redirige si estás en pantallas de auth y no hay conexión.
+  try{
+    var p = location.pathname || '';
+    var isAuth = p.startsWith('/sign-in') || p.startsWith('/sign-up');
+    var isPublic = isAuth || p.startsWith('/device-unlock') || p.startsWith('/offline') || p.startsWith('/download');
+    function afterBoot(cb){
+      try{
+        if (!window.__TAURI__) { cb(); return; }
+      }catch{ cb(); return; }
+      var maxMs = 6000, step = 150, waited = 0;
+      var iv = setInterval(function(){
+        try{
+          if ((window.__BOOT_DONE__ === true) || waited >= maxMs) {
+            clearInterval(iv); cb();
+          }
+        }catch{}
+        waited += step;
+      }, step);
+    }
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      if (isAuth) {
+        afterBoot(function(){ try{ location.replace('/offline'); }catch{} });
+      }
+      // Para rutas no públicas, dejamos que AuthGate maneje la navegación tras el boot
+    }
+  }catch{}
   // Ocultar splash al finalizar carga o tras un pequeño delay de seguridad
   function hideSplash(){
     try{
@@ -107,6 +134,8 @@ export default function RootLayout({
       setTimeout(function(){ try{ el.style.display='none'; el.setAttribute('aria-hidden','true'); }catch{} }, 280);
     }catch{}
   }
+  // Fallback para asegurar que el splash no quede visible si no se dispara 'load'
+  try{ setTimeout(hideSplash, 1800); }catch{}
   if(document.readyState==='complete') { hideSplash(); }
   else { window.addEventListener('load', hideSplash); }
 
@@ -163,6 +192,7 @@ export default function RootLayout({
       setMsg('Modelo local listo.');
     }catch(e){ setMsg('No fue posible preparar el modelo local aún.'); }
     // Pequeña espera para dar feedback y luego ocultar splash
+    try{ window.__BOOT_DONE__ = true; }catch{}
     setTimeout(hideSplash, 400);
   }
 
