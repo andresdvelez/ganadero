@@ -2,7 +2,7 @@
 
 import { HeroUIProvider } from "@heroui/system";
 import { useRouter } from "next/navigation";
-import { ReactNode, useEffect, useMemo, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { TRPCProvider } from "@/lib/trpc/provider";
 import { AuthGate } from "./auth-gate";
 import { OnboardingGate } from "./onboarding-gate";
@@ -22,9 +22,9 @@ export function Providers({ children }: { children: ReactNode }) {
           setBootReady(true);
           return;
         }
-        let waited = 0,
-          step = 150,
-          maxMs = 6500;
+        let waited = 0;
+        const step = 150;
+        const maxMs = 6500;
         iv = setInterval(() => {
           try {
             // window.__BOOT_DONE__ lo setea el layout cuando termina preparación local

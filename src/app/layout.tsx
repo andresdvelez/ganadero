@@ -3,7 +3,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { esES } from "@clerk/localizations";
 import { Providers } from "@/providers/heroui-provider";
 import "./globals.css";
-import { GlobalShell } from "@/components/layout/global-shell";
+// import { GlobalShell } from "@/components/layout/global-shell";
 
 export const metadata: Metadata = {
   title: "Ganado AI - Plataforma de Gestión Ganadera",
