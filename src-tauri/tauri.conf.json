@@ -21,7 +21,7 @@
         ".next/standalone/server.js",
         ".env",
         "resources/models/DeepSeek-R1-Distill-Qwen-1.5B-Q8_0.gguf",
-        "resources/bin/**"
+        "resources/bin/ollama.gz"
       ],
       "externalBin": ["sidecar/node"],
       "icon": [

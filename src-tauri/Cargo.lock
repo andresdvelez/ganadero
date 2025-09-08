@@ -861,6 +861,7 @@ dependencies = [
 name = "ganado-ai-app"
 version = "0.1.1"
 dependencies = [
+ "flate2",
  "futures-util",
  "hex",
  "reqwest",

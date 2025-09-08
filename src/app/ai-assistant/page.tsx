@@ -3120,6 +3120,24 @@ export default function AIAssistantPage() {
     })();
   }, [aiClient, isTauri, LLAMA_PORT]);
 
+  // Cuando el navegador está offline, fuerza el host local para evitar proxies remotos
+  useEffect(() => {
+    const applyOfflineHost = () => {
+      try {
+        const offline =
+          typeof navigator !== "undefined" && navigator.onLine === false;
+        if (offline) {
+          setAIClientHost(`http://127.0.0.1:${LLAMA_PORT}`);
+        }
+      } catch {}
+    };
+    applyOfflineHost();
+    if (typeof window !== "undefined") {
+      window.addEventListener("offline", applyOfflineHost);
+      return () => window.removeEventListener("offline", applyOfflineHost);
+    }
+  }, [LLAMA_PORT]);
+
   const confirmAndExecute = async () => {
     if (!pendingAction) return;
     const act = pendingAction;

@@ -249,9 +249,34 @@ async fn start_ollama_server(app: tauri::AppHandle, port: u16) -> Result<(), Str
     "/usr/local/bin/ollama".to_string(),
     "/usr/bin/ollama".to_string(),
   ];
-  // Añadir binario empaquetado en Resources/bin/ollama si existe
-  if let Some(res_bin) = app.path_resolver().resolve_resource("bin/ollama") {
-    if res_bin.exists() { candidates.push(res_bin.to_string_lossy().into_owned()); }
+  // Añadir binario empaquetado: si existe comprimido (bin/ollama.gz), descomprimir a app_data/bin y usarlo
+  if let Some(res_gz) = app.path_resolver().resolve_resource("bin/ollama.gz") {
+    if res_gz.exists() {
+      let app_bin_dir = data_dir.join("bin");
+      let _ = std::fs::create_dir_all(&app_bin_dir);
+      let target = app_bin_dir.join("ollama");
+      if !target.exists() {
+        if let Ok(bytes) = std::fs::read(&res_gz) {
+          // Descomprimir gzip en memoria
+          use std::io::Read;
+          let mut gz = flate2::read::GzDecoder::new(&bytes[..]);
+          let mut out: Vec<u8> = Vec::new();
+          if gz.read_to_end(&mut out).is_ok() {
+            if std::fs::write(&target, &out).is_ok() {
+              #[cfg(unix)]
+              {
+                use std::os::unix::fs::PermissionsExt;
+                if let Ok(mut perms) = std::fs::metadata(&target).map(|m| m.permissions()) {
+                  perms.set_mode(0o755);
+                  let _ = std::fs::set_permissions(&target, perms);
+                }
+              }
+            }
+          }
+        }
+      }
+      if target.exists() { candidates.push(target.to_string_lossy().into_owned()); }
+    }
   }
   if let Some(res_bin) = app.path_resolver().resolve_resource("bin/ollama.exe") {
     if res_bin.exists() { candidates.push(res_bin.to_string_lossy().into_owned()); }

@@ -80,7 +80,13 @@ export class AIClient {
       process.env.NEXT_PUBLIC_OLLAMA_MODEL || "deepseek-r1-qwen-1_5b:latest";
 
     const tryCheck = async (base: string) => {
-      const res = await fetch(`${base.replace(/\/$/, "")}/api/tags`);
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), 3500);
+      const res = await fetch(`${base.replace(/\/$/, "")}/api/tags`, {
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      clearTimeout(t);
       if (!res.ok) return false;
       const data = await res.json();
       const models: Array<{ name?: string }> = data?.models || [];
@@ -124,14 +130,14 @@ export class AIClient {
   }
 
   async processQuery(query: string, context?: any): Promise<AIResponse> {
-    // Prefer cloud when online; server will decide if key exists
+    // Si estamos offline, no intentes nube primero para evitar "pensando..." indefinido
     const online = this.hasInternet();
 
     if (online) {
       try {
         return await this.processCloudQuery(query, context);
       } catch {
-        // fall through to local
+        // Si falla la nube, probar local
       }
     }
 
@@ -141,10 +147,12 @@ export class AIClient {
       return this.processLocalQuery(query, context);
     }
 
-    // Last attempt: try cloud even if earlier failed (in case network recovered quickly)
-    try {
-      return await this.processCloudQuery(query, context);
-    } catch {}
+    // Último intento: solo probar nube si volvimos a estar online
+    if (this.hasInternet()) {
+      try {
+        return await this.processCloudQuery(query, context);
+      } catch {}
+    }
 
     return {
       content:
@@ -161,6 +169,14 @@ export class AIClient {
     const userPrompt = this.buildUserPrompt(query, context);
 
     try {
+      console.log(
+        "[AI] online=",
+        this.hasInternet(),
+        "ollamaHost=",
+        this._ollamaHost,
+        "model=",
+        this.model
+      );
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 1000 * 25);
       const response = await fetch(`${this._ollamaHost}/api/chat`, {
@@ -182,6 +198,12 @@ export class AIClient {
       const content = data?.message?.content || data?.content || "";
       return this.parseAIResponse(content);
     } catch (error) {
+      console.error(
+        "[AI][local] host=",
+        this._ollamaHost,
+        "model=",
+        this.model
+      );
       console.error("Error en consulta local:", error);
       throw error;
     }

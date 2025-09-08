@@ -39,6 +39,14 @@ else
   touch "$(pwd)/src-tauri/resources/bin/.keep"
 fi
 
+# Ensure permissions and remove quarantine if present (macOS)
+if [ -f "$(pwd)/src-tauri/resources/bin/ollama" ]; then
+  chmod 0755 "$(pwd)/src-tauri/resources/bin/ollama" || true
+  if command -v xattr >/dev/null 2>&1; then
+    xattr -dr com.apple.quarantine "$(pwd)/src-tauri/resources/bin/ollama" || true
+  fi
+fi
+
 # Ensure npm uses current node
 TAURI=1 npm run build
 node ./scripts/assert-standalone.mjs
