@@ -19,9 +19,7 @@
         ".next/standalone/**",
         ".next/static/**",
         ".next/standalone/server.js",
-        ".env",
-        "resources/models/**",
-        "resources/bin/ollama.gz"
+        ".env"
       ],
       "externalBin": ["sidecar/node"],
       "icon": [
