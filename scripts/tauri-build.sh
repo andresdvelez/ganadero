@@ -24,6 +24,21 @@ echo "[tauri-build] Using node: $(command -v node) ($(node -v 2>/dev/null || ech
 TAURI=1 node ./scripts/tauri-prebuild.mjs
 node ./scripts/prepare-node-sidecar.mjs
 
+# Ensure bundled resources for local AI
+mkdir -p "$(pwd)/src-tauri/resources/models" "$(pwd)/src-tauri/resources/bin"
+
+# Copy local Ollama binary into resources/bin if present (macOS/Homebrew or PATH)
+if [ -x "/opt/homebrew/bin/ollama" ]; then
+  cp -f "/opt/homebrew/bin/ollama" "$(pwd)/src-tauri/resources/bin/ollama" || true
+elif [ -x "/usr/local/bin/ollama" ]; then
+  cp -f "/usr/local/bin/ollama" "$(pwd)/src-tauri/resources/bin/ollama" || true
+elif command -v ollama >/dev/null 2>&1; then
+  cp -f "$(command -v ollama)" "$(pwd)/src-tauri/resources/bin/ollama" || true
+else
+  # leave placeholder to satisfy bundler glob
+  touch "$(pwd)/src-tauri/resources/bin/.keep"
+fi
+
 # Ensure npm uses current node
 TAURI=1 npm run build
 node ./scripts/assert-standalone.mjs

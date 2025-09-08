@@ -20,9 +20,7 @@
         ".next/static/**",
         ".next/standalone/server.js",
         ".env",
-        "models",
-        "bin/**",
-        "resources/models/**",
+        "resources/models/DeepSeek-R1-Distill-Qwen-1.5B-Q8_0.gguf",
         "resources/bin/**"
       ],
       "externalBin": ["sidecar/node"],
