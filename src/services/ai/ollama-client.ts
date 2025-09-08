@@ -231,7 +231,8 @@ export class AIClient {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let accumulated = "";
-      while (true) {
+      let ended = false;
+      while (!ended) {
         const { value, done } = await reader.read();
         if (done) break;
         const chunk = decoder.decode(value, { stream: true });
@@ -240,6 +241,10 @@ export class AIClient {
         for (const line of lines) {
           try {
             const obj = JSON.parse(line);
+            if (obj?.done === true) {
+              ended = true;
+              break;
+            }
             const part = obj?.message?.content ?? obj?.content ?? "";
             if (part) accumulated += part;
             // Notificar avance al consumidor (si lo solicita)
