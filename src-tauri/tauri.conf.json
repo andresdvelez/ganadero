@@ -13,14 +13,14 @@
   "tauri": {
     "bundle": {
       "active": true,
-      "targets": "all",
+      "targets": ["app"],
       "identifier": "ai.ganado.app",
       "resources": [
         ".next/standalone/**",
         ".next/static/**",
         ".next/standalone/server.js",
         ".env",
-        "resources/models/DeepSeek-R1-Distill-Qwen-1.5B-Q8_0.gguf",
+        "resources/models/**",
         "resources/bin/ollama.gz"
       ],
       "externalBin": ["sidecar/node"],
