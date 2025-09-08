@@ -195,7 +195,8 @@ export class AIClient {
         this.model
       );
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 1000 * 25);
+      // Primer token en modelos locales puede tardar. Aumentamos timeout a 120s.
+      const timeout = setTimeout(() => controller.abort(), 1000 * 120);
       const response = await fetch(`${this._ollamaHost}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -205,7 +206,13 @@ export class AIClient {
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
           ],
+          // Mantener modelo caliente y limitar tokens para respuestas ágiles
           stream: false,
+          keep_alive: "5m",
+          options: {
+            num_predict: 256,
+            temperature: 0.2,
+          },
         }),
         signal: controller.signal,
       });

@@ -2714,6 +2714,7 @@ export default function AIAssistantPage() {
           action: response.action,
         });
       } catch {}
+      // Por si el render de widgets/acciones se toma tiempo, marcamos done aquí.
       setIsLoading(false);
 
       // Persist assistant message + queue
