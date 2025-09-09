@@ -27,8 +27,8 @@ async function proxy(req: NextRequest, ctx: { params: { path: string[] } }) {
       ? undefined
       : await req.arrayBuffer(),
     cache: "no-store",
-    // Node.js stream/fetch requiere duplex para requests con cuerpo que mantienen conexión abierta
-    // @ts-ignore
+    // Node.js fetch soporta 'duplex' para streaming en requests con cuerpo.
+    // @ts-expect-error Node fetch extensions
     duplex: "half",
   };
 

@@ -218,7 +218,7 @@ export class AIClient {
             options: { num_predict: 256, temperature: 0.2 },
           }),
           signal: controller.signal,
-          // @ts-ignore
+          // @ts-expect-error Node fetch extensions
           duplex: "half",
         });
         if (!response.ok || !response.body) {
@@ -291,7 +291,7 @@ export class AIClient {
               options: { num_predict: 16, temperature: 0.2 },
             }),
             signal: controller.signal,
-            // @ts-ignore
+            // @ts-expect-error Node fetch extensions
             duplex: "half",
           });
           clearTimeout(timeout);
