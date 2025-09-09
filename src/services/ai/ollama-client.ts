@@ -203,6 +203,24 @@ export class AIClient {
       );
       const sendChat = async (host: string, abortFirstByteMs: number) => {
         const controller = new AbortController();
+        const externalSignal: AbortSignal | undefined = (context as any)
+          ?.signal;
+        let onExternalAbort: (() => void) | null = null;
+        if (externalSignal) {
+          if (externalSignal.aborted) {
+            throw new Error("ABORTED_BY_USER");
+          }
+          onExternalAbort = () => {
+            try {
+              controller.abort();
+            } catch {}
+          };
+          try {
+            externalSignal.addEventListener("abort", onExternalAbort, {
+              once: true,
+            } as any);
+          } catch {}
+        }
         const globalTimeout = setTimeout(() => controller.abort(), 1000 * 300);
         const response = await fetch(`${host.replace(/\/$/, "")}/api/chat`, {
           method: "POST",
@@ -223,6 +241,13 @@ export class AIClient {
         });
         if (!response.ok || !response.body) {
           clearTimeout(globalTimeout);
+          try {
+            if (externalSignal && onExternalAbort)
+              externalSignal.removeEventListener(
+                "abort",
+                onExternalAbort as any
+              );
+          } catch {}
           throw new Error("Error de Ollama local (sin cuerpo)");
         }
         const reader = response.body.getReader();
@@ -246,6 +271,13 @@ export class AIClient {
           } catch (e) {
             clearTimeout(firstChunkTimer);
             clearTimeout(globalTimeout);
+            try {
+              if (externalSignal && onExternalAbort)
+                externalSignal.removeEventListener(
+                  "abort",
+                  onExternalAbort as any
+                );
+            } catch {}
             if (abortedForWarmup) throw new Error("WARMUP_REQUIRED");
             throw e;
           }
@@ -260,6 +292,13 @@ export class AIClient {
               if (obj?.done === true) {
                 clearTimeout(firstChunkTimer);
                 clearTimeout(globalTimeout);
+                try {
+                  if (externalSignal && onExternalAbort)
+                    externalSignal.removeEventListener(
+                      "abort",
+                      onExternalAbort as any
+                    );
+                } catch {}
                 return this.parseAIResponse(accumulated.trim());
               }
               const part = obj?.message?.content ?? obj?.content ?? "";
@@ -274,6 +313,10 @@ export class AIClient {
         }
         clearTimeout(firstChunkTimer);
         clearTimeout(globalTimeout);
+        try {
+          if (externalSignal && onExternalAbort)
+            externalSignal.removeEventListener("abort", onExternalAbort as any);
+        } catch {}
         return this.parseAIResponse(accumulated.trim());
       };
 

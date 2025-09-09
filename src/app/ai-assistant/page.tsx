@@ -2652,6 +2652,7 @@ export default function AIAssistantPage() {
       let draftId: string | null = null;
       let sawFirstChunk = false;
       let pendingTimer: ReturnType<typeof setTimeout> | null = null;
+      const requestController = new AbortController();
       try {
         try {
           console.log("[AI] solicitando respuesta", {
@@ -2703,6 +2704,7 @@ export default function AIAssistantPage() {
           webSearch:
             webSearch &&
             (typeof navigator === "undefined" || navigator.onLine !== false),
+          signal: requestController.signal,
           onPartial: (txt: string) => {
             // Actualización de estado entendible para vaquero
             if (txt.length < 1) return;
@@ -2808,6 +2810,9 @@ export default function AIAssistantPage() {
         } as any;
         setMessages((prev) => [...prev, assistantMessage]);
         setIsLoading(false);
+        try {
+          requestController.abort();
+        } catch {}
         return;
       }
 
@@ -3083,6 +3088,9 @@ export default function AIAssistantPage() {
     } finally {
       setIsLoading(false);
     }
+    try {
+      requestController.abort();
+    } catch {}
   };
 
   const handleResendLast = async () => {
