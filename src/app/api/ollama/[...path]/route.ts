@@ -27,15 +27,25 @@ async function proxy(req: NextRequest, ctx: { params: { path: string[] } }) {
       ? undefined
       : await req.arrayBuffer(),
     cache: "no-store",
+    // Node.js stream/fetch requiere duplex para requests con cuerpo que mantienen conexión abierta
+    // @ts-ignore
+    duplex: "half",
   };
 
   try {
     const res = await fetch(targetUrl, init as any);
     const headers = new Headers(res.headers);
     headers.set("access-control-allow-origin", "*");
+    // Si la respuesta es streaming (Transfer-Encoding: chunked), devolver el body como ReadableStream
+    if (res.body) {
+      return new NextResponse(res.body as any, { status: res.status, headers });
+    }
     const body = await res.arrayBuffer();
     return new NextResponse(body, { status: res.status, headers });
   } catch (e: any) {
+    try {
+      console.error("/api/ollama proxy error:", e?.message || e);
+    } catch {}
     return NextResponse.json(
       { error: e?.message || "Proxy error" },
       { status: 502 }

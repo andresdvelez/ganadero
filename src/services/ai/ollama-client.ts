@@ -201,65 +201,127 @@ export class AIClient {
         "model=",
         this.model
       );
-      const controller = new AbortController();
-      // Primer token en modelos locales puede tardar. Aumentamos timeout a 120s.
-      const timeout = setTimeout(() => controller.abort(), 1000 * 120);
-      // Usar streaming para obtener el primer token lo antes posible
-      const response = await fetch(`${this._ollamaHost}/api/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: this.model,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          stream: true,
-          keep_alive: "5m",
-          options: {
-            num_predict: 256,
-            temperature: 0.2,
-          },
-        }),
-        signal: controller.signal,
-      });
-      if (!response.ok || !response.body) {
-        clearTimeout(timeout);
-        throw new Error("Error de Ollama local (sin cuerpo)");
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let accumulated = "";
-      let ended = false;
-      while (!ended) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        // El stream viene en líneas JSON separadas por \n
-        const lines = chunk.split(/\n+/).filter(Boolean);
-        for (const line of lines) {
-          try {
-            const obj = JSON.parse(line);
-            if (obj?.done === true) {
-              ended = true;
-              break;
-            }
-            const part = obj?.message?.content ?? obj?.content ?? "";
-            if (part) accumulated += part;
-            // Notificar avance al consumidor (si lo solicita)
+      const sendChat = async (host: string, abortFirstByteMs: number) => {
+        const controller = new AbortController();
+        const globalTimeout = setTimeout(() => controller.abort(), 1000 * 300);
+        const response = await fetch(`${host.replace(/\/$/, "")}/api/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: this.model,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt },
+            ],
+            stream: true,
+            keep_alive: "5m",
+            options: { num_predict: 256, temperature: 0.2 },
+          }),
+          signal: controller.signal,
+          // @ts-ignore
+          duplex: "half",
+        });
+        if (!response.ok || !response.body) {
+          clearTimeout(globalTimeout);
+          throw new Error("Error de Ollama local (sin cuerpo)");
+        }
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let accumulated = "";
+        let firstChunk = false;
+        let abortedForWarmup = false;
+        const firstChunkTimer = setTimeout(() => {
+          if (!firstChunk) {
+            abortedForWarmup = true;
             try {
-              if (typeof (context as any)?.onPartial === "function") {
-                (context as any).onPartial(accumulated);
-              }
+              controller.abort();
             } catch {}
-          } catch {
-            // líneas incompletas pueden aparecer; ignorar y continuar
+          }
+        }, abortFirstByteMs);
+
+        while (true) {
+          let read;
+          try {
+            read = await reader.read();
+          } catch (e) {
+            clearTimeout(firstChunkTimer);
+            clearTimeout(globalTimeout);
+            if (abortedForWarmup) throw new Error("WARMUP_REQUIRED");
+            throw e;
+          }
+          const { value, done } = read;
+          if (done) break;
+          if (!firstChunk) firstChunk = true;
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split(/\n+/).filter(Boolean);
+          for (const line of lines) {
+            try {
+              const obj = JSON.parse(line);
+              if (obj?.done === true) {
+                clearTimeout(firstChunkTimer);
+                clearTimeout(globalTimeout);
+                return this.parseAIResponse(accumulated.trim());
+              }
+              const part = obj?.message?.content ?? obj?.content ?? "";
+              if (part) accumulated += part;
+              try {
+                if (typeof (context as any)?.onPartial === "function") {
+                  (context as any).onPartial(accumulated);
+                }
+              } catch {}
+            } catch {}
           }
         }
+        clearTimeout(firstChunkTimer);
+        clearTimeout(globalTimeout);
+        return this.parseAIResponse(accumulated.trim());
+      };
+
+      const warmup = async (host: string) => {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 1000 * 120);
+        try {
+          const r = await fetch(`${host.replace(/\/$/, "")}/api/generate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: this.model,
+              prompt: "ok",
+              stream: false,
+              options: { num_predict: 16, temperature: 0.2 },
+            }),
+            signal: controller.signal,
+            // @ts-ignore
+            duplex: "half",
+          });
+          clearTimeout(timeout);
+          if (!r.ok) throw new Error("warmup failed");
+        } catch (e) {
+          clearTimeout(timeout);
+        }
+      };
+
+      // 1) Intentar con host actual; si no llega primer byte en 10s, calentar y reintentar
+      try {
+        return await sendChat(this._ollamaHost, 10_000);
+      } catch (e: any) {
+        if (e?.message === "WARMUP_REQUIRED") {
+          await warmup(this._ollamaHost);
+          return await sendChat(this._ollamaHost, 30_000);
+        }
+        // Si el proxy 4317 falla, probar directo 11434 como fallback rápido en Tauri
+        try {
+          const port = Number(process.env.NEXT_PUBLIC_LLAMA_PORT || 11434);
+          const direct = `http://127.0.0.1:${port}`;
+          if (this._ollamaHost !== direct) {
+            await warmup(direct);
+            const res = await sendChat(direct, 30_000);
+            this.setHost(direct);
+            return res;
+          }
+        } catch {}
+        throw e;
       }
-      clearTimeout(timeout);
-      return this.parseAIResponse(accumulated.trim());
     } catch (error) {
       console.error(
         "[AI][local] host=",
