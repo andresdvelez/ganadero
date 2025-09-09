@@ -3088,9 +3088,7 @@ export default function AIAssistantPage() {
     } finally {
       setIsLoading(false);
     }
-    try {
-      requestController.abort();
-    } catch {}
+    // no-op
   };
 
   const handleResendLast = async () => {
