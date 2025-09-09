@@ -100,6 +100,7 @@ export default function AIAssistantPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const requestRef = useRef<AbortController | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [chatUuid, setChatUuid] = useState<string | null>(null);
   const [chatList, setChatList] = useState<OfflineChat[]>([]);
@@ -2653,6 +2654,8 @@ export default function AIAssistantPage() {
       let sawFirstChunk = false;
       let pendingTimer: ReturnType<typeof setTimeout> | null = null;
       const requestController = new AbortController();
+      requestRef.current = requestController;
+      let hardTimeout: ReturnType<typeof setTimeout> | null = null;
       try {
         try {
           console.log("[AI] solicitando respuesta", {
@@ -2696,6 +2699,15 @@ export default function AIAssistantPage() {
           ]);
         };
         stage("Alistando la bestia…");
+        // hard timeout 90s para evitar quedarse colgado si no llega nada
+        try {
+          hardTimeout = setTimeout(() => {
+            try {
+              requestController.abort();
+            } catch {}
+          }, 90_000);
+        } catch {}
+
         response = await aiClient.processQuery(textToSend, {
           currentModule: "chat",
           recentMessages: messages.slice(-5),
@@ -2750,6 +2762,9 @@ export default function AIAssistantPage() {
       } catch (e) {
         try {
           if (pendingTimer) clearTimeout(pendingTimer);
+        } catch {}
+        try {
+          if (hardTimeout) clearTimeout(hardTimeout);
         } catch {}
         try {
           console.error("Fallo consulta IA (offline/local):", e);
@@ -2813,6 +2828,7 @@ export default function AIAssistantPage() {
         try {
           requestController.abort();
         } catch {}
+        requestRef.current = null;
         return;
       }
 
@@ -2855,6 +2871,10 @@ export default function AIAssistantPage() {
       try {
         if (pendingTimer) clearTimeout(pendingTimer);
       } catch {}
+      try {
+        if (hardTimeout) clearTimeout(hardTimeout);
+      } catch {}
+      requestRef.current = null;
 
       // Persistir contenido del asistente + cola de sync
       await db.chatMessages.add({
@@ -4991,9 +5011,21 @@ export default function AIAssistantPage() {
 
                   {isLoading && (
                     <div className="mx-auto max-w-3xl">
-                      <div className="inline-flex items-center gap-2 rounded-2xl bg-white border border-neutral-200 px-4 py-2 shadow-sm">
+                      <div className="inline-flex items-center gap-3 rounded-2xl bg-white border border-neutral-200 px-4 py-2 shadow-sm">
                         <span className="typing-dots" />
                         <span className="text-neutral-600">Pensando…</span>
+                        <Button
+                          size="sm"
+                          variant="light"
+                          onPress={() => {
+                            try {
+                              requestRef.current?.abort();
+                            } catch {}
+                            setIsLoading(false);
+                          }}
+                        >
+                          Cancelar
+                        </Button>
                       </div>
                     </div>
                   )}
