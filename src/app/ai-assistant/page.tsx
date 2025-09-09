@@ -2656,6 +2656,8 @@ export default function AIAssistantPage() {
           });
         } catch {}
         let stageText = "";
+        let draftId: string | null = null;
+        let sawFirstChunk = false;
         const stage = (t: string) => {
           stageText = t;
           setMessages((prev) => [
@@ -2682,15 +2684,40 @@ export default function AIAssistantPage() {
           onPartial: (txt: string) => {
             // Actualización de estado entendible para vaquero
             if (txt.length < 1) return;
-            if (txt.length < 30 && stageText !== "Arriando datos…")
-              stage("Arriando datos…");
-            else if (
+            if (!sawFirstChunk) {
+              sawFirstChunk = true;
+              // Quitar "Pensando…" tan pronto como llegue el primer token
+              setIsLoading(false);
+              draftId = `assistant-draft-${Date.now()}`;
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: draftId!,
+                  role: "assistant",
+                  content: txt,
+                  timestamp: new Date(),
+                  module: "chat",
+                  action: "answer",
+                } as any,
+              ]);
+              if (stageText !== "Arriando datos…") stage("Arriando datos…");
+              return;
+            }
+            // Actualizar el borrador en vivo
+            if (draftId) {
+              const content = txt;
+              setMessages((prev) =>
+                prev.map((m: any) => (m.id === draftId ? { ...m, content } : m))
+              );
+            }
+            if (
               txt.length < 120 &&
               stageText !== "Desensillando la respuesta…"
-            )
+            ) {
               stage("Desensillando la respuesta…");
-            else if (stageText !== "Ya casi, amarrando la idea…")
+            } else if (stageText !== "Ya casi, amarrando la idea…") {
               stage("Ya casi, amarrando la idea…");
+            }
           },
         });
       } catch (e) {
@@ -2728,15 +2755,31 @@ export default function AIAssistantPage() {
         return;
       }
 
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: String(response.content ?? ""),
-        timestamp: new Date(),
-        module: response.module,
-        action: response.action,
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
+      // Si hubo borrador, reemplazar su contenido final; si no, agregar mensaje nuevo
+      if (draftId) {
+        setMessages((prev) =>
+          prev.map((m: any) =>
+            m.id === draftId
+              ? {
+                  ...m,
+                  content: String(response.content ?? ""),
+                  module: response.module,
+                  action: response.action,
+                }
+              : m
+          )
+        );
+      } else {
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: String(response.content ?? ""),
+          timestamp: new Date(),
+          module: response.module,
+          action: response.action,
+        } as any;
+        setMessages((prev) => [...prev, assistantMessage]);
+      }
       try {
         console.log("[AI] respuesta recibida", {
           module: response.module,
