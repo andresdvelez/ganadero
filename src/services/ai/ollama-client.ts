@@ -255,6 +255,7 @@ export class AIClient {
         let accumulated = "";
         let firstChunk = false;
         let abortedForWarmup = false;
+        let buffer = "";
         const firstChunkTimer = setTimeout(() => {
           if (!firstChunk) {
             abortedForWarmup = true;
@@ -283,12 +284,17 @@ export class AIClient {
           }
           const { value, done } = read;
           if (done) break;
-          if (!firstChunk) firstChunk = true;
           const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split(/\n+/).filter(Boolean);
-          for (const line of lines) {
+          buffer += chunk;
+          let newlineIndex = buffer.indexOf("\n");
+          while (newlineIndex !== -1) {
+            const line = buffer.slice(0, newlineIndex).trim();
+            buffer = buffer.slice(newlineIndex + 1);
+            newlineIndex = buffer.indexOf("\n");
+            if (!line) continue;
             try {
               const obj = JSON.parse(line);
+              if (!firstChunk) firstChunk = true;
               if (obj?.done === true) {
                 clearTimeout(firstChunkTimer);
                 clearTimeout(globalTimeout);
@@ -308,6 +314,18 @@ export class AIClient {
                   (context as any).onPartial(accumulated);
                 }
               } catch {}
+            } catch {
+              // Si una línea no es JSON válido, la ignoramos pero mantenemos el buffer
+            }
+          }
+          // Si es el primer paquete pero aún no pudimos parsear JSON completo,
+          // emite un onPartial mínimo para quitar el loader si hay texto legible
+          if (!firstChunk && buffer.length > 0) {
+            firstChunk = true;
+            try {
+              if (typeof (context as any)?.onPartial === "function") {
+                (context as any).onPartial("");
+              }
             } catch {}
           }
         }
