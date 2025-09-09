@@ -2651,6 +2651,7 @@ export default function AIAssistantPage() {
       // Variables para gestionar el streaming y el borrador fuera del try/catch
       let draftId: string | null = null;
       let sawFirstChunk = false;
+      let pendingTimer: ReturnType<typeof setTimeout> | null = null;
       try {
         try {
           console.log("[AI] solicitando respuesta", {
@@ -2659,6 +2660,26 @@ export default function AIAssistantPage() {
           });
         } catch {}
         let stageText = "";
+        // Fallback: si en 12s no llega el primer token, quitar "Pensando…" y avisar
+        try {
+          pendingTimer = setTimeout(() => {
+            if (!sawFirstChunk) {
+              setIsLoading(false);
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: `assistant-warmup-${Date.now()}`,
+                  role: "assistant",
+                  content:
+                    "Estoy calentando el modelo local… Si es la primera vez, puede tardar un poco.",
+                  timestamp: new Date(),
+                  module: "chat",
+                  action: "warmup",
+                } as any,
+              ]);
+            }
+          }, 12_000);
+        } catch {}
         const stage = (t: string) => {
           stageText = t;
           setMessages((prev) => [
@@ -2689,6 +2710,9 @@ export default function AIAssistantPage() {
               sawFirstChunk = true;
               // Quitar "Pensando…" tan pronto como llegue el primer token
               setIsLoading(false);
+              try {
+                if (pendingTimer) clearTimeout(pendingTimer);
+              } catch {}
               draftId = `assistant-draft-${Date.now()}`;
               setMessages((prev) => [
                 ...prev,
@@ -2723,12 +2747,12 @@ export default function AIAssistantPage() {
         });
       } catch (e) {
         try {
+          if (pendingTimer) clearTimeout(pendingTimer);
+        } catch {}
+        try {
           console.error("Fallo consulta IA (offline/local):", e);
         } catch {}
-        const showDevError =
-          process.env.NODE_ENV !== "production" ||
-          (typeof window !== "undefined" &&
-            window.localStorage.getItem("DEBUG_AI") === "1");
+        const showDevError = true;
         const devDetails = (() => {
           try {
             const err = e as any;
@@ -2736,7 +2760,38 @@ export default function AIAssistantPage() {
             const host = aiClient.ollamaHost;
             const online =
               typeof navigator === "undefined" ? true : navigator.onLine;
-            return `\n\n[DEV] online=${online} host=${host} error=${msg}`;
+            const status = err?.status || err?.response?.status;
+            const code = err?.code || err?.response?.code;
+            const name = err?.name;
+            const stackShort = (() => {
+              try {
+                return String(err?.stack || "")
+                  .split("\n")
+                  .slice(0, 3)
+                  .join(" | ");
+              } catch {
+                return "";
+              }
+            })();
+            const lh = (() => {
+              try {
+                return window.localStorage.getItem("OLLAMA_HOST") || "";
+              } catch {
+                return "";
+              }
+            })();
+            const lm = (() => {
+              try {
+                return window.localStorage.getItem("OLLAMA_MODEL") || "";
+              } catch {
+                return "";
+              }
+            })();
+            return `\n\n[DEBUG_AI] online=${online} host=${host} ls.OLLAMA_HOST=${lh} ls.OLLAMA_MODEL=${lm} name=${
+              name || "-"
+            } code=${code || "-"} status=${
+              status || "-"
+            } msg=${msg} stack=${stackShort}`;
           } catch {
             return "";
           }
@@ -2745,7 +2800,7 @@ export default function AIAssistantPage() {
           id: (Date.now() + 1).toString(),
           role: "assistant",
           content:
-            "El asistente de IA no está disponible sin conexión en este momento. Verifica que el modelo local esté instalado y el servidor esté activo. Cuando recuperes internet, también podrás usar la IA en la nube." +
+            "Error al consultar la IA local. Revisa el servidor/modelo y vuelve a intentar." +
             (showDevError ? devDetails : ""),
           timestamp: new Date(),
           module: "error",
@@ -2757,13 +2812,14 @@ export default function AIAssistantPage() {
       }
 
       // Si hubo borrador, reemplazar su contenido final; si no, agregar mensaje nuevo
+      const finalAssistantContent = String(response.content ?? "");
       if (draftId) {
         setMessages((prev) =>
           prev.map((m: any) =>
             m.id === draftId
               ? {
                   ...m,
-                  content: String(response.content ?? ""),
+                  content: finalAssistantContent,
                   module: response.module,
                   action: response.action,
                 }
@@ -2771,15 +2827,17 @@ export default function AIAssistantPage() {
           )
         );
       } else {
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          content: String(response.content ?? ""),
-          timestamp: new Date(),
-          module: response.module,
-          action: response.action,
-        } as any;
-        setMessages((prev) => [...prev, assistantMessage]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            content: finalAssistantContent,
+            timestamp: new Date(),
+            module: response.module,
+            action: response.action,
+          } as any,
+        ]);
       }
       try {
         console.log("[AI] respuesta recibida", {
@@ -2789,12 +2847,15 @@ export default function AIAssistantPage() {
       } catch {}
       // Por si el render de widgets/acciones se toma tiempo, marcamos done aquí.
       setIsLoading(false);
+      try {
+        if (pendingTimer) clearTimeout(pendingTimer);
+      } catch {}
 
-      // Persist assistant message + queue
+      // Persistir contenido del asistente + cola de sync
       await db.chatMessages.add({
         chatUuid: currentChatUuid!,
         role: "assistant",
-        content: assistantMessage.content,
+        content: finalAssistantContent,
         createdAt: new Date(),
       } as OfflineChatMessage);
       await db.chats
@@ -2807,18 +2868,18 @@ export default function AIAssistantPage() {
         {
           sessionId: currentChatUuid,
           role: "assistant",
-          content: assistantMessage.content,
+          content: finalAssistantContent,
           createdAt: new Date().toISOString(),
         },
         "dev-user"
       );
 
-      // Record assistant server-side (for summaries, future extractions if needed)
+      // Registrar mensaje del asistente en el servidor (resúmenes, extracciones futuras)
       try {
         await recordMessage.mutateAsync({
           sessionId: currentChatUuid!,
           role: "assistant",
-          content: assistantMessage.content,
+          content: finalAssistantContent,
         });
       } catch {}
 
