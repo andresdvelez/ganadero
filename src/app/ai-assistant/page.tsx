@@ -2648,6 +2648,9 @@ export default function AIAssistantPage() {
       } catch {}
 
       let response: any;
+      // Variables para gestionar el streaming y el borrador fuera del try/catch
+      let draftId: string | null = null;
+      let sawFirstChunk = false;
       try {
         try {
           console.log("[AI] solicitando respuesta", {
@@ -2656,8 +2659,6 @@ export default function AIAssistantPage() {
           });
         } catch {}
         let stageText = "";
-        let draftId: string | null = null;
-        let sawFirstChunk = false;
         const stage = (t: string) => {
           stageText = t;
           setMessages((prev) => [
