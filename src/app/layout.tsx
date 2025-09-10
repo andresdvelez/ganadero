@@ -183,6 +183,47 @@ export default function RootLayout({
   // En Tauri, desregistrar SW al inicio para evitar Workbox 404
   try{ if(window.__TAURI__){ navigator.serviceWorker?.getRegistrations().then(rs=>Promise.all(rs.map(r=>r.unregister()))); } }catch{}
 
+  // Crear UI de logs/acciones en el splash de inmediato (antes del boot)
+  function ensureSplashUI(){
+    try{
+      var layer = document.getElementById('__splash_layer');
+      if(!layer) return null;
+      var pre = document.getElementById('__splash_log');
+      if(!pre){
+        var title = document.getElementById('__splash_log_title');
+        if(!title){
+          title = document.createElement('div');
+          title.id='__splash_log_title';
+          title.textContent='Registros del arranque';
+          title.style.cssText='margin-top:10px;width:100%;max-width:720px;font-size:12px;color:rgba(255,255,255,0.85);font-weight:600;';
+          layer.appendChild(title);
+        }
+        pre = document.createElement('pre');
+        pre.id='__splash_log';
+        pre.style.cssText='margin:6px 0 0 0;max-height:22vh;overflow:auto;font-size:11px;line-height:1.2;background:rgba(0,0,0,0.25);padding:8px;border-radius:8px;white-space:pre-wrap;width:100%;max-width:720px;';
+        layer.appendChild(pre);
+        var wrap = document.getElementById('__splash_actions');
+        if(!wrap){
+          wrap = document.createElement('div');
+          wrap.id='__splash_actions';
+          wrap.style.cssText='margin-top:10px;display:flex;gap:8px;width:100%;max-width:720px;justify-content:flex-start;';
+          var btnRetry = document.createElement('button');
+          btnRetry.id='__splash_btn_retry';
+          btnRetry.textContent='Reintentar';
+          btnRetry.style.cssText='padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.35);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;backdrop-filter:blur(3px)';
+          var btnCopy = document.createElement('button');
+          btnCopy.id='__splash_btn_copy';
+          btnCopy.textContent='Copiar log';
+          btnCopy.style.cssText='padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.35);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;backdrop-filter:blur(3px)';
+          wrap.appendChild(btnRetry); wrap.appendChild(btnCopy);
+          layer.appendChild(wrap);
+        }
+      }
+      return pre;
+    }catch{return null}
+  }
+  try{ ensureSplashUI(); }catch{}
+
   // Boot secuencial de IA local durante splash (solo Tauri, bloqueante)
   async function bootLocalAI(){
     if(!window.__TAURI__) return;
@@ -198,53 +239,16 @@ export default function RootLayout({
       setMsg('No fue posible preparar la IA local. Reintenta o copia el log.');
       // Mantener el splash visible; los botones de reintento/copiar log ya están disponibles
     }
-    // Área de logs simple en el splash (reutilizable entre reintentos)
-    var logBox = (function(){
+    // Asegurar UI y enlazar acciones ahora
+    var logBox = ensureSplashUI();
+    (function(){
       try{
-        var layer = document.getElementById('__splash_layer');
-        var pre = document.getElementById('__splash_log');
-        if(!pre){
-          // Título compacto
-          var title = document.createElement('div');
-          title.id='__splash_log_title';
-          title.textContent='Registros del arranque';
-          title.style.cssText='margin-top:10px;width:100%;max-width:720px;font-size:12px;color:rgba(255,255,255,0.85);font-weight:600;';
-          layer?.appendChild(title);
-          pre = document.createElement('pre');
-          pre.id='__splash_log';
-          pre.style.cssText='margin:6px 0 0 0;max-height:22vh;overflow:auto;font-size:11px;line-height:1.2;background:rgba(0,0,0,0.25);padding:8px;border-radius:8px;white-space:pre-wrap;width:100%;max-width:720px;';
-          layer?.appendChild(pre);
-        }
-        return pre as any;
-      }catch{}
-      return null;
-    })();
-    // Barra de acciones (reintentar/copiar log)
-    var actions = (function(){
-      try{
-        var layer = document.getElementById('__splash_layer');
-        var wrap = document.getElementById('__splash_actions');
-        if(!wrap){
-          wrap = document.createElement('div');
-          wrap.id='__splash_actions';
-          wrap.style.cssText='margin-top:10px;display:flex;gap:8px;width:100%;max-width:720px;justify-content:flex-start;';
-          var btnRetry = document.createElement('button');
-          btnRetry.id='__splash_btn_retry';
-          btnRetry.textContent='Reintentar';
-          btnRetry.style.cssText='padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.35);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;backdrop-filter:blur(3px)';
-          var btnCopy = document.createElement('button');
-          btnCopy.id='__splash_btn_copy';
-          btnCopy.textContent='Copiar log';
-          btnCopy.style.cssText='padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.35);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;backdrop-filter:blur(3px)';
-          wrap.appendChild(btnRetry); wrap.appendChild(btnCopy);
-          layer?.appendChild(wrap);
-        }
         var btnRetryEl = document.getElementById('__splash_btn_retry');
         var btnCopyEl = document.getElementById('__splash_btn_copy');
         if(btnRetryEl && !(btnRetryEl as any).dataset?.bound){
           (btnRetryEl as any).dataset = { bound: '1' };
           btnRetryEl.addEventListener('click', function(){
-            try{ if(logBox) logBox.textContent=''; }catch{}
+            try{ if(logBox) (logBox as any).textContent=''; }catch{}
             try{ window.__BOOT_DONE__ = false; window.__BOOT_BUSY__ = false; }catch{}
             try{ setMsg('Reintentando…'); }catch{}
             try{ bootLocalAI(); }catch{}
@@ -253,12 +257,10 @@ export default function RootLayout({
         if(btnCopyEl && !(btnCopyEl as any).dataset?.bound){
           (btnCopyEl as any).dataset = { bound: '1' };
           btnCopyEl.addEventListener('click', function(){
-            try{ navigator.clipboard?.writeText((document.getElementById('__splash_log') as any)?.textContent||''); }catch{}
+            try{ navigator.clipboard?.writeText(((document.getElementById('__splash_log')||{}) as any).textContent||''); }catch{}
           });
         }
-        return wrap as any;
       }catch{}
-      return null;
     })();
     function log(line){
       try{
