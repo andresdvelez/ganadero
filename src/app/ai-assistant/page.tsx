@@ -5046,6 +5046,27 @@ export default function AIAssistantPage() {
                               requestRef.current?.abort();
                             } catch {}
                             setIsLoading(false);
+                            try {
+                              const online =
+                                typeof navigator === "undefined"
+                                  ? true
+                                  : navigator.onLine;
+                              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                              const _ = aiClient; // asegurar acceso a host/model actuales
+                              setMessages((prev) => [
+                                ...prev,
+                                {
+                                  id: `log-cancel-${Date.now()}`,
+                                  role: "assistant",
+                                  content: `[DEBUG_AI] cancelado por el usuario · online=${String(
+                                    online
+                                  )} · host=${getAIClient().ollamaHost}`,
+                                  timestamp: new Date(),
+                                  module: "debug",
+                                  action: "cancel",
+                                } as any,
+                              ]);
+                            } catch {}
                           }}
                         >
                           Cancelar
