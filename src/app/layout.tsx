@@ -198,15 +198,24 @@ export default function RootLayout({
       setMsg('No fue posible preparar la IA local. Reintenta o copia el log.');
       // Mantener el splash visible; los botones de reintento/copiar log ya están disponibles
     }
-    // Área de logs simple en el splash
+    // Área de logs simple en el splash (reutilizable entre reintentos)
     var logBox = (function(){
       try{
         var layer = document.getElementById('__splash_layer');
-        var pre = document.createElement('pre');
-        pre.id='__splash_log';
-        pre.style.cssText='margin:8px 0 0 0;max-height:22vh;overflow:auto;font-size:11px;line-height:1.2;background:rgba(0,0,0,0.25);padding:8px;border-radius:8px;white-space:pre-wrap;width:100%;max-width:720px;';
-        layer?.appendChild(pre);
-        return pre;
+        var pre = document.getElementById('__splash_log');
+        if(!pre){
+          // Título compacto
+          var title = document.createElement('div');
+          title.id='__splash_log_title';
+          title.textContent='Registros del arranque';
+          title.style.cssText='margin-top:10px;width:100%;max-width:720px;font-size:12px;color:rgba(255,255,255,0.85);font-weight:600;';
+          layer?.appendChild(title);
+          pre = document.createElement('pre');
+          pre.id='__splash_log';
+          pre.style.cssText='margin:6px 0 0 0;max-height:22vh;overflow:auto;font-size:11px;line-height:1.2;background:rgba(0,0,0,0.25);padding:8px;border-radius:8px;white-space:pre-wrap;width:100%;max-width:720px;';
+          layer?.appendChild(pre);
+        }
+        return pre as any;
       }catch{}
       return null;
     })();
@@ -214,27 +223,40 @@ export default function RootLayout({
     var actions = (function(){
       try{
         var layer = document.getElementById('__splash_layer');
-        var wrap = document.createElement('div');
-        wrap.id='__splash_actions';
-        wrap.style.cssText='margin-top:10px;display:flex;gap:8px;width:100%;max-width:720px;justify-content:flex-start;';
-        var btnRetry = document.createElement('button');
-        btnRetry.textContent='Reintentar';
-        btnRetry.style.cssText='padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.35);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;backdrop-filter:blur(3px)';
-        var btnCopy = document.createElement('button');
-        btnCopy.textContent='Copiar log';
-        btnCopy.style.cssText='padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.35);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;backdrop-filter:blur(3px)';
-        wrap.appendChild(btnRetry); wrap.appendChild(btnCopy);
-        layer?.appendChild(wrap);
-        btnRetry.addEventListener('click', function(){
-          try{ if(logBox) logBox.textContent=''; }catch{}
-          try{ window.__BOOT_DONE__ = false; window.__BOOT_BUSY__ = false; }catch{}
-          try{ setMsg('Reintentando…'); }catch{}
-          try{ bootLocalAI(); }catch{}
-        });
-        btnCopy.addEventListener('click', function(){
-          try{ navigator.clipboard?.writeText(logBox?.textContent||''); }catch{}
-        });
-        return wrap;
+        var wrap = document.getElementById('__splash_actions');
+        if(!wrap){
+          wrap = document.createElement('div');
+          wrap.id='__splash_actions';
+          wrap.style.cssText='margin-top:10px;display:flex;gap:8px;width:100%;max-width:720px;justify-content:flex-start;';
+          var btnRetry = document.createElement('button');
+          btnRetry.id='__splash_btn_retry';
+          btnRetry.textContent='Reintentar';
+          btnRetry.style.cssText='padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.35);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;backdrop-filter:blur(3px)';
+          var btnCopy = document.createElement('button');
+          btnCopy.id='__splash_btn_copy';
+          btnCopy.textContent='Copiar log';
+          btnCopy.style.cssText='padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.35);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;backdrop-filter:blur(3px)';
+          wrap.appendChild(btnRetry); wrap.appendChild(btnCopy);
+          layer?.appendChild(wrap);
+        }
+        var btnRetryEl = document.getElementById('__splash_btn_retry');
+        var btnCopyEl = document.getElementById('__splash_btn_copy');
+        if(btnRetryEl && !(btnRetryEl as any).dataset?.bound){
+          (btnRetryEl as any).dataset = { bound: '1' };
+          btnRetryEl.addEventListener('click', function(){
+            try{ if(logBox) logBox.textContent=''; }catch{}
+            try{ window.__BOOT_DONE__ = false; window.__BOOT_BUSY__ = false; }catch{}
+            try{ setMsg('Reintentando…'); }catch{}
+            try{ bootLocalAI(); }catch{}
+          });
+        }
+        if(btnCopyEl && !(btnCopyEl as any).dataset?.bound){
+          (btnCopyEl as any).dataset = { bound: '1' };
+          btnCopyEl.addEventListener('click', function(){
+            try{ navigator.clipboard?.writeText((document.getElementById('__splash_log') as any)?.textContent||''); }catch{}
+          });
+        }
+        return wrap as any;
       }catch{}
       return null;
     })();
