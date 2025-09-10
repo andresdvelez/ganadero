@@ -2708,6 +2708,29 @@ export default function AIAssistantPage() {
           }, 90_000);
         } catch {}
 
+        // Flag de depuración para mostrar logs en el chat (localStorage.DEBUG_AI === '1')
+        const DEBUG_AI = (() => {
+          try {
+            return (window.localStorage.getItem("DEBUG_AI") || "0") === "1";
+          } catch {
+            return true;
+          }
+        })();
+        const logLine = (line: string) => {
+          if (!DEBUG_AI) return;
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              role: "assistant",
+              content: `[DEBUG_AI] ${line}`,
+              timestamp: new Date(),
+              module: "debug",
+              action: "log",
+            } as any,
+          ]);
+        };
+
         response = await aiClient.processQuery(textToSend, {
           currentModule: "chat",
           recentMessages: messages.slice(-5),
@@ -2717,6 +2740,7 @@ export default function AIAssistantPage() {
             webSearch &&
             (typeof navigator === "undefined" || navigator.onLine !== false),
           signal: requestController.signal,
+          onLog: logLine,
           onPartial: (txt: string) => {
             // Actualización de estado entendible para vaquero
             if (txt.length < 1) return;

@@ -193,6 +193,13 @@ export class AIClient {
     const userPrompt = this.buildUserPrompt(query, context);
 
     try {
+      const emitLog = (line: string) => {
+        try {
+          if (typeof (context as any)?.onLog === "function") {
+            (context as any).onLog(line);
+          }
+        } catch {}
+      };
       console.log(
         "[AI] online=",
         this.hasInternet(),
@@ -201,6 +208,11 @@ export class AIClient {
         "model=",
         this.model
       );
+      emitLog(
+        `[LOCAL] start online=${this.hasInternet()} host=${
+          this._ollamaHost
+        } model=${this.model}`
+      );
       const sendChat = async (host: string, abortFirstByteMs: number) => {
         const controller = new AbortController();
         const externalSignal: AbortSignal | undefined = (context as any)
@@ -208,12 +220,14 @@ export class AIClient {
         let onExternalAbort: (() => void) | null = null;
         if (externalSignal) {
           if (externalSignal.aborted) {
+            emitLog(`[LOCAL] aborted_by_user (pre-send)`);
             throw new Error("ABORTED_BY_USER");
           }
           onExternalAbort = () => {
             try {
               controller.abort();
             } catch {}
+            emitLog(`[LOCAL] aborted_by_user (runtime)`);
           };
           try {
             externalSignal.addEventListener("abort", onExternalAbort, {
@@ -222,6 +236,12 @@ export class AIClient {
           } catch {}
         }
         const globalTimeout = setTimeout(() => controller.abort(), 1000 * 300);
+        emitLog(
+          `[LOCAL] chat:POST ${host.replace(
+            /\/$/,
+            ""
+          )}/api/chat firstByte=${abortFirstByteMs}ms`
+        );
         const response = await fetch(`${host.replace(/\/$/, "")}/api/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -248,6 +268,9 @@ export class AIClient {
                 onExternalAbort as any
               );
           } catch {}
+          emitLog(
+            `[LOCAL] error: respuesta sin cuerpo status=${response.status}`
+          );
           throw new Error("Error de Ollama local (sin cuerpo)");
         }
         const reader = response.body.getReader();
@@ -256,12 +279,16 @@ export class AIClient {
         let firstChunk = false;
         let abortedForWarmup = false;
         let buffer = "";
+        emitLog(`[LOCAL] waiting first byte (${abortFirstByteMs}ms)`);
         const firstChunkTimer = setTimeout(() => {
           if (!firstChunk) {
             abortedForWarmup = true;
             try {
               controller.abort();
             } catch {}
+            emitLog(
+              `[LOCAL] warmup_required: no first byte in ${abortFirstByteMs}ms`
+            );
           }
         }, abortFirstByteMs);
 
@@ -280,6 +307,7 @@ export class AIClient {
                 );
             } catch {}
             if (abortedForWarmup) throw new Error("WARMUP_REQUIRED");
+            emitLog(`[LOCAL] read_error ${(e as any)?.message || e}`);
             throw e;
           }
           const { value, done } = read;
@@ -294,7 +322,10 @@ export class AIClient {
             if (!line) continue;
             try {
               const obj = JSON.parse(line);
-              if (!firstChunk) firstChunk = true;
+              if (!firstChunk) {
+                firstChunk = true;
+                emitLog(`[LOCAL] first_chunk`);
+              }
               if (obj?.done === true) {
                 clearTimeout(firstChunkTimer);
                 clearTimeout(globalTimeout);
@@ -305,6 +336,7 @@ export class AIClient {
                       onExternalAbort as any
                     );
                 } catch {}
+                emitLog(`[LOCAL] done len=${accumulated.length}`);
                 return this.parseAIResponse(accumulated.trim());
               }
               const part = obj?.message?.content ?? obj?.content ?? "";
@@ -314,6 +346,10 @@ export class AIClient {
                   (context as any).onPartial(accumulated);
                 }
               } catch {}
+              if (part)
+                emitLog(
+                  `[LOCAL] chunk +${part.length} total=${accumulated.length}`
+                );
             } catch {
               // Si una línea no es JSON válido, la ignoramos pero mantenemos el buffer
             }
@@ -327,6 +363,7 @@ export class AIClient {
                 (context as any).onPartial("");
               }
             } catch {}
+            emitLog(`[LOCAL] first_bytes buffered=${buffer.length}`);
           }
         }
         clearTimeout(firstChunkTimer);
@@ -335,6 +372,7 @@ export class AIClient {
           if (externalSignal && onExternalAbort)
             externalSignal.removeEventListener("abort", onExternalAbort as any);
         } catch {}
+        emitLog(`[LOCAL] end_of_stream len=${accumulated.length}`);
         return this.parseAIResponse(accumulated.trim());
       };
 
@@ -342,6 +380,9 @@ export class AIClient {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 1000 * 120);
         try {
+          emitLog(
+            `[LOCAL] warmup:POST ${host.replace(/\/$/, "")}/api/generate`
+          );
           const r = await fetch(`${host.replace(/\/$/, "")}/api/generate`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -357,8 +398,10 @@ export class AIClient {
           });
           clearTimeout(timeout);
           if (!r.ok) throw new Error("warmup failed");
+          emitLog(`[LOCAL] warmup:ok`);
         } catch (e) {
           clearTimeout(timeout);
+          emitLog(`[LOCAL] warmup:fail ${(e as any)?.message || e}`);
         }
       };
 
@@ -375,12 +418,14 @@ export class AIClient {
           const port = Number(process.env.NEXT_PUBLIC_LLAMA_PORT || 11434);
           const direct = `http://127.0.0.1:${port}`;
           if (this._ollamaHost !== direct) {
+            emitLog(`[LOCAL] fallback:direct ${direct}`);
             await warmup(direct);
             const res = await sendChat(direct, 30_000);
             this.setHost(direct);
             return res;
           }
         } catch {}
+        emitLog(`[LOCAL] error ${(e as any)?.message || e}`);
         throw e;
       }
     } catch (error) {
@@ -391,6 +436,13 @@ export class AIClient {
         this.model
       );
       console.error("Error en consulta local:", error);
+      try {
+        if (typeof (context as any)?.onLog === "function") {
+          (context as any).onLog(
+            `[LOCAL] fatal ${(error as any)?.message || error}`
+          );
+        }
+      } catch {}
       throw error;
     }
   }
