@@ -123,7 +123,7 @@ export default function RootLayout({
       // Para rutas no públicas, dejamos que AuthGate maneje la navegación tras el boot
     }
   }catch{}
-  // Ocultar splash al finalizar carga o tras un pequeño delay de seguridad
+  // Ocultar splash
   function hideSplash(){
     try{
       var el = document.getElementById('__splash');
@@ -134,10 +134,15 @@ export default function RootLayout({
       setTimeout(function(){ try{ el.style.display='none'; el.setAttribute('aria-hidden','true'); }catch{} }, 280);
     }catch{}
   }
-  // Fallback para asegurar que el splash no quede visible si no se dispara 'load'
-  try{ setTimeout(hideSplash, 1800); }catch{}
-  if(document.readyState==='complete') { hideSplash(); }
-  else { window.addEventListener('load', hideSplash); }
+  // En Tauri NO ocultar por fallback: solo cuando el boot local termine
+  try{
+    if(!window.__TAURI__){
+      // En web, sí permitimos fallback por UX
+      try{ setTimeout(hideSplash, 1800); }catch{}
+      if(document.readyState==='complete') { hideSplash(); }
+      else { window.addEventListener('load', hideSplash); }
+    }
+  }catch{}
 
   function clearAndReload(){
     try{ if (sessionStorage.getItem('NEXT_RECOVERED_ONCE') === '1') { return; } }catch{}
@@ -177,35 +182,97 @@ export default function RootLayout({
   // En Tauri, desregistrar SW al inicio para evitar Workbox 404
   try{ if(window.__TAURI__){ navigator.serviceWorker?.getRegistrations().then(rs=>Promise.all(rs.map(r=>r.unregister()))); } }catch{}
 
-  // Boot secuencial de IA local durante splash (solo Tauri)
+  // Boot secuencial de IA local durante splash (solo Tauri, bloqueante)
   async function bootLocalAI(){
     if(!window.__TAURI__) return;
     var msgEl = document.getElementById('__splash_msg');
     function setMsg(t){ try{ if(msgEl) msgEl.textContent=t; }catch{} }
+    // Área de logs simple en el splash
+    var logBox = (function(){
+      try{
+        var layer = document.getElementById('__splash_layer');
+        var pre = document.createElement('pre');
+        pre.id='__splash_log';
+        pre.style.cssText='margin:8px 0 0 0;max-height:22vh;overflow:auto;font-size:11px;line-height:1.2;background:rgba(0,0,0,0.25);padding:8px;border-radius:8px;white-space:pre-wrap;width:100%;max-width:720px;';
+        layer?.appendChild(pre);
+        return pre;
+      }catch{}
+      return null;
+    })();
+    function log(line){
+      try{
+        if(!logBox) return;
+        var text = (logBox.textContent||'');
+        var lines = (text+"\n"+line).split('\n');
+        if(lines.length>120) lines = lines.slice(lines.length-120);
+        logBox.textContent = lines.join('\n');
+        logBox.scrollTop = logBox.scrollHeight;
+      }catch{}
+    }
     try{
       setMsg('Iniciando servidor de IA local…');
       await window.__TAURI__.invoke('start_ollama_server', { port: Number(window.process?.env?.NEXT_PUBLIC_LLAMA_PORT||11434) });
+      log('[BOOT] sidecar/ollama server start solicitado');
     }catch(e){ setMsg('Intentando abrir Ollama…'); }
     try{
       setMsg('Verificando/creando modelo DeepSeek…');
       // Modelo más ligero por defecto para respuesta inicial más rápida
       await window.__TAURI__.invoke('ensure_ollama_model_available', { tag: 'deepseek-r1:7b', modelPath: null });
-      setMsg('Modelo local listo.');
+      setMsg('Modelo verificado.');
+      log('[BOOT] modelo deepseek-r1:7b verificado');
     }catch(e){
-      // No bloquear el acceso por fallo de preparación: seguimos y dejamos que el cliente maneje reintentos
-      try{ console.warn('[BOOT] ensure_ollama_model_available failed', e); }catch{}
-      setMsg('Iniciando sin precarga del modelo…');
+      // Registrar error y mantener splash (bloqueante)
+      log('[BOOT][error] ensure_ollama_model_available: '+(e&&e.message?e.message:String(e)));
+      setMsg('No fue posible preparar el modelo local aún.');
+      return; // no marcar BOOT_DONE
     }
-    // Precalentar con consulta mínima
+    // Precalentar con consulta mínima con estrategia de host: proxy 4317 → directo 11434
+    async function warm(host){
+      const controller = new AbortController();
+      const to = setTimeout(()=>controller.abort(), 15000);
+      try{
+        log('[BOOT] warmup host='+host);
+        const res = await fetch(host+'/api/chat', { method:'POST', signal: controller.signal, headers:{'Content-Type':'application/json'}, body: JSON.stringify({ model: 'deepseek-r1:7b', messages:[{role:'user', content:'ok'}], stream:false, options:{ num_predict: 16 } }) });
+        clearTimeout(to);
+        if(!res.ok){ throw new Error('status '+res.status); }
+        const j = await res.json().catch(()=>({}));
+        log('[BOOT] warmup ok ('+(j?.created_at||'no ts')+')');
+        return true;
+      }catch(err){
+        clearTimeout(to);
+        log('[BOOT][error] warmup fail '+String(err));
+        return false;
+      }
+    }
+    // Probar primero sidecar proxy, luego puerto directo
+    var sidecar = 'http://127.0.0.1:4317/api/ollama';
+    var direct = 'http://127.0.0.1:'+Number(window.process?.env?.NEXT_PUBLIC_LLAMA_PORT||11434);
+    var ok = false;
+    // pequeño ping a /api/tags para elegir host rápidamente
+    async function ping(base){
+      const c = new AbortController();
+      const t = setTimeout(()=>c.abort(), 4000);
+      try{
+        const r = await fetch(base+'/api/tags', { signal: c.signal });
+        clearTimeout(t);
+        return r.ok;
+      }catch(e){ clearTimeout(t); return false; }
+    }
     try{
-      await fetch('http://127.0.0.1:'+Number(window.process?.env?.NEXT_PUBLIC_LLAMA_PORT||11434)+'/api/chat', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ model: 'deepseek-r1:7b', messages:[{role:'user', content:'ok'}], stream:false, options:{ num_predict: 16 } })
-      });
-    }catch{}
-    // Pequeña espera para dar feedback y luego ocultar splash
+      setMsg('Calentando modelo local…');
+      let base = sidecar;
+      const sidecarOk = await ping(sidecar);
+      if(!sidecarOk){ log('[BOOT] sidecar no responde, probando puerto directo'); base = direct; }
+      // Guardar host elegido para el cliente
+      try{ localStorage.setItem('OLLAMA_HOST', base); }catch{}
+      ok = await warm(base);
+      if(!ok && base!==direct){ ok = await warm(direct); if(ok){ try{ localStorage.setItem('OLLAMA_HOST', direct); }catch{} } }
+    }catch(err){ log('[BOOT][error] '+String(err)); }
+    if(!ok){ setMsg('No fue posible preparar el modelo local aún.'); return; }
+    // Listo: marcar flag y ocultar splash
     try{ window.__BOOT_DONE__ = true; }catch{}
-    setTimeout(hideSplash, 400);
+    setMsg('Modelo local listo.');
+    setTimeout(hideSplash, 200);
   }
 
   try{ bootLocalAI(); }catch{}
