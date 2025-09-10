@@ -2696,6 +2696,7 @@ export default function AIAssistantPage() {
         } catch {}
         const stage = (t: string) => {
           stageText = t;
+          pushLog(`[UI] stage: ${t}`);
           setMessages((prev) => [
             ...prev,
             {
@@ -2727,8 +2728,8 @@ export default function AIAssistantPage() {
           }
         })();
         const logLine = (line: string) => {
-          if (!DEBUG_AI) return;
           pushLog(line);
+          if (!DEBUG_AI) return;
           setMessages((prev) => [
             ...prev,
             {
@@ -2741,6 +2742,30 @@ export default function AIAssistantPage() {
             } as any,
           ]);
         };
+
+        // Pre-flight: registrar estado inicial
+        try {
+          const online =
+            typeof navigator === "undefined" ? true : navigator.onLine;
+          const host = aiClient.ollamaHost;
+          const lm = (() => {
+            try {
+              return window.localStorage.getItem("OLLAMA_MODEL") || "";
+            } catch {
+              return "";
+            }
+          })();
+          const lh = (() => {
+            try {
+              return window.localStorage.getItem("OLLAMA_HOST") || "";
+            } catch {
+              return "";
+            }
+          })();
+          logLine(
+            `[UI] preflight online=${online} host=${host} ls.OLLAMA_HOST=${lh} ls.OLLAMA_MODEL=${lm}`
+          );
+        } catch {}
 
         response = await aiClient.processQuery(textToSend, {
           currentModule: "chat",

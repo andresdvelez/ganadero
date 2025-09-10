@@ -268,9 +268,18 @@ export class AIClient {
                 onExternalAbort as any
               );
           } catch {}
-          emitLog(
-            `[LOCAL] error: respuesta sin cuerpo status=${response.status}`
-          );
+          try {
+            const bodyPreview = await response.text();
+            emitLog(
+              `[LOCAL] error: no body status=${
+                response.status
+              } body=${bodyPreview.slice(0, 400)}`
+            );
+          } catch {
+            emitLog(
+              `[LOCAL] error: respuesta sin cuerpo status=${response.status}`
+            );
+          }
           throw new Error("Error de Ollama local (sin cuerpo)");
         }
         const reader = response.body.getReader();
@@ -406,9 +415,9 @@ export class AIClient {
         }
       };
 
-      // 1) Intentar con host actual; si no llega primer byte en 10s, calentar y reintentar
+      // 1) Intentar con host actual; si no llega primer byte en 8s, calentar y reintentar con 30s
       try {
-        return await sendChat(this._ollamaHost, 10_000);
+        return await sendChat(this._ollamaHost, 8_000);
       } catch (e: any) {
         if (e?.message === "WARMUP_REQUIRED") {
           await warmup(this._ollamaHost);
