@@ -22,18 +22,15 @@ export function Providers({ children }: { children: ReactNode }) {
           setBootReady(true);
           return;
         }
-        let waited = 0;
         const step = 150;
-        const maxMs = 6500;
         iv = setInterval(() => {
           try {
             // window.__BOOT_DONE__ lo setea el layout cuando termina preparación local
-            if ((window as any).__BOOT_DONE__ === true || waited >= maxMs) {
+            if ((window as any).__BOOT_DONE__ === true) {
               clearInterval(iv);
               setBootReady(true);
             }
           } catch {}
-          waited += step;
         }, step);
       } catch {
         setBootReady(true);

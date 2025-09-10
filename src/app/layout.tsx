@@ -191,12 +191,12 @@ export default function RootLayout({
     var msgEl = document.getElementById('__splash_msg');
     function setMsg(t){ try{ if(msgEl) msgEl.textContent=t; }catch{} }
     function degradeAndProceed(reason){
-      try{ console.warn('[BOOT][degraded]', reason); }catch{}
+      // No avanzar a la app si la IA no está lista: bloquear hasta intervención o éxito
+      try{ console.warn('[BOOT][blocked_until_ready]', reason); }catch{}
       try{ window.__BOOT_DEGRADED__ = true; }catch{}
-      try{ window.__BOOT_DONE__ = true; }catch{}
       try{ window.__BOOT_BUSY__ = false; }catch{}
-      setMsg('Continuando sin IA local (modo limitado)…');
-      try{ setTimeout(hideSplash, 400); }catch{}
+      setMsg('No fue posible preparar la IA local. Reintenta o copia el log.');
+      // Mantener el splash visible; los botones de reintento/copiar log ya están disponibles
     }
     // Área de logs simple en el splash
     var logBox = (function(){
@@ -248,26 +248,35 @@ export default function RootLayout({
         logBox.scrollTop = logBox.scrollHeight;
       }catch{}
     }
-    // Watchdog de 60s para mostrar acciones si se tarda demasiado
+    // Watchdog de 60s para degradar si se tarda demasiado
     var start = Date.now();
     var watchdog = setInterval(function(){
       try{
         if(Date.now()-start > 60000){
           clearInterval(watchdog);
           setMsg('Esto está tardando más de lo esperado…');
-          log('[BOOT][watchdog] >60s sin completar; muestra acciones');
+          log('[BOOT][watchdog] >60s sin completar; degradando y continuando');
+          degradeAndProceed('watchdog_timeout');
         }
       }catch{}
     }, 1000);
+    // Helper para evitar esperas infinitas en invocaciones Tauri
+    async function withTimeout(p, ms, label){
+      var to;
+      return Promise.race([
+        p,
+        new Promise(function(_, reject){ to = setTimeout(function(){ reject(new Error('timeout:'+label)); }, ms); })
+      ]).finally(function(){ try{ clearTimeout(to); }catch{} });
+    }
     try{
       setMsg('Iniciando servidor de IA local…');
-      await window.__TAURI__.invoke('start_ollama_server', { port: Number(window.process?.env?.NEXT_PUBLIC_LLAMA_PORT||11434) });
+      await withTimeout(window.__TAURI__.invoke('start_ollama_server', { port: Number(window.process?.env?.NEXT_PUBLIC_LLAMA_PORT||11434) }), 12000, 'start_ollama_server');
       log('[BOOT] sidecar/ollama server start solicitado');
     }catch(e){ setMsg('Intentando abrir Ollama…'); }
     try{
       setMsg('Verificando/creando modelo DeepSeek…');
       // Modelo más ligero por defecto para respuesta inicial más rápida
-      await window.__TAURI__.invoke('ensure_ollama_model_available', { tag: 'deepseek-r1:7b', modelPath: null });
+      await withTimeout(window.__TAURI__.invoke('ensure_ollama_model_available', { tag: 'deepseek-r1:7b', modelPath: null }), 25000, 'ensure_model');
       setMsg('Modelo verificado.');
       log('[BOOT] modelo deepseek-r1:7b verificado');
     }catch(e){
