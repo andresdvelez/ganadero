@@ -53,8 +53,9 @@ export default function RootLayout({
               position: "absolute",
               inset: 0,
               display: "flex",
-              alignItems: "flex-end",
-              justifyContent: "center",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "flex-end",
               padding: "18px",
               background:
                 "linear-gradient(to top, rgba(0,0,0,0.55), rgba(0,0,0,0.0))",
@@ -185,6 +186,8 @@ export default function RootLayout({
   // Boot secuencial de IA local durante splash (solo Tauri, bloqueante)
   async function bootLocalAI(){
     if(!window.__TAURI__) return;
+    if(window.__BOOT_BUSY__===true) return; // evitar paralelos
+    try{ window.__BOOT_BUSY__ = true; }catch{}
     var msgEl = document.getElementById('__splash_msg');
     function setMsg(t){ try{ if(msgEl) msgEl.textContent=t; }catch{} }
     // Área de logs simple en el splash
@@ -199,6 +202,34 @@ export default function RootLayout({
       }catch{}
       return null;
     })();
+    // Barra de acciones (reintentar/copiar log)
+    var actions = (function(){
+      try{
+        var layer = document.getElementById('__splash_layer');
+        var wrap = document.createElement('div');
+        wrap.id='__splash_actions';
+        wrap.style.cssText='margin-top:10px;display:flex;gap:8px;width:100%;max-width:720px;justify-content:flex-start;';
+        var btnRetry = document.createElement('button');
+        btnRetry.textContent='Reintentar';
+        btnRetry.style.cssText='padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.35);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;backdrop-filter:blur(3px)';
+        var btnCopy = document.createElement('button');
+        btnCopy.textContent='Copiar log';
+        btnCopy.style.cssText='padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.35);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;backdrop-filter:blur(3px)';
+        wrap.appendChild(btnRetry); wrap.appendChild(btnCopy);
+        layer?.appendChild(wrap);
+        btnRetry.addEventListener('click', function(){
+          try{ if(logBox) logBox.textContent=''; }catch{}
+          try{ window.__BOOT_DONE__ = false; window.__BOOT_BUSY__ = false; }catch{}
+          try{ setMsg('Reintentando…'); }catch{}
+          try{ bootLocalAI(); }catch{}
+        });
+        btnCopy.addEventListener('click', function(){
+          try{ navigator.clipboard?.writeText(logBox?.textContent||''); }catch{}
+        });
+        return wrap;
+      }catch{}
+      return null;
+    })();
     function log(line){
       try{
         if(!logBox) return;
@@ -209,6 +240,17 @@ export default function RootLayout({
         logBox.scrollTop = logBox.scrollHeight;
       }catch{}
     }
+    // Watchdog de 60s para mostrar acciones si se tarda demasiado
+    var start = Date.now();
+    var watchdog = setInterval(function(){
+      try{
+        if(Date.now()-start > 60000){
+          clearInterval(watchdog);
+          setMsg('Esto está tardando más de lo esperado…');
+          log('[BOOT][watchdog] >60s sin completar; muestra acciones');
+        }
+      }catch{}
+    }, 1000);
     try{
       setMsg('Iniciando servidor de IA local…');
       await window.__TAURI__.invoke('start_ollama_server', { port: Number(window.process?.env?.NEXT_PUBLIC_LLAMA_PORT||11434) });
@@ -224,6 +266,8 @@ export default function RootLayout({
       // Registrar error y mantener splash (bloqueante)
       log('[BOOT][error] ensure_ollama_model_available: '+(e&&e.message?e.message:String(e)));
       setMsg('No fue posible preparar el modelo local aún.');
+      try{ window.__BOOT_BUSY__ = false; }catch{}
+      clearInterval(watchdog);
       return; // no marcar BOOT_DONE
     }
     // Precalentar con consulta mínima con estrategia de host: proxy 4317 → directo 11434
@@ -268,14 +312,16 @@ export default function RootLayout({
       ok = await warm(base);
       if(!ok && base!==direct){ ok = await warm(direct); if(ok){ try{ localStorage.setItem('OLLAMA_HOST', direct); }catch{} } }
     }catch(err){ log('[BOOT][error] '+String(err)); }
-    if(!ok){ setMsg('No fue posible preparar el modelo local aún.'); return; }
+    if(!ok){ setMsg('No fue posible preparar el modelo local aún.'); try{ window.__BOOT_BUSY__ = false; }catch{}; clearInterval(watchdog); return; }
     // Listo: marcar flag y ocultar splash
     try{ window.__BOOT_DONE__ = true; }catch{}
+    try{ window.__BOOT_BUSY__ = false; }catch{}
+    clearInterval(watchdog);
     setMsg('Modelo local listo.');
     setTimeout(hideSplash, 200);
   }
 
-  try{ bootLocalAI(); }catch{}
+  try{ window.__BOOT_BUSY__ = false; bootLocalAI(); }catch{}
 
   // Si la app pierde conexión en caliente, iniciar IA local automáticamente
   try{
