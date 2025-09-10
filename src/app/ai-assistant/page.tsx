@@ -2187,10 +2187,17 @@ export default function AIAssistantPage() {
         return;
       }
 
-      // Intent quick path
-      const intent = await routeIntent.mutateAsync({
-        query: userMessage.content,
-      });
+      // Intent quick path (solo si online)
+      const isOnlineNow =
+        typeof navigator === "undefined" ? true : navigator.onLine;
+      if (!isOnlineNow) {
+        try {
+          pushLog("[UI] offline: skip routeIntent");
+        } catch {}
+      }
+      const intent = isOnlineNow
+        ? await routeIntent.mutateAsync({ query: userMessage.content })
+        : ({ module: "unknown", action: "none", data: {} } as any);
       if (intent?.module === "unknown" && intent?.data?.candidates?.length) {
         setPendingCandidates({
           modules: intent.data.candidates,
@@ -2655,16 +2662,22 @@ export default function AIAssistantPage() {
         return;
       }
 
-      // Build richer context from server
+      // Build richer context from server (solo si online)
       let context: any = null;
-      try {
-        context = await utils.ai.getContext.fetch({
-          sessionId: currentChatUuid!,
-          recent: 8,
-          memories: 10,
-          query: textToSend,
-        });
-      } catch {}
+      if (isOnlineNow) {
+        try {
+          context = await utils.ai.getContext.fetch({
+            sessionId: currentChatUuid!,
+            recent: 8,
+            memories: 10,
+            query: textToSend,
+          });
+        } catch {}
+      } else {
+        try {
+          pushLog("[UI] offline: skip getContext");
+        } catch {}
+      }
 
       let response: any;
       // Variables para gestionar el streaming y el borrador fuera del try/catch
