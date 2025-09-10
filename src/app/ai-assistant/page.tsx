@@ -103,7 +103,7 @@ export default function AIAssistantPage() {
   const requestRef = useRef<AbortController | null>(null);
   // Buffer circular para logs de IA (se muestra tail en cancel/error)
   const logBufferRef = useRef<string[]>([]);
-  const LOG_MAX_LINES = 200;
+  const LOG_MAX_LINES = 600;
   const pushLog = (line: string) => {
     try {
       const buf = logBufferRef.current;
@@ -828,6 +828,14 @@ export default function AIAssistantPage() {
     }
     const textToSend = (overrideText ?? input).trim();
     if (!textToSend || isLoading) return;
+
+    // Nueva sesión de logs por request
+    try {
+      logBufferRef.current = [];
+      logBufferRef.current.push(
+        `[UI] request:start ts=${Date.now()} text="${textToSend.slice(0, 120)}"`
+      );
+    } catch {}
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -2779,7 +2787,6 @@ export default function AIAssistantPage() {
           onLog: logLine,
           onPartial: (txt: string) => {
             // Actualización de estado entendible para vaquero
-            if (txt.length < 1) return;
             if (!sawFirstChunk) {
               sawFirstChunk = true;
               // Quitar "Pensando…" tan pronto como llegue el primer token
@@ -2787,6 +2794,10 @@ export default function AIAssistantPage() {
               try {
                 if (pendingTimer) clearTimeout(pendingTimer);
               } catch {}
+              if (String(txt).trim().length === 0) {
+                if (stageText !== "Arriando datos…") stage("Arriando datos…");
+                return;
+              }
               draftId = `assistant-draft-${Date.now()}`;
               setMessages((prev) => [
                 ...prev,
@@ -2829,6 +2840,12 @@ export default function AIAssistantPage() {
         try {
           console.error("Fallo consulta IA (offline/local):", e);
         } catch {}
+        // Log de cierre en error
+        try {
+          const errAny = e as any;
+          const endMsg = errAny?.message ? String(errAny.message) : String(e);
+          pushLog(`[UI] request:end status=error msg=${endMsg}`);
+        } catch {}
         const showDevError = true;
         const devDetails = (() => {
           try {
@@ -2867,7 +2884,7 @@ export default function AIAssistantPage() {
             const tail = (() => {
               try {
                 const buf = logBufferRef.current;
-                const last = buf.slice(-40).join("\n");
+                const last = buf.slice(-100).join("\n");
                 return last ? `\n[DEBUG_AI][tail]\n${last}` : "";
               } catch {
                 return "";
@@ -2942,6 +2959,9 @@ export default function AIAssistantPage() {
       } catch {}
       try {
         if (hardTimeout) clearTimeout(hardTimeout);
+      } catch {}
+      try {
+        pushLog(`[UI] request:end status=ok`);
       } catch {}
       requestRef.current = null;
 
@@ -5101,11 +5121,14 @@ export default function AIAssistantPage() {
                               const tail = (() => {
                                 try {
                                   const buf = logBufferRef.current;
-                                  return buf.slice(-40).join("\n");
+                                  return buf.slice(-100).join("\n");
                                 } catch {
                                   return "";
                                 }
                               })();
+                              try {
+                                pushLog(`[UI] request:end status=cancel`);
+                              } catch {}
                               setMessages((prev) => [
                                 ...prev,
                                 {

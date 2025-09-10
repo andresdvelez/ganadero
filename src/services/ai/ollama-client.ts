@@ -200,6 +200,9 @@ export class AIClient {
           }
         } catch {}
       };
+      emitLog(
+        `[CLIENT] request:init model=${this.model} host=${this._ollamaHost}`
+      );
       console.log(
         "[AI] online=",
         this.hasInternet(),
@@ -288,6 +291,7 @@ export class AIClient {
         let firstChunk = false;
         let abortedForWarmup = false;
         let buffer = "";
+        emitLog(`[LOCAL] stream:open`);
         emitLog(`[LOCAL] waiting first byte (${abortFirstByteMs}ms)`);
         const firstChunkTimer = setTimeout(() => {
           if (!firstChunk) {
