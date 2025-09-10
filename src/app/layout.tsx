@@ -191,7 +191,11 @@ export default function RootLayout({
       // Modelo más ligero por defecto para respuesta inicial más rápida
       await window.__TAURI__.invoke('ensure_ollama_model_available', { tag: 'deepseek-r1:7b', modelPath: null });
       setMsg('Modelo local listo.');
-    }catch(e){ setMsg('No fue posible preparar el modelo local aún.'); }
+    }catch(e){
+      // No bloquear el acceso por fallo de preparación: seguimos y dejamos que el cliente maneje reintentos
+      try{ console.warn('[BOOT] ensure_ollama_model_available failed', e); }catch{}
+      setMsg('Iniciando sin precarga del modelo…');
+    }
     // Precalentar con consulta mínima
     try{
       await fetch('http://127.0.0.1:'+Number(window.process?.env?.NEXT_PUBLIC_LLAMA_PORT||11434)+'/api/chat', {

@@ -10,7 +10,19 @@ import {
 let unlocked = false;
 let currentClerkId: string | null = null;
 
+function syncUnlockedFromSessionStorage(): void {
+  // Mantener estado entre navegaciones/hidrataciones en el cliente.
+  try {
+    if (typeof window === "undefined") return;
+    if (unlocked) return;
+    const v = window.sessionStorage.getItem("OFFLINE_UNLOCKED");
+    if (v === "1") unlocked = true;
+  } catch {}
+}
+
 export function isUnlocked(): boolean {
+  // Asegurar que reflejamos el estado persistido si existe
+  syncUnlockedFromSessionStorage();
   return unlocked;
 }
 
@@ -146,12 +158,23 @@ export async function unlock(passcode: string): Promise<void> {
   setExternalEncryptionKey(key);
   unlocked = true;
   currentClerkId = identity.clerkId;
+  // Persistir estado de desbloqueo en la sesión del navegador para sobrevivir a navegación/rehidratación
+  try {
+    if (typeof window !== "undefined") {
+      window.sessionStorage.setItem("OFFLINE_UNLOCKED", "1");
+    }
+  } catch {}
 }
 
 export function lock(): void {
   unlocked = false;
   currentClerkId = null;
   setExternalEncryptionKey(null);
+  try {
+    if (typeof window !== "undefined") {
+      window.sessionStorage.removeItem("OFFLINE_UNLOCKED");
+    }
+  } catch {}
 }
 
 // Verifica passcode y elimina el vínculo local del dispositivo actual
