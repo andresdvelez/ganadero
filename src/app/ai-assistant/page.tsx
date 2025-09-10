@@ -101,6 +101,16 @@ export default function AIAssistantPage() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const requestRef = useRef<AbortController | null>(null);
+  // Buffer circular para logs de IA (se muestra tail en cancel/error)
+  const logBufferRef = useRef<string[]>([]);
+  const LOG_MAX_LINES = 200;
+  const pushLog = (line: string) => {
+    try {
+      const buf = logBufferRef.current;
+      buf.push(line);
+      if (buf.length > LOG_MAX_LINES) buf.splice(0, buf.length - LOG_MAX_LINES);
+    } catch {}
+  };
   const [isListening, setIsListening] = useState(false);
   const [chatUuid, setChatUuid] = useState<string | null>(null);
   const [chatList, setChatList] = useState<OfflineChat[]>([]);
@@ -2708,16 +2718,17 @@ export default function AIAssistantPage() {
           }, 90_000);
         } catch {}
 
-        // Flag de depuración para mostrar logs en el chat (localStorage.DEBUG_AI === '1')
+        // Flag de depuración: por ahora SIEMPRE mostrar logs salvo que DEBUG_AI sea '0'
         const DEBUG_AI = (() => {
           try {
-            return (window.localStorage.getItem("DEBUG_AI") || "0") === "1";
+            return (window.localStorage.getItem("DEBUG_AI") || "1") === "1";
           } catch {
             return true;
           }
         })();
         const logLine = (line: string) => {
           if (!DEBUG_AI) return;
+          pushLog(line);
           setMessages((prev) => [
             ...prev,
             {
@@ -2828,11 +2839,20 @@ export default function AIAssistantPage() {
                 return "";
               }
             })();
+            const tail = (() => {
+              try {
+                const buf = logBufferRef.current;
+                const last = buf.slice(-40).join("\n");
+                return last ? `\n[DEBUG_AI][tail]\n${last}` : "";
+              } catch {
+                return "";
+              }
+            })();
             return `\n\n[DEBUG_AI] online=${online} host=${host} ls.OLLAMA_HOST=${lh} ls.OLLAMA_MODEL=${lm} name=${
               name || "-"
             } code=${code || "-"} status=${
               status || "-"
-            } msg=${msg} stack=${stackShort}`;
+            } msg=${msg} stack=${stackShort}${tail}`;
           } catch {
             return "";
           }
@@ -5053,14 +5073,24 @@ export default function AIAssistantPage() {
                                   : navigator.onLine;
                               // eslint-disable-next-line @typescript-eslint/no-unused-vars
                               const _ = aiClient; // asegurar acceso a host/model actuales
+                              const tail = (() => {
+                                try {
+                                  const buf = logBufferRef.current;
+                                  return buf.slice(-40).join("\n");
+                                } catch {
+                                  return "";
+                                }
+                              })();
                               setMessages((prev) => [
                                 ...prev,
                                 {
                                   id: `log-cancel-${Date.now()}`,
                                   role: "assistant",
-                                  content: `[DEBUG_AI] cancelado por el usuario · online=${String(
-                                    online
-                                  )} · host=${getAIClient().ollamaHost}`,
+                                  content:
+                                    `[DEBUG_AI] cancelado por el usuario · online=${String(
+                                      online
+                                    )} · host=${getAIClient().ollamaHost}` +
+                                    (tail ? `\n[DEBUG_AI][tail]\n${tail}` : ""),
                                   timestamp: new Date(),
                                   module: "debug",
                                   action: "cancel",

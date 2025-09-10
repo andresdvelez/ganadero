@@ -360,7 +360,8 @@ export class AIClient {
             firstChunk = true;
             try {
               if (typeof (context as any)?.onPartial === "function") {
-                (context as any).onPartial("");
+                // Forzar a quitar loader aunque aún no haya texto (UI lo maneja)
+                (context as any).onPartial(" ");
               }
             } catch {}
             emitLog(`[LOCAL] first_bytes buffered=${buffer.length}`);
