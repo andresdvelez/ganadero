@@ -154,29 +154,57 @@ export class AIClient {
   }
 
   async processQuery(query: string, context?: any): Promise<AIResponse> {
-    // Si estamos offline, no intentes nube primero para evitar "pensando..." indefinido
+    // Evitar quedarse colgado: en Tauri o offline, priorizamos local inmediatamente.
     const online = this.hasInternet();
+    const isBrowser = typeof window !== "undefined";
+    const isTauri = isBrowser && !!(window as any).__TAURI__;
 
-    if (online) {
-      try {
-        return await this.processCloudQuery(query, context);
-      } catch {
-        // Si falla la nube, probar local
+    // 1) En Tauri: siempre intentar local primero (proxy o puerto directo)
+    if (isTauri) {
+      const isLocalAvailable = await this.checkLocalAvailability();
+      if (isLocalAvailable) {
+        try {
+          return await this.processLocalQuery(query, context);
+        } catch {
+          // si local falla, solo entonces intentar nube si hay internet
+          if (online) {
+            try {
+              return await this.processCloudQuery(query, context);
+            } catch {}
+          }
+        }
       }
+      // si no está disponible local pero hay internet, intenta nube
+      if (online) {
+        try {
+          return await this.processCloudQuery(query, context);
+        } catch {}
+      }
+      return {
+        content:
+          "El asistente de IA no está disponible en este momento. Por favor, verifica la configuración.",
+        module: "error",
+      };
     }
+
+    // 2) En navegador: si offline → local; si online → nube con fallback a local
+    if (!online) {
+      const isLocalAvailable = await this.checkLocalAvailability();
+      if (isLocalAvailable) return this.processLocalQuery(query, context);
+      return {
+        content:
+          "El modelo local no está disponible y no hay conexión a internet.",
+        module: "error",
+      };
+    }
+
+    // 3) Online (web): intentar nube y si falla caer a local
+    try {
+      return await this.processCloudQuery(query, context);
+    } catch {}
 
     const isLocalAvailable = await this.checkLocalAvailability();
-
-    if (isLocalAvailable) {
-      return this.processLocalQuery(query, context);
-    }
-
-    // Último intento: solo probar nube si volvimos a estar online
-    if (this.hasInternet()) {
-      try {
-        return await this.processCloudQuery(query, context);
-      } catch {}
-    }
+    if (isLocalAvailable) return this.processLocalQuery(query, context);
 
     return {
       content:
