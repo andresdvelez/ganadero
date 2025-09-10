@@ -190,6 +190,14 @@ export default function RootLayout({
     try{ window.__BOOT_BUSY__ = true; }catch{}
     var msgEl = document.getElementById('__splash_msg');
     function setMsg(t){ try{ if(msgEl) msgEl.textContent=t; }catch{} }
+    function degradeAndProceed(reason){
+      try{ console.warn('[BOOT][degraded]', reason); }catch{}
+      try{ window.__BOOT_DEGRADED__ = true; }catch{}
+      try{ window.__BOOT_DONE__ = true; }catch{}
+      try{ window.__BOOT_BUSY__ = false; }catch{}
+      setMsg('Continuando sin IA local (modo limitado)…');
+      try{ setTimeout(hideSplash, 400); }catch{}
+    }
     // Área de logs simple en el splash
     var logBox = (function(){
       try{
@@ -263,12 +271,11 @@ export default function RootLayout({
       setMsg('Modelo verificado.');
       log('[BOOT] modelo deepseek-r1:7b verificado');
     }catch(e){
-      // Registrar error y mantener splash (bloqueante)
+      // Registrar error pero no bloquear: degradar y continuar
       log('[BOOT][error] ensure_ollama_model_available: '+(e&&e.message?e.message:String(e)));
-      setMsg('No fue posible preparar el modelo local aún.');
-      try{ window.__BOOT_BUSY__ = false; }catch{}
       clearInterval(watchdog);
-      return; // no marcar BOOT_DONE
+      degradeAndProceed('ensure_model_failed');
+      return;
     }
     // Precalentar con consulta mínima con estrategia de host: proxy 4317 → directo 11434
     async function warm(host){
@@ -312,7 +319,12 @@ export default function RootLayout({
       ok = await warm(base);
       if(!ok && base!==direct){ ok = await warm(direct); if(ok){ try{ localStorage.setItem('OLLAMA_HOST', direct); }catch{} } }
     }catch(err){ log('[BOOT][error] '+String(err)); }
-    if(!ok){ setMsg('No fue posible preparar el modelo local aún.'); try{ window.__BOOT_BUSY__ = false; }catch{}; clearInterval(watchdog); return; }
+    if(!ok){
+      log('[BOOT][warn] warmup falló en ambos hosts, continuando degradado');
+      clearInterval(watchdog);
+      degradeAndProceed('warmup_failed');
+      return;
+    }
     // Listo: marcar flag y ocultar splash
     try{ window.__BOOT_DONE__ = true; }catch{}
     try{ window.__BOOT_BUSY__ = false; }catch{}
