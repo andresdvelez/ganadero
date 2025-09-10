@@ -48,6 +48,38 @@
         margin-top: 8px;
         font-size: 14px;
       }
+      .logbox {
+        margin-top: 10px;
+        max-width: 520px;
+        width: min(80vw, 520px);
+        max-height: 22vh;
+        overflow: auto;
+        font-size: 11px;
+        line-height: 1.25;
+        color: #e5e7eb;
+        background: rgba(0, 0, 0, 0.25);
+        padding: 8px;
+        border-radius: 8px;
+        white-space: pre-wrap;
+        text-align: left;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      .actions {
+        margin-top: 8px;
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+      }
+      .btn {
+        padding: 8px 12px;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        background: rgba(255, 255, 255, 0.08);
+        color: #fff;
+        cursor: pointer;
+        backdrop-filter: blur(3px);
+      }
     </style>
   </head>
   <body>
@@ -56,30 +88,66 @@
         <img src="./splash-screen.jpeg" alt="Ganado AI" class="splash" />
         <div class="spinner"></div>
         <div class="muted">Cargando Ganado AI…</div>
+        <pre id="loader_log" class="logbox"></pre>
+        <div class="actions">
+          <button id="btn_retry" class="btn">Reintentar</button>
+          <button id="btn_copy" class="btn">Copiar log</button>
+        </div>
       </div>
     </div>
     <script>
       // El arranque y la redirección los maneja Rust (main.rs) cuando el servidor local está listo.
       // Aquí solo mostramos el estado de carga para evitar redirecciones prematuras.
       (function () {
-        setTimeout(() => {
-          const muted = document.querySelector(".muted");
+        const muted = document.querySelector(".muted");
+        const logEl = document.getElementById("loader_log");
+        const btnRetry = document.getElementById("btn_retry");
+        const btnCopy = document.getElementById("btn_copy");
+
+        function append(line) {
+          try {
+            const text =
+              (logEl.textContent || "") +
+              (logEl.textContent ? "\n" : "") +
+              line;
+            const parts = text.split("\n");
+            const keep = parts.slice(Math.max(0, parts.length - 120));
+            logEl.textContent = keep.join("\n");
+            logEl.scrollTop = logEl.scrollHeight;
+          } catch {}
+        }
+
+        let t1 = setTimeout(() => {
           if (muted) muted.textContent = "Verificando servidor local…";
+          append("[LOADER] verificando servidor local");
         }, 1200);
-        setTimeout(() => {
-          const muted = document.querySelector(".muted");
+        let t2 = setTimeout(() => {
           if (muted && !/http/.test(location.href)) {
             muted.textContent =
-              "Esto está tardando… intentando iniciar en modo limitado.";
+              "Esto está tardando… revisa el log o reintenta.";
+            append("[LOADER][warn] >8s sin listo");
           }
         }, 8000);
-        setTimeout(() => {
-          const muted = document.querySelector(".muted");
+        let t3 = setTimeout(() => {
           if (muted && !/http/.test(location.href)) {
-            muted.textContent =
-              "Cargando interfaz local… si no mejora, cierra y reabre.";
+            muted.textContent = "Cargando interfaz local…";
+            append("[LOADER] aún esperando servidor");
           }
         }, 20000);
+
+        btnRetry?.addEventListener("click", () => {
+          try {
+            logEl.textContent = "";
+          } catch {}
+          append("[LOADER] reintento manual");
+          // El proceso real de arranque lo maneja Rust; aquí solo informamos visualmente
+          location.reload();
+        });
+        btnCopy?.addEventListener("click", () => {
+          try {
+            navigator.clipboard?.writeText(logEl.textContent || "");
+          } catch {}
+        });
       })();
     </script>
   </body>

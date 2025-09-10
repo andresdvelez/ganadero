@@ -248,14 +248,14 @@ export default function RootLayout({
         logBox.scrollTop = logBox.scrollHeight;
       }catch{}
     }
-    // Watchdog de 60s para degradar si se tarda demasiado
+    // Watchdog de 60s: informar si se tarda demasiado (sin salir del splash)
     var start = Date.now();
     var watchdog = setInterval(function(){
       try{
         if(Date.now()-start > 60000){
           clearInterval(watchdog);
           setMsg('Esto está tardando más de lo esperado…');
-          log('[BOOT][watchdog] >60s sin completar; degradando y continuando');
+          log('[BOOT][watchdog] >60s sin completar; esperando intervención del usuario');
           degradeAndProceed('watchdog_timeout');
         }
       }catch{}
