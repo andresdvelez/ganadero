@@ -161,20 +161,23 @@ export class AIClient {
 
     // 1) En Tauri: siempre intentar local primero (proxy o puerto directo)
     if (isTauri) {
-      const isLocalAvailable = await this.checkLocalAvailability();
-      if (isLocalAvailable) {
-        try {
-          return await this.processLocalQuery(query, context);
-        } catch {
-          // si local falla, solo entonces intentar nube si hay internet
-          if (online) {
-            try {
-              return await this.processCloudQuery(query, context);
-            } catch {}
-          }
+      // Intentar inmediatamente chat local; si falla, caer a nube (si hay)
+      try {
+        return await this.processLocalQuery(query, context);
+      } catch {
+        // si local falla, intentar nube si hay internet
+        if (online) {
+          try {
+            return await this.processCloudQuery(query, context);
+          } catch {}
         }
       }
-      // si no está disponible local pero hay internet, intenta nube
+      // si local falló y no hay nube, como último recurso intentar ajustar host con tags
+      try {
+        const ok = await this.checkLocalAvailability();
+        if (ok) return await this.processLocalQuery(query, context);
+      } catch {}
+      // si no está disponible local y no hay internet, error
       if (online) {
         try {
           return await this.processCloudQuery(query, context);
@@ -189,8 +192,14 @@ export class AIClient {
 
     // 2) En navegador: si offline → local; si online → nube con fallback a local
     if (!online) {
-      const isLocalAvailable = await this.checkLocalAvailability();
-      if (isLocalAvailable) return this.processLocalQuery(query, context);
+      // Offline: intentar de una vez chat local; si falla, probar a ajustar host y reintentar
+      try {
+        return await this.processLocalQuery(query, context);
+      } catch {}
+      try {
+        const ok = await this.checkLocalAvailability();
+        if (ok) return await this.processLocalQuery(query, context);
+      } catch {}
       return {
         content:
           "El modelo local no está disponible y no hay conexión a internet.",
