@@ -164,13 +164,52 @@ export default function RootLayout({
             </div>
           </div>
         </div>
-        {/* Auto-recover de chunks desincronizados tras despliegue */}
-        <Script
-          id="splash-boot"
-          strategy="afterInteractive"
+        {/* Script mínimo: asegura logs y botones funcionales inmediatamente */}
+        <script
           dangerouslySetInnerHTML={{
             __html: `
 (function(){
+  try{
+    var pre = document.getElementById('__splash_log');
+    var btnRetry = document.getElementById('__splash_btn_retry');
+    var btnCopy = document.getElementById('__splash_btn_copy');
+    function log(line){
+      try{
+        if(!pre) return;
+        var text = (pre.textContent||'');
+        pre.textContent = (text ? text+'\n' : '') + String(line);
+        pre.scrollTop = pre.scrollHeight;
+      }catch{}
+    }
+    window.__SPLASH_LOG__ = log;
+    if(pre && !pre.textContent){ log('[BOOT] loader inicializado'); }
+    if(btnRetry && !(btnRetry.dataset && btnRetry.dataset.bound)){
+      try{ btnRetry.dataset.bound = '1'; }catch{}
+      btnRetry.addEventListener('click', function(){
+        try{ log('[BOOT] usuario presionó Reintentar'); }catch{}
+        try{ if(window.__force_boot__) { window.__force_boot__(); } else { location.reload(); } }catch{ location.reload(); }
+      });
+    }
+    if(btnCopy && !(btnCopy.dataset && btnCopy.dataset.bound)){
+      try{ btnCopy.dataset.bound = '1'; }catch{}
+      btnCopy.addEventListener('click', function(){
+        try{ navigator.clipboard?.writeText((pre && pre.textContent) || ''); }catch{}
+      });
+    }
+    setTimeout(function(){ try{ if(!window.__BOOT_INIT__){ log('[BOOT][warn] módulo de arranque aún no cargado…'); } }catch{} }, 2000);
+  }catch{}
+})();
+`,
+          }}
+        />
+        {/* Auto-recover de chunks desincronizados tras despliegue */}
+        <Script
+          id="splash-boot"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+(function(){
+  try{ window.__BOOT_INIT__ = true; }catch{}
   // Defiere cualquier redirección hasta completar boot local en Tauri.
   // En web, solo redirige si estás en pantallas de auth y no hay conexión.
   try{
@@ -460,7 +499,7 @@ export default function RootLayout({
     setTimeout(hideSplash, 200);
   }
 
-  try{ window.__BOOT_BUSY__ = false; bootLocalAI(); }catch{}
+  try{ window.__BOOT_BUSY__ = false; window.__force_boot__ = function(){ try{ window.__BOOT_BUSY__ = false; }catch{} try{ bootLocalAI(); }catch{} }; window.__force_boot__(); }catch{}
 
   // Si la app pierde conexión en caliente, iniciar IA local automáticamente
   try{
