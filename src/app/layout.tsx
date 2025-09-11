@@ -211,6 +211,31 @@ export default function RootLayout({
           window.__TAURI__.invoke('get_boot_log').then(function(lines){ try{ (lines||[]).forEach(function(l){ log(String(l)); }); }catch{} }).catch(function(){});
         }catch{}
       }
+      // Conector tardío: si __TAURI__ aún no existe, reintentar y luego enlazar
+      (function lateBind(){
+        var bound = false;
+        var attempts = 0;
+        var iv = setInterval(function(){
+          attempts++;
+          try{
+            if(bound) { return; }
+            if(window.__TAURI__ && window.__TAURI__.event && window.__TAURI__.invoke){
+              bound = true; clearInterval(iv);
+              try{ window.__TAURI__.event.listen('boot-log', function(ev){ try{ log(String(ev && ev.payload || '')); }catch{} }); }catch{}
+              try{ window.__TAURI__.invoke('get_boot_log').then(function(lines){ try{ (lines||[]).forEach(function(l){ log(String(l)); }); }catch{} }).catch(function(){}); }catch{}
+              // Pull periódico del buffer por si algún evento se pierde
+              try{
+                var pullIv = setInterval(function(){
+                  try{ window.__TAURI__.invoke('get_boot_log').then(function(lines){ try{ (lines||[]).slice(-10).forEach(function(l){ log(String(l)); }); }catch{} }).catch(function(){}); }catch{}
+                }, 1200);
+                // Autocancelar después de 2 minutos
+                setTimeout(function(){ try{ clearInterval(pullIv); }catch{} }, 120000);
+              }catch{}
+            }
+            if(attempts>200) { clearInterval(iv); }
+          }catch{}
+        }, 150);
+      })();
     }catch{}
   }catch{}
 })();

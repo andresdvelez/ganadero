@@ -864,6 +864,7 @@ dependencies = [
  "flate2",
  "futures-util",
  "hex",
+ "once_cell",
  "reqwest",
  "serde",
  "serde_json",
