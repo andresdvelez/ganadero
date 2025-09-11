@@ -201,6 +201,13 @@ export default function RootLayout({
     // Heartbeat para confirmar que el splash está vivo
     var ticks=0; setInterval(function(){ try{ if(++ticks%5===0) log('[BOOT] heartbeat '+ticks); }catch{} }, 1000);
     setTimeout(function(){ try{ if(!window.__BOOT_INIT__){ log('[BOOT][warn] módulo de arranque aún no cargado…'); } }catch{} }, 2000);
+
+    // Escuchar eventos de Tauri para imprimir logs del lado Rust
+    try{
+      if(window.__TAURI__ && window.__TAURI__.event){
+        window.__TAURI__.event.listen('boot-log', function(ev){ try{ log(String(ev && ev.payload || '')); }catch{} });
+      }
+    }catch{}
   }catch{}
 })();
 `,
@@ -451,7 +458,7 @@ export default function RootLayout({
       const to = setTimeout(()=>controller.abort(), 15000);
       try{
         log('[BOOT] warmup host='+host);
-        const res = await fetch(host+'/api/chat', { method:'POST', signal: controller.signal, headers:{'Content-Type':'application/json'}, body: JSON.stringify({ model: 'deepseek-r1:7b', messages:[{role:'user', content:'ok'}], stream:false, options:{ num_predict: 16 } }) });
+        const res = await fetch(host+'/api/chat', { method:'POST', signal: controller.signal, headers:{'Content-Type':'application/json'}, body: JSON.stringify({ model: 'deepseek-r1-qwen-1_5b:latest', messages:[{role:'user', content:'ok'}], stream:false, options:{ num_predict: 16 } }) });
         clearTimeout(to);
         if(!res.ok){ throw new Error('status '+res.status); }
         const j = await res.json().catch(()=>({}));

@@ -222,6 +222,8 @@ async fn start_ollama_server(app: tauri::AppHandle, port: u16) -> Result<(), Str
   let log_path = logs_dir.join("ollama.log");
   let mut logf = OpenOptions::new().create(true).append(true).open(&log_path).map_err(|e| e.to_string())?;
   let _ = writeln!(logf, "[tauri] start_ollama_server: inicio puerto {}", port);
+  // Enviar evento para UI de splash
+  let _ = app.emit_all("boot-log", format!("[tauri] start_ollama_server puerto {}", port));
   // Chequeo previo: si ya responde /api/tags en este puerto, no hacer nada
   let pre_client = reqwest::Client::builder()
     .timeout(Duration::from_millis(800))
@@ -231,6 +233,7 @@ async fn start_ollama_server(app: tauri::AppHandle, port: u16) -> Result<(), Str
   if let Ok(resp) = pre_client.get(&pre_url).send().await {
     if resp.status().is_success() {
       let _ = writeln!(logf, "[tauri] start_ollama_server: ya estaba listo en {}", pre_url);
+      let _ = app.emit_all("boot-log", format!("[tauri] ollama ya listo en {}", pre_url));
       return Ok(());
     }
   }
@@ -299,6 +302,7 @@ async fn start_ollama_server(app: tauri::AppHandle, port: u16) -> Result<(), Str
 
   let mut last_err: Option<String> = None;
   let _ = writeln!(logf, "[tauri] start_ollama_server: candidatos {:?}", candidates);
+  let _ = app.emit_all("boot-log", format!("[tauri] candidatos ollama: {:?}", candidates));
   // Directorio de modelos privado de la app para evitar corrupciones en ~/.ollama
   let app_models_root = data_dir.join("ollama-store");
   let _ = std::fs::create_dir_all(&app_models_root);
@@ -333,14 +337,22 @@ async fn start_ollama_server(app: tauri::AppHandle, port: u16) -> Result<(), Str
           }
           sleep(Duration::from_millis(200)).await;
         }
-        if ready { let _ = writeln!(logf, "[tauri] ollama listo en {}", url); return Ok(()); }
+        if ready {
+          let _ = writeln!(logf, "[tauri] ollama listo en {}", url);
+          let _ = app.emit_all("boot-log", format!("[tauri] ollama listo en {}", url));
+          return Ok(());
+        }
         last_err = Some("ollama serve did not become ready".into());
         // Si no estuvo listo, matar e intentar siguiente candidato
         let mut guard = OLLAMA_CHILD.lock().await;
         if let Some(child) = guard.as_mut() { let _ = child.kill(); }
         *guard = None;
       },
-      Err(e) => { let _ = writeln!(logf, "[tauri] fallo al ejecutar '{}': {}", bin, e); last_err = Some(format!("{}", e)); }
+      Err(e) => {
+        let _ = writeln!(logf, "[tauri] fallo al ejecutar '{}': {}", bin, e);
+        let _ = app.emit_all("boot-log", format!("[tauri] fallo al ejecutar '{}': {}", bin, e));
+        last_err = Some(format!("{}", e));
+      }
     }
   }
   
@@ -349,6 +361,7 @@ async fn start_ollama_server(app: tauri::AppHandle, port: u16) -> Result<(), Str
   {
     if last_err.is_none() { last_err = Some("no candidate bin worked".into()); }
     let _ = writeln!(logf, "[tauri] intentando abrir Ollama.app");
+    let _ = app.emit_all("boot-log", "[tauri] intentando abrir Ollama.app".to_string());
     let _ = Command::new("open")
       .arg("-a").arg("Ollama")
       .stdout(Stdio::null())
@@ -358,7 +371,7 @@ async fn start_ollama_server(app: tauri::AppHandle, port: u16) -> Result<(), Str
     let mut attempts = 0u32;
     while attempts < 120 {
       if let Ok(resp) = client.get(&url).send().await {
-        if resp.status().is_success() { let _ = writeln!(logf, "[tauri] Ollama.app lista"); return Ok(()); }
+        if resp.status().is_success() { let _ = writeln!(logf, "[tauri] Ollama.app lista"); let _ = app.emit_all("boot-log", "[tauri] Ollama.app lista".to_string()); return Ok(()); }
       }
       sleep(Duration::from_millis(200)).await;
       attempts += 1;
@@ -366,6 +379,7 @@ async fn start_ollama_server(app: tauri::AppHandle, port: u16) -> Result<(), Str
     last_err = Some("opened Ollama.app but server not ready".into());
   }
   let _ = writeln!(logf, "[tauri] cannot start ollama serve: {}", last_err.clone().unwrap_or_else(|| "unknown error".into()));
+  let _ = app.emit_all("boot-log", format!("[tauri] cannot start ollama serve: {}", last_err.clone().unwrap_or_else(|| "unknown error".into())));
   Err(format!("cannot start ollama serve: {}", last_err.unwrap_or_else(|| "unknown error".into())))
 }
 
@@ -400,11 +414,13 @@ async fn ensure_ollama_model_available(app: tauri::AppHandle, tag: String, model
         if let Ok(r) = client.post(&chat_url).json(&body).send().await {
           if !r.status().is_success() {
             // Respuesta 5xx indica posible modelo corrupto
+            let _ = app.emit_all("boot-log", format!("[tauri] modelo '{}' parece corrupto. Eliminando y re-creando…", tag));
             let _ = Command::new("ollama")
               .arg("rm").arg(&tag)
               .env("OLLAMA_HOST", format!("127.0.0.1:{}", port))
               .stdout(Stdio::null()).stderr(Stdio::null()).status();
           } else {
+            let _ = app.emit_all("boot-log", format!("[tauri] modelo '{}' ya disponible", tag));
             return Ok(());
           }
         }
@@ -452,6 +468,7 @@ async fn ensure_ollama_model_available(app: tauri::AppHandle, tag: String, model
   let models_env = app_models_root.to_string_lossy().into_owned();
   for bin in candidates {
     // Intento defensivo: borrar tag previo si existe para evitar referenciar blobs corruptos
+    let _ = app.emit_all("boot-log", format!("[tauri] creando tag '{}' con binario {}", tag, bin));
     let _ = Command::new(&bin)
       .arg("rm")
       .arg(&tag)
@@ -471,7 +488,7 @@ async fn ensure_ollama_model_available(app: tauri::AppHandle, tag: String, model
       .stderr(Stdio::null())
       .status();
     match status {
-      Ok(s) if s.success() => { created = true; break; }
+      Ok(s) if s.success() => { created = true; let _ = app.emit_all("boot-log", format!("[tauri] tag '{}' creado", tag)); break; }
       _ => {}
     }
   }
@@ -520,6 +537,7 @@ async fn ensure_ollama_model_available(app: tauri::AppHandle, tag: String, model
         .env("OLLAMA_HOST", format!("127.0.0.1:{}", port))
         .env("OLLAMA_MODELS", &models_env)
         .stdout(Stdio::null()).stderr(Stdio::null()).status();
+      let _ = app.emit_all("boot-log", format!("[tauri] validación de chat falló para '{}': modelo dañado", tag));
       Err("Modelo local dañado o incompleto. Conéctate para re-descargar el modelo.".into())
     }
   }
