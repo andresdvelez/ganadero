@@ -342,6 +342,8 @@ export default function RootLayout({
         logBox.scrollTop = logBox.scrollHeight;
       }catch{}
     }
+    // Primer rastro inmediato
+    log('[BOOT] iniciando secuencia de arranque local');
     // Watchdog de 60s: informar si se tarda demasiado (sin salir del splash)
     var start = Date.now();
     var watchdog = setInterval(function(){
@@ -364,11 +366,13 @@ export default function RootLayout({
     }
     try{
       setMsg('Iniciando servidor de IA local…');
+      log('[BOOT] start_ollama_server (timeout 12s)');
       await withTimeout(window.__TAURI__.invoke('start_ollama_server', { port: Number(window.process?.env?.NEXT_PUBLIC_LLAMA_PORT||11434) }), 12000, 'start_ollama_server');
       log('[BOOT] sidecar/ollama server start solicitado');
-    }catch(e){ setMsg('Intentando abrir Ollama…'); }
+    }catch(e){ setMsg('Intentando abrir Ollama…'); log('[BOOT][warn] start_ollama_server: '+String(e)); }
     try{
       setMsg('Verificando/creando modelo DeepSeek…');
+      log('[BOOT] ensure_model (timeout 25s)');
       // Modelo más ligero por defecto para respuesta inicial más rápida
       await withTimeout(window.__TAURI__.invoke('ensure_ollama_model_available', { tag: 'deepseek-r1:7b', modelPath: null }), 25000, 'ensure_model');
       setMsg('Modelo verificado.');
@@ -415,8 +419,10 @@ export default function RootLayout({
     try{
       setMsg('Calentando modelo local…');
       let base = sidecar;
+      log('[BOOT] ping sidecar…');
       const sidecarOk = await ping(sidecar);
-      if(!sidecarOk){ log('[BOOT] sidecar no responde, probando puerto directo'); base = direct; }
+      if(!sidecarOk){ log('[BOOT] sidecar no responde, probando puerto directo'); base = direct; } else { log('[BOOT] sidecar OK'); }
+      log('[BOOT] host seleccionado = '+base);
       // Guardar host elegido para el cliente
       try{ localStorage.setItem('OLLAMA_HOST', base); }catch{}
       ok = await warm(base);
