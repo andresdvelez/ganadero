@@ -165,7 +165,9 @@ export default function RootLayout({
           </div>
         </div>
         {/* Script mínimo: asegura logs y botones funcionales inmediatamente */}
-        <script
+        <Script
+          id="splash-boot-mini"
+          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `
 (function(){
@@ -196,6 +198,8 @@ export default function RootLayout({
         try{ navigator.clipboard?.writeText((pre && pre.textContent) || ''); }catch{}
       });
     }
+    // Heartbeat para confirmar que el splash está vivo
+    var ticks=0; setInterval(function(){ try{ if(++ticks%5===0) log('[BOOT] heartbeat '+ticks); }catch{} }, 1000);
     setTimeout(function(){ try{ if(!window.__BOOT_INIT__){ log('[BOOT][warn] módulo de arranque aún no cargado…'); } }catch{} }, 2000);
   }catch{}
 })();
@@ -431,9 +435,9 @@ export default function RootLayout({
       setMsg('Verificando/creando modelo DeepSeek…');
       log('[BOOT] ensure_model (timeout 25s)');
       // Modelo más ligero por defecto para respuesta inicial más rápida
-      await withTimeout(window.__TAURI__.invoke('ensure_ollama_model_available', { tag: 'deepseek-r1:7b', modelPath: null }), 25000, 'ensure_model');
+      await withTimeout(window.__TAURI__.invoke('ensure_ollama_model_available', { tag: 'deepseek-r1-qwen-1_5b:latest', modelPath: null }), 25000, 'ensure_model');
       setMsg('Modelo verificado.');
-      log('[BOOT] modelo deepseek-r1:7b verificado');
+      log('[BOOT] modelo deepseek-r1-qwen-1_5b:latest verificado');
     }catch(e){
       // Registrar error pero no bloquear: degradar y continuar
       log('[BOOT][error] ensure_ollama_model_available: '+(e&&e.message?e.message:String(e)));
