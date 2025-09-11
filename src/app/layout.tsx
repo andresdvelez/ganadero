@@ -90,6 +90,76 @@ export default function RootLayout({
                 Preparando Ganado AI…
               </div>
             </div>
+            {/* Panel de logs y acciones siempre presente en el DOM */}
+            <div
+              id="__splash_log_title"
+              style={{
+                marginTop: 10,
+                width: "100%",
+                maxWidth: 720,
+                fontSize: 12,
+                color: "rgba(255,255,255,0.85)",
+                fontWeight: 600,
+              }}
+            >
+              Registros del arranque
+            </div>
+            <pre
+              id="__splash_log"
+              style={{
+                margin: "6px 0 0 0",
+                maxHeight: "22vh",
+                overflow: "auto",
+                fontSize: 11,
+                lineHeight: 1.2,
+                background: "rgba(0,0,0,0.25)",
+                padding: 8,
+                borderRadius: 8,
+                whiteSpace: "pre-wrap",
+                width: "100%",
+                maxWidth: 720,
+              }}
+            />
+            <div
+              id="__splash_actions"
+              style={{
+                marginTop: 10,
+                display: "flex",
+                gap: 8,
+                width: "100%",
+                maxWidth: 720,
+                justifyContent: "flex-start",
+              }}
+            >
+              <button
+                id="__splash_btn_retry"
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: 10,
+                  border: "1px solid rgba(255,255,255,0.35)",
+                  background: "rgba(255,255,255,0.08)",
+                  color: "#fff",
+                  cursor: "pointer",
+                  backdropFilter: "blur(3px)",
+                }}
+              >
+                Reintentar
+              </button>
+              <button
+                id="__splash_btn_copy"
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: 10,
+                  border: "1px solid rgba(255,255,255,0.35)",
+                  background: "rgba(255,255,255,0.08)",
+                  color: "#fff",
+                  cursor: "pointer",
+                  backdropFilter: "blur(3px)",
+                }}
+              >
+                Copiar log
+              </button>
+            </div>
           </div>
         </div>
         {/* Auto-recover de chunks desincronizados tras despliegue */}
