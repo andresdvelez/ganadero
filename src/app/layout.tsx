@@ -315,19 +315,19 @@ export default function RootLayout({
       try{
         var btnRetryEl = document.getElementById('__splash_btn_retry');
         var btnCopyEl = document.getElementById('__splash_btn_copy');
-        if(btnRetryEl && !(btnRetryEl as any).dataset?.bound){
-          (btnRetryEl as any).dataset = { bound: '1' };
+        if(btnRetryEl && !(btnRetryEl.dataset && btnRetryEl.dataset.bound)){
+          try{ btnRetryEl.dataset.bound = '1'; }catch{}
           btnRetryEl.addEventListener('click', function(){
-            try{ if(logBox) (logBox as any).textContent=''; }catch{}
+            try{ if(logBox) logBox.textContent=''; }catch{}
             try{ window.__BOOT_DONE__ = false; window.__BOOT_BUSY__ = false; }catch{}
             try{ setMsg('Reintentando…'); }catch{}
             try{ bootLocalAI(); }catch{}
           });
         }
-        if(btnCopyEl && !(btnCopyEl as any).dataset?.bound){
-          (btnCopyEl as any).dataset = { bound: '1' };
+        if(btnCopyEl && !(btnCopyEl.dataset && btnCopyEl.dataset.bound)){
+          try{ btnCopyEl.dataset.bound = '1'; }catch{}
           btnCopyEl.addEventListener('click', function(){
-            try{ navigator.clipboard?.writeText(((document.getElementById('__splash_log')||{}) as any).textContent||''); }catch{}
+            try{ var lg = document.getElementById('__splash_log'); navigator.clipboard?.writeText((lg && lg.textContent) || ''); }catch{}
           });
         }
       }catch{}
