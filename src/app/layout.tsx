@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import { ClerkProvider } from "@clerk/nextjs";
 import { esES } from "@clerk/localizations";
 import { Providers } from "@/providers/heroui-provider";
@@ -164,7 +165,9 @@ export default function RootLayout({
           </div>
         </div>
         {/* Auto-recover de chunks desincronizados tras despliegue */}
-        <script
+        <Script
+          id="splash-boot"
+          strategy="afterInteractive"
           dangerouslySetInnerHTML={{
             __html: `
 (function(){
