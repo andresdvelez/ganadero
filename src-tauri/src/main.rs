@@ -5,11 +5,31 @@ use std::io::{BufWriter, Write};
 use std::process::{Child, Command, Stdio};
 use std::net::TcpStream;
 use tauri::Manager;
+use once_cell::sync::Lazy;
+use tokio::sync::RwLock;
 use tokio::time::sleep;
 use std::time::Duration;
 
 static SERVER_CHILD: tauri::async_runtime::Mutex<Option<Child>> = tauri::async_runtime::Mutex::const_new(None);
 static OLLAMA_CHILD: tauri::async_runtime::Mutex<Option<Child>> = tauri::async_runtime::Mutex::const_new(None);
+
+static BOOT_LOG: Lazy<RwLock<Vec<String>>> = Lazy::new(|| RwLock::new(Vec::new()));
+
+async fn boot_log(app: &tauri::AppHandle, line: impl Into<String>) {
+  let text = line.into();
+  {
+    let mut guard = BOOT_LOG.write().await;
+    guard.push(text.clone());
+    if guard.len() > 500 { let excess = guard.len() - 500; guard.drain(0..excess); }
+  }
+  let _ = app.emit_all("boot-log", text);
+}
+
+#[tauri::command]
+async fn get_boot_log() -> Vec<String> {
+  let guard = BOOT_LOG.read().await;
+  guard.clone()
+}
 
 fn load_env_from_file(path: &std::path::Path) -> std::collections::HashMap<String, String> {
   let mut map = std::collections::HashMap::new();
@@ -223,7 +243,7 @@ async fn start_ollama_server(app: tauri::AppHandle, port: u16) -> Result<(), Str
   let mut logf = OpenOptions::new().create(true).append(true).open(&log_path).map_err(|e| e.to_string())?;
   let _ = writeln!(logf, "[tauri] start_ollama_server: inicio puerto {}", port);
   // Enviar evento para UI de splash
-  let _ = app.emit_all("boot-log", format!("[tauri] start_ollama_server puerto {}", port));
+  boot_log(&app, format!("[tauri] start_ollama_server puerto {}", port)).await;
   // Chequeo previo: si ya responde /api/tags en este puerto, no hacer nada
   let pre_client = reqwest::Client::builder()
     .timeout(Duration::from_millis(800))
@@ -233,7 +253,7 @@ async fn start_ollama_server(app: tauri::AppHandle, port: u16) -> Result<(), Str
   if let Ok(resp) = pre_client.get(&pre_url).send().await {
     if resp.status().is_success() {
       let _ = writeln!(logf, "[tauri] start_ollama_server: ya estaba listo en {}", pre_url);
-      let _ = app.emit_all("boot-log", format!("[tauri] ollama ya listo en {}", pre_url));
+      boot_log(&app, format!("[tauri] ollama ya listo en {}", pre_url)).await;
       return Ok(());
     }
   }
@@ -302,7 +322,7 @@ async fn start_ollama_server(app: tauri::AppHandle, port: u16) -> Result<(), Str
 
   let mut last_err: Option<String> = None;
   let _ = writeln!(logf, "[tauri] start_ollama_server: candidatos {:?}", candidates);
-  let _ = app.emit_all("boot-log", format!("[tauri] candidatos ollama: {:?}", candidates));
+  boot_log(&app, format!("[tauri] candidatos ollama: {:?}", candidates)).await;
   // Directorio de modelos privado de la app para evitar corrupciones en ~/.ollama
   let app_models_root = data_dir.join("ollama-store");
   let _ = std::fs::create_dir_all(&app_models_root);
@@ -339,7 +359,7 @@ async fn start_ollama_server(app: tauri::AppHandle, port: u16) -> Result<(), Str
         }
         if ready {
           let _ = writeln!(logf, "[tauri] ollama listo en {}", url);
-          let _ = app.emit_all("boot-log", format!("[tauri] ollama listo en {}", url));
+          boot_log(&app, format!("[tauri] ollama listo en {}", url)).await;
           return Ok(());
         }
         last_err = Some("ollama serve did not become ready".into());
@@ -350,7 +370,7 @@ async fn start_ollama_server(app: tauri::AppHandle, port: u16) -> Result<(), Str
       },
       Err(e) => {
         let _ = writeln!(logf, "[tauri] fallo al ejecutar '{}': {}", bin, e);
-        let _ = app.emit_all("boot-log", format!("[tauri] fallo al ejecutar '{}': {}", bin, e));
+        boot_log(&app, format!("[tauri] fallo al ejecutar '{}': {}", bin, e)).await;
         last_err = Some(format!("{}", e));
       }
     }
@@ -361,7 +381,7 @@ async fn start_ollama_server(app: tauri::AppHandle, port: u16) -> Result<(), Str
   {
     if last_err.is_none() { last_err = Some("no candidate bin worked".into()); }
     let _ = writeln!(logf, "[tauri] intentando abrir Ollama.app");
-    let _ = app.emit_all("boot-log", "[tauri] intentando abrir Ollama.app".to_string());
+    boot_log(&app, "[tauri] intentando abrir Ollama.app".to_string()).await;
     let _ = Command::new("open")
       .arg("-a").arg("Ollama")
       .stdout(Stdio::null())
@@ -371,7 +391,7 @@ async fn start_ollama_server(app: tauri::AppHandle, port: u16) -> Result<(), Str
     let mut attempts = 0u32;
     while attempts < 120 {
       if let Ok(resp) = client.get(&url).send().await {
-        if resp.status().is_success() { let _ = writeln!(logf, "[tauri] Ollama.app lista"); let _ = app.emit_all("boot-log", "[tauri] Ollama.app lista".to_string()); return Ok(()); }
+        if resp.status().is_success() { let _ = writeln!(logf, "[tauri] Ollama.app lista"); boot_log(&app, "[tauri] Ollama.app lista".to_string()).await; return Ok(()); }
       }
       sleep(Duration::from_millis(200)).await;
       attempts += 1;
@@ -379,7 +399,7 @@ async fn start_ollama_server(app: tauri::AppHandle, port: u16) -> Result<(), Str
     last_err = Some("opened Ollama.app but server not ready".into());
   }
   let _ = writeln!(logf, "[tauri] cannot start ollama serve: {}", last_err.clone().unwrap_or_else(|| "unknown error".into()));
-  let _ = app.emit_all("boot-log", format!("[tauri] cannot start ollama serve: {}", last_err.clone().unwrap_or_else(|| "unknown error".into())));
+  boot_log(&app, format!("[tauri] cannot start ollama serve: {}", last_err.clone().unwrap_or_else(|| "unknown error".into()))).await;
   Err(format!("cannot start ollama serve: {}", last_err.unwrap_or_else(|| "unknown error".into())))
 }
 
@@ -414,13 +434,13 @@ async fn ensure_ollama_model_available(app: tauri::AppHandle, tag: String, model
         if let Ok(r) = client.post(&chat_url).json(&body).send().await {
           if !r.status().is_success() {
             // Respuesta 5xx indica posible modelo corrupto
-            let _ = app.emit_all("boot-log", format!("[tauri] modelo '{}' parece corrupto. Eliminando y re-creando…", tag));
+            boot_log(&app, format!("[tauri] modelo '{}' parece corrupto. Eliminando y re-creando…", tag)).await;
             let _ = Command::new("ollama")
               .arg("rm").arg(&tag)
               .env("OLLAMA_HOST", format!("127.0.0.1:{}", port))
               .stdout(Stdio::null()).stderr(Stdio::null()).status();
           } else {
-            let _ = app.emit_all("boot-log", format!("[tauri] modelo '{}' ya disponible", tag));
+            boot_log(&app, format!("[tauri] modelo '{}' ya disponible", tag)).await;
             return Ok(());
           }
         }
@@ -468,7 +488,7 @@ async fn ensure_ollama_model_available(app: tauri::AppHandle, tag: String, model
   let models_env = app_models_root.to_string_lossy().into_owned();
   for bin in candidates {
     // Intento defensivo: borrar tag previo si existe para evitar referenciar blobs corruptos
-    let _ = app.emit_all("boot-log", format!("[tauri] creando tag '{}' con binario {}", tag, bin));
+    boot_log(&app, format!("[tauri] creando tag '{}' con binario {}", tag, bin)).await;
     let _ = Command::new(&bin)
       .arg("rm")
       .arg(&tag)
@@ -488,7 +508,7 @@ async fn ensure_ollama_model_available(app: tauri::AppHandle, tag: String, model
       .stderr(Stdio::null())
       .status();
     match status {
-      Ok(s) if s.success() => { created = true; let _ = app.emit_all("boot-log", format!("[tauri] tag '{}' creado", tag)); break; }
+      Ok(s) if s.success() => { created = true; boot_log(&app, format!("[tauri] tag '{}' creado", tag)).await; break; }
       _ => {}
     }
   }
@@ -537,7 +557,7 @@ async fn ensure_ollama_model_available(app: tauri::AppHandle, tag: String, model
         .env("OLLAMA_HOST", format!("127.0.0.1:{}", port))
         .env("OLLAMA_MODELS", &models_env)
         .stdout(Stdio::null()).stderr(Stdio::null()).status();
-      let _ = app.emit_all("boot-log", format!("[tauri] validación de chat falló para '{}': modelo dañado", tag));
+      boot_log(&app, format!("[tauri] validación de chat falló para '{}': modelo dañado", tag)).await;
       Err("Modelo local dañado o incompleto. Conéctate para re-descargar el modelo.".into())
     }
   }
@@ -545,7 +565,7 @@ async fn ensure_ollama_model_available(app: tauri::AppHandle, tag: String, model
 
 fn main() {
   tauri::Builder::default()
-    .invoke_handler(tauri::generate_handler![download_model, models_dir, download_llama_binary, start_llama_server, stop_llama_server, find_available_model, start_ollama_server, stop_ollama_server, ensure_ollama_model_available])
+    .invoke_handler(tauri::generate_handler![download_model, models_dir, download_llama_binary, start_llama_server, stop_llama_server, find_available_model, start_ollama_server, stop_ollama_server, ensure_ollama_model_available, get_boot_log])
     .setup(|app| {
       // Autoinicio del servidor de Ollama y preparación del modelo en segundo plano (dev y prod)
       {

@@ -206,6 +206,10 @@ export default function RootLayout({
     try{
       if(window.__TAURI__ && window.__TAURI__.event){
         window.__TAURI__.event.listen('boot-log', function(ev){ try{ log(String(ev && ev.payload || '')); }catch{} });
+        // Además, hacer pull del buffer si llegamos tarde
+        try{
+          window.__TAURI__.invoke('get_boot_log').then(function(lines){ try{ (lines||[]).forEach(function(l){ log(String(l)); }); }catch{} }).catch(function(){});
+        }catch{}
       }
     }catch{}
   }catch{}
