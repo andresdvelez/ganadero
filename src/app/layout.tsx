@@ -172,19 +172,21 @@ export default function RootLayout({
             __html: `
 (function(){
   try{
-    var pre = document.getElementById('__splash_log');
+    function getPre(){ try{ return document.getElementById('__splash_log'); }catch{return null} }
     var btnRetry = document.getElementById('__splash_btn_retry');
     var btnCopy = document.getElementById('__splash_btn_copy');
     function log(line){
       try{
-        if(!pre) return;
-        var text = (pre.textContent||'');
-        pre.textContent = (text ? text+'\n' : '') + String(line);
-        pre.scrollTop = pre.scrollHeight;
+        var el = getPre();
+        if(!el) return;
+        var text = (el.textContent||'');
+        el.textContent = (text ? text+'\n' : '') + String(line);
+        el.scrollTop = el.scrollHeight;
+        try{ console.debug('[SPLASH]', String(line)); }catch{}
       }catch{}
     }
     window.__SPLASH_LOG__ = log;
-    if(pre && !pre.textContent){ log('[BOOT] loader inicializado'); }
+    try{ var preNow = getPre(); if(preNow && !preNow.textContent){ log('[BOOT] loader inicializado'); } }catch{}
     if(btnRetry && !(btnRetry.dataset && btnRetry.dataset.bound)){
       try{ btnRetry.dataset.bound = '1'; }catch{}
       btnRetry.addEventListener('click', function(){
@@ -288,7 +290,7 @@ export default function RootLayout({
       setTimeout(function(){ try{ el.style.display='none'; el.setAttribute('aria-hidden','true'); }catch{} }, 280);
     }catch{}
   }
-  // En Tauri NO ocultar por fallback: solo cuando el boot local termine
+  // En Tauri NO ocultar por fallback: solo cuando el boot local termine o tras watchdog
   try{
     if(!window.__TAURI__){
       // En web, sí permitimos fallback por UX
@@ -428,28 +430,31 @@ export default function RootLayout({
     // Primer rastro inmediato
     log('[BOOT] iniciando secuencia de arranque local');
     // Esperar a que la API de Tauri esté inyectada antes de continuar
+    // Esperar hasta 5s a que __TAURI__ se inyecte antes de rendirse
     try{
-      if(!window.__TAURI__){
-        log('[BOOT] esperando API de Tauri…');
-        try{ window.__BOOT_BUSY__ = false; }catch{}
-        setTimeout(function(){ try{ bootLocalAI(); }catch{} }, 500);
-        return;
+      var waitedMs = 0; var ok = false;
+      while(waitedMs < 5000){
+        if(window.__TAURI__ && window.__TAURI__.invoke){ ok = true; break; }
+        await new Promise(function(r){ setTimeout(r, 150); });
+        waitedMs += 150;
       }
-    }catch{
-      log('[BOOT][warn] acceso a window.__TAURI__ no disponible aún');
-      try{ window.__BOOT_BUSY__ = false; }catch{}
-      setTimeout(function(){ try{ bootLocalAI(); }catch{} }, 500);
-      return;
-    }
+      if(!ok){
+        log('[BOOT][warn] API de Tauri no disponible tras 5s');
+        try{ window.__BOOT_BUSY__ = false; }catch{}
+        // No devolvemos: continuamos y dejamos que la UI principal cargue
+      }
+    }catch{ log('[BOOT][warn] espera activa por __TAURI__ falló'); }
     // Watchdog de 60s: informar si se tarda demasiado (sin salir del splash)
     var start = Date.now();
     var watchdog = setInterval(function(){
       try{
         if(Date.now()-start > 60000){
           clearInterval(watchdog);
-          setMsg('Esto está tardando más de lo esperado…');
-          log('[BOOT][watchdog] >60s sin completar; esperando intervención del usuario');
-          degradeAndProceed('watchdog_timeout');
+          setMsg('Esto está tardando más de lo esperado… intentando continuar.');
+          log('[BOOT][watchdog] >60s; mostrando UI aunque la IA tarde más');
+          try{ window.__BOOT_DONE__ = true; }catch{}
+          try{ window.__BOOT_BUSY__ = false; }catch{}
+          setTimeout(hideSplash, 200);
         }
       }catch{}
     }, 1000);
