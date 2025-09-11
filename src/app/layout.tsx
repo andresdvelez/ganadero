@@ -108,6 +108,7 @@ export default function RootLayout({
               id="__splash_log"
               style={{
                 margin: "6px 0 0 0",
+                minHeight: "88px",
                 maxHeight: "22vh",
                 overflow: "auto",
                 fontSize: 11,
@@ -293,10 +294,10 @@ export default function RootLayout({
     }catch{return null}
   }
   try{ ensureSplashUI(); }catch{}
+  try{ var __lg=document.getElementById('__splash_log'); if(__lg && !__lg.textContent){ __lg.textContent='[BOOT] script de splash cargado'; } }catch{}
 
   // Boot secuencial de IA local durante splash (solo Tauri, bloqueante)
   async function bootLocalAI(){
-    if(!window.__TAURI__) return;
     if(window.__BOOT_BUSY__===true) return; // evitar paralelos
     try{ window.__BOOT_BUSY__ = true; }catch{}
     var msgEl = document.getElementById('__splash_msg');
@@ -344,6 +345,20 @@ export default function RootLayout({
     }
     // Primer rastro inmediato
     log('[BOOT] iniciando secuencia de arranque local');
+    // Esperar a que la API de Tauri esté inyectada antes de continuar
+    try{
+      if(!window.__TAURI__){
+        log('[BOOT] esperando API de Tauri…');
+        try{ window.__BOOT_BUSY__ = false; }catch{}
+        setTimeout(function(){ try{ bootLocalAI(); }catch{} }, 500);
+        return;
+      }
+    }catch{
+      log('[BOOT][warn] acceso a window.__TAURI__ no disponible aún');
+      try{ window.__BOOT_BUSY__ = false; }catch{}
+      setTimeout(function(){ try{ bootLocalAI(); }catch{} }, 500);
+      return;
+    }
     // Watchdog de 60s: informar si se tarda demasiado (sin salir del splash)
     var start = Date.now();
     var watchdog = setInterval(function(){
